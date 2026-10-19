@@ -225,6 +225,11 @@ class Game:
             # HORROR PROGRESSION SYSTEM
             from engine.horror_progression import HorrorManager
             self.horror_manager = HorrorManager()
+            try:
+                from dread.bridge import DreadBridge
+                self.horror_manager.attach_dread(DreadBridge(getattr(self, 'crew_roster', None)))
+            except Exception as dread_err:   # fall back to the legacy model, but say so
+                self.logger.log(f"[dread] disabled, using legacy horror model: {dread_err!r}")
             
             self.logger.log("New tactical systems initialized: Time, Fog of War, Divers, HORROR")
         except Exception as e:
@@ -378,7 +383,8 @@ class Game:
                 # Advance horror (1 hour per turn)
                 horror_results = self.horror_manager.advance_turn(
                     time_passed_hours=1.0,
-                    current_depth=depth
+                    current_depth=depth,
+                    submarine=self.submarine
                 )
                 
                 # Display horror messages
@@ -399,10 +405,17 @@ class Game:
                         # TODO: Apply to crew_roster when sanity system is integrated
                         pass
                         
+                # A dread event is waiting for the captain
+                dread = self.horror_manager.dread
+                if dread is not None and self.decision_manager and not self.decision_manager.pending_decision:
+                    decision = dread.pending_decision()
+                    if decision:
+                        self.decision_manager.pending_decision = decision
+                        self.logger.log(f"CAPTAIN! {decision.title} (Input required)")
+
             except Exception as horror_err:
-                # Don't let horror system crash the game
-                if self.turn == 1:
-                    print(f"Horror system error: {horror_err}")
+                # Don't let the horror system crash the game, but never swallow it silently
+                self.logger.log(f"[horror] error on turn {self.turn}: {horror_err!r}")
         
         # Update fog of war with current sensors
         if self.fog_of_war and self.submarine and self.time_system:
@@ -707,7 +720,9 @@ class Game:
         if self.decision_manager and not self.decision_manager.pending_decision:
             # Only trigger if not in combat
             in_combat = self.tactical_map and self.tactical_map.any_contacts() if self.tactical_map else False
-            if not in_combat and random.random() < 0.015:  # 1.5% chance per turn
+            dread_active = bool(self.horror_manager and getattr(self.horror_manager, 'dread', None))
+            # With the dread model attached, decisions come from state-driven events instead
+            if not dread_active and not in_combat and random.random() < 0.015:  # 1.5% chance per turn
                 decision = self.decision_manager.generate_random_decision()
                 if decision:
                     self.decision_manager.pending_decision = decision

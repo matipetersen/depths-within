@@ -3,7 +3,12 @@
 ## Overview
 A modern-feeling roguelike submarine simulator set in World War II, blending tactical stealth, sonar-based detection, crew management, environmental hazards, and historical accuracy. Built with Python and libtcod.
 
+> **Diseño vigente: [`DESIGN.md`](DESIGN.md).** Horror por estado (moral oculta, sonar fantasma,
+> eventos con causa mundana y sobrenatural). Simulador de balance: `python -m dread.sim`.
+> Documentos de fases anteriores: `docs/archive/`.
+
 ## Project Structure
+- `dread/`: horror state model, event engine, phantom sonar, captain's orders, headless simulator, game bridge
 - `engine/`: Game loop, state management, event system
 - `ui/`: Rendering, controls, and UI panels (main, compartment, log, lore)
 - `world/`: Regions, encounters, weather, navigation, lore integration

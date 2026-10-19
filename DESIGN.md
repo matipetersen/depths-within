@@ -200,8 +200,9 @@ tomado por alucinación, alarma falsa.
 ## 7. Actos y estructura de patrulla
 
 Patrulla de vertical slice: **72 ticks (3 días)**. Los actos se **derivan del
-estado, no del calendario** (`act = 1` mientras `dread < 0.3`, `2` hasta `0.6`,
-`3` desde ahí, con un mínimo por tiempo para evitar saltos).
+estado, no del calendario**: `act = min(según_dread, 1 + tick // 24)`, con
+`según_dread = 1` si `dread < 0.22`, `2` si `< 0.38`, `3` desde ahí. El tope por
+tiempo solo impide que el acto III aparezca el primer día; nunca lo provoca.
 
 - **Acto I — Normalidad bajo tensión.** Rutina, combate de la guerra, primer eco que solo oye un operador.
 - **Acto II — Grietas.** Desaparición, rumores, órdenes costosas, primer motín en gestación.
@@ -225,15 +226,42 @@ El simulador (`python -m dread.sim`) juega patrullas con políticas fijas
 (`mission_first`, `crew_first`, `paranoid`) sobre muchas semillas. El diseño es
 válido si:
 
-1. **Las políticas divergen:** `mission_first` > `crew_first` en progreso, y
-   `crew_first` > `mission_first` en cohesión y supervivencia de tripulación.
-   Si una estrategia domina en todo, falta un dilema.
+1. **Las políticas divergen en un trade-off real:** `mission_first` completa la
+   misión bastante más a menudo que `crew_first`, y `crew_first` deja mejor
+   cohesión, supervivencia y casco. Si una estrategia domina en todo, falta un dilema.
 2. **Ninguna política termina en el mismo final > 80 % de las semillas.**
-3. **Auditoría de ambigüedad:** ≥ 70 % de los eventos de actos I–II con
-   explicación mundana disponible.
-4. **Sin muerte súbita:** el casco nunca baja a 0 antes del tick 24 con ninguna política.
+3. **Auditoría de ambigüedad:** ≥ 70 % de los eventos de actos I–II se disparan
+   con la explicación mundana disponible (`mundane_when`).
+4. **Sin muerte súbita:** el casco nunca baja de 0.3 antes del tick 24 con ninguna política.
+5. **Sin contenido muerto:** cada evento del catálogo se dispara en alguna política.
+6. **Determinismo:** misma semilla, misma patrulla.
 
-Estos criterios son pruebas automáticas (`tests/test_dread_sim.py`).
+Todos son pruebas automáticas (`tests/test_dread_sim.py`).
+
+### Calibración actual (300 semillas, 72 ticks)
+
+| Política | Misión cumplida | Cohesión final | Supervivencia | Casco | Dread máx. |
+|---|---|---|---|---|---|
+| `mission_first` | 76 % | 0.44 | 0.88 | 0.28 | 0.73 |
+| `crew_first` | 35 % | 0.76 | 0.97 | 0.45 | 0.29 |
+| `paranoid` | 38 % (53 % pierde el barco) | 0.60 | 0.94 | 0.09 | 0.44 |
+
+Estos números son una **primera calibración**, no un objetivo. Lo que fijan los
+tests son las relaciones entre políticas, no los valores absolutos.
+
+### Problemas abiertos (conocidos)
+
+- **El juego cuidadoso casi no ve horror** (`crew_first`: dread máx. 0.29; el
+  primer evento inquietante llega hacia el tick 48). Buena gestión no debería
+  eliminar a la presencia, solo retrasarla. Candidato: un piso de `attention`
+  que crece con las horas sumergidas, o un evento inquietante garantizado por acto.
+- **`crew_first` fracasa la misión el 65 %.** El costo en tiempo del cuidado
+  (rituales, superficie, búsquedas) puede ser excesivo. Falta ver si el jugador
+  humano lo percibe como justo.
+- **`paranoid` pierde el barco la mitad de las veces** por quedarse sordo ante
+  contactos reales. Es la lección buscada, pero conviene revisar si es demasiado dura.
+- Las políticas son simples. Un jugador humano combinará órdenes de formas que
+  el simulador no cubre; hay que jugar la patrulla a mano antes de fiarse de estos números.
 
 ## 10. Qué cambia en el código existente
 

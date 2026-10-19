@@ -70,7 +70,11 @@ class HorrorMetrics:
     distance_from_known_territory: float = 0.0
     
     def calculate_horror_stage(self) -> HorrorStage:
-        """Determine current horror stage based on metrics."""
+        """LEGACY: time-driven stage. Used only when no DreadBridge is attached.
+
+        With a bridge attached the stage is derived from crew/ship state
+        (DESIGN.md 3.4); elapsed days are no longer a cause of horror.
+        """
         # Primary factor: days since start
         if self.total_days <= 3:
             return HorrorStage.DENIAL
@@ -149,6 +153,7 @@ class HorrorManager:
     
     def __init__(self):
         self.metrics = HorrorMetrics()
+        self.dread = None            # DreadBridge; see attach_dread()
         self.current_stage = HorrorStage.DENIAL
         self.reality_state = RealityStability.NORMAL
         
@@ -201,7 +206,34 @@ class HorrorManager:
             ],
         }
     
-    def advance_turn(self, time_passed_hours: float, current_depth: float) -> Dict[str, any]:
+    def attach_dread(self, bridge):
+        """Switch to the state-driven model (dread/bridge.py)."""
+        self.dread = bridge
+        self.current_stage = self._derive_stage()
+
+    def _derive_stage(self) -> HorrorStage:
+        if self.dread is not None:
+            return HorrorStage[self.dread.stage()]
+        return self.metrics.calculate_horror_stage()
+
+    def _advance_dread(self, time_passed_hours: float, current_depth: float, submarine=None) -> Dict[str, any]:
+        results = {'messages': [], 'sanity_effects': [], 'spawn_encounter': False,
+                   'encounter_type': None, 'reality_breach': False}
+        self.metrics.total_days = int(self.metrics.total_days + time_passed_hours / 24)
+        if current_depth > 50:
+            self.metrics.turns_without_surfacing += 1
+            self.metrics.days_submerged += time_passed_hours / 24
+        else:
+            self.metrics.turns_without_surfacing = 0
+        self.metrics.deepest_dive = max(self.metrics.deepest_dive, current_depth)
+        results['messages'].extend(self.dread.tick(current_depth, submarine))
+        self.metrics.average_crew_sanity = self.dread.mean_sanity()
+        old, self.current_stage = self.current_stage, self._derive_stage()
+        if self.current_stage != old:
+            results['messages'].append(self._get_stage_transition_message(self.current_stage))
+        return results
+
+    def advance_turn(self, time_passed_hours: float, current_depth: float, submarine=None) -> Dict[str, any]:
         """
         Advance horror progression. Returns events/messages.
         
@@ -217,6 +249,9 @@ class HorrorManager:
             'reality_breach': False,
         }
         
+        if self.dread is not None:
+            return self._advance_dread(time_passed_hours, current_depth, submarine)
+
         # Update metrics
         self.metrics.total_days = int(self.metrics.total_days + time_passed_hours / 24)
         
@@ -385,8 +420,11 @@ class HorrorManager:
             results['messages'].append(f"Limited shore leave. Sanity restored: +{sanity_gain:.1f}%")
         
         # Recalculate stage after port visit
+        if self.dread is not None:
+            self.dread.reach_port(at_friendly_port)
+            self.metrics.average_crew_sanity = self.dread.mean_sanity()
         old_stage = self.current_stage
-        self.current_stage = self.metrics.calculate_horror_stage()
+        self.current_stage = self._derive_stage()
         
         if old_stage != self.current_stage:
             results['messages'].append(f"Horror subsides: {old_stage.name} → {self.current_stage.name}")
