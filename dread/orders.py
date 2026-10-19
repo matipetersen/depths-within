@@ -88,7 +88,7 @@ def hold_ritual(world):
     s = world.ship
     for item in sorted(s.routines, key=s.routines.get)[:2]:
         s.routines[item] = clamp(s.routines[item] + 0.4)
-    world.time_cost += 2.0 / world.patrol_ticks
+    world.time_cost += 1.5 / world.patrol_ticks
     for c in _live(world):
         c.fear = clamp(c.fear - 0.03)
     return "The crew eats together. Someone finds a deck of cards."

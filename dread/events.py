@@ -14,6 +14,8 @@ DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", 
 
 REQUIRED_FIELDS = ("id", "acts", "text", "mundane_cause", "uncanny_cause", "mundane_when")
 GLOBAL_COOLDOWN = 3
+BEAT_GAP = 14          # ticks without the presence showing itself before one is forced
+BEAT_START = 8         # no forced beat before this tick
 CREW_STATS = ("fear", "fatigue", "guilt", "trust")
 SHIP_CLAMP = {"co2": (0.0, 0.1)}
 
@@ -69,6 +71,7 @@ class FiredEvent:
     text: str
     mundane_ok: bool
     choice: Optional[str] = None
+    beat: bool = False
 
 
 class EventEngine:
@@ -78,6 +81,7 @@ class EventEngine:
         self.events = {e["id"]: e for e in events}
         self.last_fired: Dict[str, int] = {}
         self.last_any = -99
+        self.last_beat = 0
 
     # -- selection ----------------------------------------------------------
     def select(self, world) -> Optional[dict]:
@@ -90,10 +94,16 @@ class EventEngine:
             return scheduled[0]
         if t - self.last_any < GLOBAL_COOLDOWN:
             return None
-        if world.rng.random() > 0.22 + 0.35 * world.dread():
-            return None
         cands = [e for e in self.events.values()
                  if "schedule" not in e and self._ready(e, t, act, world)]
+        # Good management delays the presence, it does not remove it (DESIGN.md 2):
+        # when it has been quiet for too long, the next event is one that shows it.
+        overdue = t >= BEAT_START and t - self.last_beat >= BEAT_GAP
+        beats = [e for e in cands if e.get("beat")]
+        if overdue and beats:
+            return world.rng.choices(beats, weights=[e.get("weight", 1.0) for e in beats], k=1)[0]
+        if world.rng.random() > 0.22 + 0.35 * world.dread():
+            return None
         if not cands:
             return None
         weights = [e.get("weight", 1.0) for e in cands]
@@ -119,7 +129,9 @@ class EventEngine:
         world.event_target = target
         mundane_ok = evaluate(ev.get("mundane_when"), world)
         text = ev["text"].format(target=target.name if target else "someone")
-        record = FiredEvent(t, ev["id"], world.act(), text, mundane_ok)
+        record = FiredEvent(t, ev["id"], world.act(), text, mundane_ok, beat=bool(ev.get("beat")))
+        if ev.get("beat"):
+            self.last_beat = t
         world.fired.append(record)
         world.log.append(f"[{t:03d}] {text}")
         apply_effects(ev.get("effects", []), world, target)

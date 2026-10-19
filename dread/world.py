@@ -9,6 +9,8 @@ from .state import Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 DEFAULT_NAMES = ("Brandt", "Keller", "Vogel", "Hahn", "Lenz", "Ostrow",
                  "Weiss", "Maier", "Fuchs", "Reiter", "Arndt", "Kopp")
 HARD_LIMIT_FACTOR = 1.1        # the patrol window closes at patrol_ticks * 1.1
+ATTENTION_FLOOR = 0.25          # attention the presence reaches on its own after ~70 h submerged
+REST_CANCEL_FATIGUE = 0.012    # per-tick fatigue for off-watch crew when rest is cancelled
 PACE = 0.95                    # ticks needed = patrol_ticks * PACE / effective readiness
 
 
@@ -144,7 +146,7 @@ class DreadWorld:
             if on_watch:
                 c.fatigue = clamp(c.fatigue + 0.015)
             elif s.rest_cancelled:
-                c.fatigue = clamp(c.fatigue + 0.01)
+                c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE)
             else:
                 quality = (0.5 if s.co2 > 0.015 else 1.0) * (0.5 if c.fear > 0.6 else 1.0)
                 c.fatigue = clamp(c.fatigue - 0.012 * quality)
@@ -174,8 +176,8 @@ class DreadWorld:
                                                 + 0.25 * (1 - mean("fatigue"))), 0.05)
         s.readiness = clamp(1.05 - 0.4 * mean("fatigue") - 0.3 * (1 - s.discipline)
                             + (0.35 if s.rest_cancelled else 0.0), 0.0, 1.4)
-        if mean("fatigue") > 0.7:      # exhausted crews cause accidents
-            s.hull = clamp(s.hull - 0.002)
+        if mean("fatigue") > 0.6:      # exhausted crews cause accidents
+            s.hull = clamp(s.hull - 0.004)
         if s.rest_cancelled:
             for c in live:
                 c.trust = clamp(c.trust - 0.004)
@@ -186,6 +188,9 @@ class DreadWorld:
         if s.surfaced:
             da -= 0.03
         s.attention = clamp(s.attention + da)
+        # The presence is patient: time under the water alone gives it a foothold,
+        # whatever the captain does. Only hours submerged count; surfacing pauses the clock.
+        s.attention = max(s.attention, ATTENTION_FLOOR * clamp((s.hours_submerged - 10) / 60))
         # alone on the night watch feeds it, but only for the unlucky
         for c in live:
             if c.isolated or (self.tick_no % 24 in (0, 1, 2, 3, 22, 23) and c.fear > 0.5):

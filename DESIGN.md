@@ -235,31 +235,49 @@ válido si:
 4. **Sin muerte súbita:** el casco nunca baja de 0.3 antes del tick 24 con ninguna política.
 5. **Sin contenido muerto:** cada evento del catálogo se dispara en alguna política.
 6. **Determinismo:** misma semilla, misma patrulla.
+7. **La presencia no desaparece con buena gestión:** toda política ve ≥ 2 pulsos
+   y el primero antes del tick 30 en ≥ 95 % de las semillas; los pulsos severos
+   los gana quien juega mal.
 
 Todos son pruebas automáticas (`tests/test_dread_sim.py`).
 
 ### Calibración actual (300 semillas, 72 ticks)
 
-| Política | Misión cumplida | Cohesión final | Supervivencia | Casco | Dread máx. |
-|---|---|---|---|---|---|
-| `mission_first` | 76 % | 0.44 | 0.88 | 0.28 | 0.73 |
-| `crew_first` | 35 % | 0.76 | 0.97 | 0.45 | 0.29 |
-| `paranoid` | 38 % (53 % pierde el barco) | 0.60 | 0.94 | 0.09 | 0.44 |
+| Política | Misión cumplida | Pierde el barco | Cohesión | Supervivencia | Casco | Dread máx. | Pulsos |
+|---|---|---|---|---|---|---|---|
+| `mission_first` | 55% | 8% | 0.47 | 0.90 | 0.18 | 0.73 | 10.1 (primero: tick 14) |
+| `crew_first` | 38% | 0% | 0.77 | 0.97 | 0.44 | 0.30 | 7.4 (primero: tick 15) |
+| `paranoid` | 60% | 32% | 0.60 | 0.95 | 0.14 | 0.44 | 8.1 (primero: tick 15) |
 
 Estos números son una **primera calibración**, no un objetivo. Lo que fijan los
 tests son las relaciones entre políticas, no los valores absolutos.
 
+### La presencia no desaparece con buena gestión
+
+Dos mecanismos lo garantizan (criterio 7):
+
+- **Piso de atención:** `attention` nunca baja de `0.25 × clamp((horas_sumergido − 10) / 60)`.
+  El tiempo bajo el agua le da un punto de apoyo pase lo que pase. Solo cuentan
+  horas sumergido; salir a superficie pausa el reloj.
+- **Pulsos obligatorios:** los eventos marcados `"beat": true` son los que
+  manifiestan a la presencia. Si pasan 14 ticks (a partir del tick 8) sin
+  ninguno, el siguiente evento sale forzosamente de entre los pulsos cuyos
+  requisitos se cumplen. Hay pulsos de requisitos bajos (`footsteps_on_hull`,
+  `extra_place_set`, `clock_slow`) para que el juego cuidadoso los vea.
+
+El jugador cuidadoso ve pulsos leves y repetidos (pasos en el casco, un lugar de más
+en la mesa). Los severos (`hatch_caller`, `unaccounted_count`, `tube_breathing`)
+los gana quien juega mal.
+
 ### Problemas abiertos (conocidos)
 
-- **El juego cuidadoso casi no ve horror** (`crew_first`: dread máx. 0.29; el
-  primer evento inquietante llega hacia el tick 48). Buena gestión no debería
-  eliminar a la presencia, solo retrasarla. Candidato: un piso de `attention`
-  que crece con las horas sumergidas, o un evento inquietante garantizado por acto.
-- **`crew_first` fracasa la misión el 65 %.** El costo en tiempo del cuidado
+- **`crew_first` fracasa la misión ~60 %.** El costo en tiempo del cuidado
   (rituales, superficie, búsquedas) puede ser excesivo. Falta ver si el jugador
   humano lo percibe como justo.
-- **`paranoid` pierde el barco la mitad de las veces** por quedarse sordo ante
+- **`paranoid` pierde el barco ~un tercio de las veces** por quedarse sordo ante
   contactos reales. Es la lección buscada, pero conviene revisar si es demasiado dura.
+- **Pulsos repetidos:** `footsteps_on_hull` sale ~2 veces por patrulla con el mismo
+  texto. Es repetición deliberada, pero hace falta más variantes de texto.
 - Las políticas son simples. Un jugador humano combinará órdenes de formas que
   el simulador no cubre; hay que jugar la patrulla a mano antes de fiarse de estos números.
 

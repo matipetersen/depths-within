@@ -104,6 +104,7 @@ def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = F
         w.tick()
         if w.tick_no <= 24:
             min_hull_by_24 = min(min_hull_by_24, w.ship.hull)
+    beats = [f for f in w.fired if f.beat]
     early = [f for f in w.fired if f.act in (1, 2) and not f.id.startswith("destroyer")]
     result = {
         "policy": policy, "seed": seed, "ending": classify_ending(w, initial),
@@ -111,6 +112,7 @@ def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = F
         "survivors": len(w.active_crew()), "initial": initial,
         "cohesion": round(w.ship.cohesion, 3), "peak_dread": round(w.peak_dread, 3),
         "events": len(w.fired), "min_hull_by_24": round(min_hull_by_24, 3),
+        "beats": len(beats), "first_beat": beats[0].tick if beats else None,
         "early_events": len(early), "early_mundane": sum(1 for f in early if f.mundane_ok),
         "event_ids": [f.id for f in w.fired],
     }
@@ -133,6 +135,11 @@ def summarize(policy: str, seeds: List[int], patrol_ticks: int = 72) -> Dict:
         "survival": sum(r["survivors"] / r["initial"] for r in runs) / n,
         "peak_dread": sum(r["peak_dread"] for r in runs) / n,
         "events": sum(r["events"] for r in runs) / n,
+        "beats": sum(r["beats"] for r in runs) / n,
+        "first_beat": sum(r["first_beat"] for r in runs if r["first_beat"] is not None)
+                      / max(1, sum(1 for r in runs if r["first_beat"] is not None)),
+        "beat_coverage": sum(1 for r in runs if r["beats"] >= 2
+                             and r["first_beat"] is not None and r["first_beat"] <= 30) / n,
         "ambiguity": (sum(r["early_mundane"] for r in runs) / early) if early else 1.0,
         "min_hull_by_24": min(r["min_hull_by_24"] for r in runs),
         "endings": {k: v / n for k, v in endings.most_common()},
@@ -152,7 +159,8 @@ def main(argv=None):
         ends = ", ".join(f"{k} {v:.0%}" for k, v in s["endings"].items())
         print(f"{name:14s} progress {s['progress']:.2f}  ticks {s['ticks']:.0f}  hull {s['hull']:.2f}  cohesion {s['cohesion']:.2f}  "
               f"survival {s['survival']:.2f}  peak dread {s['peak_dread']:.2f}  "
-              f"events {s['events']:.1f}  ambiguity {s['ambiguity']:.0%}")
+              f"events {s['events']:.1f}  beats {s['beats']:.1f} (first t{s['first_beat']:.0f}, "
+              f"covered {s['beat_coverage']:.0%})  ambiguity {s['ambiguity']:.0%}")
         print(f"{'':14s} endings: {ends}")
         if args.log:
             print("\n".join(run_patrol(name, 0, verbose=True)["log"]))
