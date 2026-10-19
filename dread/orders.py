@@ -60,6 +60,13 @@ def force_compartment(world, cid):
     return f"{c.name} goes in. The repair holds."
 
 
+def stand_down(world):
+    """All hands but a skeleton watch sleep. Recovers a broken crew; sleepers feed the presence."""
+    world.ship.stand_down = True
+    world.ship.rest_cancelled = False
+    return "All hands but the skeleton watch are sent to their bunks."
+
+
 def cancel_rest(world):
     if not world.ship.rest_cancelled:
         for c in _live(world):
@@ -166,7 +173,7 @@ def verify_orders(world):
 
 
 ORDERS = {
-    "verify_orders": verify_orders,
+    "verify_orders": verify_orders, "stand_down": stand_down,
     "silence_sonar": silence_sonar, "restore_sonar": restore_sonar, "isolate": isolate,
     "release": release, "force_compartment": force_compartment, "cancel_rest": cancel_rest,
     "grant_rest": grant_rest, "ration": ration, "hold_ritual": hold_ritual,

@@ -91,6 +91,13 @@ class Ship:
     noise: float = 0.1
     attention: float = 0.0    # hidden: the presence's interest (DESIGN.md 2)
     progress: float = 0.0     # mission progress 0..1
+    # The ledger: honest numbers, unlike everything about the people (DESIGN.md 12)
+    food: float = 1.0
+    water: float = 1.0
+    fuel: float = 1.0
+    rations: float = 1.0      # 1.0 full, 0.75, 0.5
+    returning: bool = False   # on the way home from the station
+    owed: float = 0.0         # hidden: what the sea expects for what it gave
     orders_doubt: float = 0.0 # how little the crew trusts where the orders came from
     moral_debt: float = 0.0   # hidden: what the boat has done that it cannot undo
     scrubber: float = 1.0     # remaining CO2 absorbent
@@ -98,6 +105,7 @@ class Ship:
     silent_running: bool = False
     surfaced: bool = False
     rest_cancelled: bool = False
+    stand_down: bool = False   # all hands but a skeleton watch rest; the presence is fed by sleepers
     hours_submerged: int = 0
     routines: Dict[str, float] = field(
         default_factory=lambda: {k: 0.9 for k in ROUTINE_ITEMS})

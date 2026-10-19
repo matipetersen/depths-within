@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "missions.json")
-OUTCOMES = ("success", "failed", "refused", "altered")
+OUTCOMES = ("success", "failed", "refused", "altered", "left")
 WINDOW_FACTOR = 1.25
 
 

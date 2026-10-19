@@ -277,90 +277,177 @@ Las misiones morales ofrecen siempre tres salidas con etiquetas
 **`moral_debt`** (oculta) alimenta la culpa de todos y a la presencia
 (`attention`). Lo que el barco ha hecho no se deshace y atrae lo que lo persigue.
 
+### 7.4 El endgame: la Estación
+
+> **No hay batalla contra la presencia. Nunca.** Lo que cierra el juego es una
+> decisión con coste irreversible, tomada con la máxima incertidumbre, que lee todo
+> lo que la patrulla dejó atrás.
+
+La misión 5, *Mantener el sector hasta nuevo aviso*, no tiene barra de progreso ni
+ventana. Su reloj es la despensa. Procedencia: calidad 0.05 (una frecuencia que el
+radiotelegrafista jura no haber sintonizado, con la misma firma que la primera orden).
+
+**El libro de existencias es honrado; las personas, no.** Comida, agua, gasóleo,
+absorbente y raciones se muestran exactos. El calendario no: en la estación el diario,
+el cronómetro y el cocinero no coinciden en el día. Bajo el 20 % de víveres hay miedo,
+fatiga y desconfianza; a cero, muere un hombre cada 8 horas.
+
+**Dos verdades ocultas, fijadas por semilla con dados propios** (no alteran nada de
+lo anterior): `war_over` (50 %: la guerra terminó y nadie avisó) y `notice_at`
+(a las 50–150 horas de vigilia llega el «nuevo aviso»; nunca llega si la guerra terminó).
+El jugador no puede saber cuál es su mundo, salvo escuchando.
+
+El **Consejo de estación** vuelve cada pocas horas y ofrece siempre las mismas salidas,
+cada una con su precio:
+
+| Salida | Cómo | Qué cuesta | Qué puede darte |
+|---|---|---|---|
+| **Mantener** | seguir; opcionalmente recortar raciones | víveres, cordura; el motín vive aquí | un aviso que llegue (y vuelta legal) |
+| **Escuchar el mundo** | subir a superficie y sintonizar | exposición aérea (si hay guerra) | si la guerra terminó, **vuelta legal inmediata**; si no, estática |
+| **Volver** | 18 h, gasóleo ≥ 25 % | sin aviso es **desobediencia** (si consta); recuento desajustado | salir |
+| **La ofrenda** | la propone la tripulación; ver abajo | `moral_debt` +0.5, un hombre menos | un aviso en 6 h, siempre |
+
+**La ofrenda.** Cuando hay deuda (`owed`, `moral_debt`, nombres aprendidos) y miedo, los
+hombres vienen a decir que el mar deja ir a un barco cuando se le ha pagado. Tres
+respuestas: *prohibirlo* (una de cada cuatro veces lo hacen igual), *mirar a otro lado* (se
+ofrece el más culpable) o *dar un nombre* (el que más problemas da: no es casualidad).
+**Nunca se sabe si la presencia pidió algo o si fue un asesinato por superstición.**
+Es la regla de oro en su forma más pura.
+
+**El mar da.** Una red llena de peces iguales, un chubasco de cielo despejado. Aceptar es
+comer, y también deber (`owed`). Rechazar es pasar hambre con la tripulación mirando.
+
+**La vuelta** es un viaje con sus propios eventos (cartas que se actualizan con
+reportes falsos, un eco que mantiene la distancia, un muelle a oscuras con un
+hombre esperando). Al llegar, que el recuento cuadre depende de lo que se debe:
+`p = 0.08 + 0.35·owed + 0.2·(náufragos o hombre de más) + 0.03·nombres_aprendidos` (máx. 0.8).
+
+**Descanso general** (`stand_down`): una tripulación rota se recupera si todos duermen
+menos una guardia mínima. Cuesta disciplina y **alimenta a la presencia** (un barco que
+duerme es un barco que nadie vigila). Existe para que ninguna espiral sea un callejón sin salida.
+
+**La última escena es el silencio:** los hidrófonos dejan de oír, hasta los ecos
+fantasma que fueron el motor de todo. Después, los dos informes.
+
 ## 8. Finales (estados, no escenas)
 
-Derivados del estado final (`dread/sim.py: classify_ending`):
+Derivados del estado final (`dread/endings.py: classify_ending`). Los veredictos del
+endgame **tienen prioridad** sobre los demás, porque leen toda la patrulla.
 
-- `lost_with_all_hands`: casco en 0 o sin tripulación.
-- `deposed`: motín consumado; el capitán pierde el mando.
-- `turned_back`: se abortó la patrulla.
-- `stained_victory`: se hundió al buque civil. **Gana el remordimiento, no el consejo de guerra:** la tripulación lo sabe aunque el registro no lo diga.
-- `court_martial`: se desobedeció una orden que *consta* en los registros.
-- `returned_under_a_cloud`: se torció una orden que *consta*; el mando hará preguntas sobre el diario.
-- `returned`: sin sangre en el diario ni expediente.
-- `hollow_victory`: misiones cumplidas con cohesión < 0.3 o menos del 60 % de la tripulación.
-- `mission_failed`: menos de 3 misiones cumplidas.
-- `unaccounted` (reservado): llega a puerto con más tripulantes de los que salieron.
+| Final | Cuándo |
+|---|---|
+| `derelict` | casco 0 o sin tripulación, estando en la estación: el barco aparece a la deriva |
+| `lost_with_all_hands` | lo mismo, antes de llegar a la estación |
+| `deposed` | motín consumado |
+| `turned_back` | se abortó la patrulla (antes de la estación) |
+| `the_price` | se hizo la ofrenda |
+| `home_unaccounted` | se volvió y el recuento no cuadra |
+| `forgotten_post` | se supo de la paz y se volvió: *«nadie canceló tus órdenes porque no quedaba nadie»* |
+| `stained_victory` | se hundió al buque civil: la tripulación lo sabe aunque el registro no lo diga |
+| `court_martial` | se desobedeció una orden que *consta* en los registros |
+| `returned_under_a_cloud` | se torció una orden que *consta* |
+| `returned` | sin sangre en el diario ni expediente |
+| `hollow_victory` | misiones cumplidas con cohesión < 0.3 o menos del 60 % de la tripulación |
+| `mission_failed` | menos de 3 misiones cumplidas |
+
+**El epílogo de todos los finales termina igual**: *los hidrófonos callan; no es el
+silencio de un mar vacío, sino el de algo que ha dejado de escuchar.* Y después, **dos
+documentos lado a lado, fila por fila**: el informe oficial (todo tiene explicación,
+`mundane_*`) y el diario del capitán (nada la tiene, `uncanny_*`). Nadie los reconcilia.
 
 ## 9. Criterios de aceptación del bucle
 
 El simulador (`python -m dread.sim`) juega patrullas con políticas fijas
 (`mission_first`, `crew_first`, `paranoid`) y un **capitán aleatorio** (`random`)
-sobre muchas semillas. El diseño es válido si:
+sobre muchas semillas, y además un **experimento controlado de la estación**
+(`run_station`) que parte todas las estrategias del mismo estado. El diseño es válido si:
 
 1. **Obedecer lo inmoral se paga:** `mission_first` hunde al buque civil casi
    siempre y `crew_first` casi nunca; el primero acumula mucha más culpa y llega a
    un pavor máximo mucho mayor. Lo que hizo el barco alimenta a la presencia.
 2. **Negarse y torcer también cuestan:** `crew_first` cumple menos órdenes tal como
-   se dieron y recibe más veces "bajo una nube", pero conserva casco, cohesión y supervivencia.
+   se dieron, casi nadie vuelve con las manos limpias, pero conserva casco y cohesión.
 3. **Finales variados:** el capitán aleatorio no acaba en el mismo final > 60 % de
-   las semillas, ve ≥ 5 finales distintos, y todo final alcanzable se alcanza.
+   las semillas, ve ≥ 5 finales distintos, y los finales del endgame son alcanzables.
 4. **Auditoría de ambigüedad:** ≥ 70 % de los eventos de actos I–II se disparan
    con la explicación mundana disponible (`mundane_when`).
 5. **Sin muerte súbita:** el casco nunca baja de 0.3 antes del tick 24 con ninguna política.
 6. **Sin contenido muerto:** cada evento del catálogo se dispara en alguna política.
-7. **Determinismo:** misma semilla, misma patrulla.
+7. **Determinismo:** misma semilla, misma patrulla. **Mirar la pantalla no cambia la partida**
+   (el HUD no consume los dados del mundo).
 8. **La presencia no desaparece con buena gestión:** toda política ve ≥ 2 pulsos
    y el primero antes del tick 30 en ≥ 95 % de las semillas; los pulsos severos
    los gana quien juega mal.
+9. **Cada salida de la estación tiene un precio propio** (experimento controlado):
+   irse sin aviso casi siempre acaba en consejo de guerra; escuchar primero es la única
+   vía a `forgotten_post` y baja ese riesgo; pagar es la única vía a `the_price` en ≥ 30 %;
+   mantener es donde vive el motín; ninguna estrategia acaba en lo mismo > 85 %.
+10. **Esperar órdenes no es seguro:** quien se queda «como se ordenó» termina en barco a la
+    deriva, ofrenda o pérdida ≥ 70 % de las veces.
+11. **Ningún valor oculto llega a la pantalla** (ver sección 12).
 
-Todos son pruebas automáticas (`tests/test_dread_sim.py`, `tests/test_dread_missions.py`).
+Todos son pruebas automáticas (`tests/test_dread_sim.py`, `test_dread_missions.py`,
+`test_dread_endgame.py`, `test_dread_ui.py`).
 
-(El antiguo criterio "ninguna política termina en el mismo final > 80 %" se retiró:
+(El antiguo criterio «ninguna política termina en el mismo final > 80 %» se retiró:
 con misiones morales, el final de una política determinista lo decide una elección
-deliberada, que es justo lo que se quiere. La diversidad se mide con el capitán aleatorio.)
+deliberada, que es lo que se quiere. La diversidad se mide con el capitán aleatorio.)
 
-### Calibración actual (300 semillas, 4 misiones)
+### Calibración actual (300 semillas, 5 misiones)
 
-| Política | Órdenes cumplidas | Hunde al buque civil | Culpa | Cohesión | Casco | Dread máx. |
-|---|---|---|---|---|---|---|
-| `mission_first` | 76 % | 96 % | 0.42 | 0.46 | 0.20 | 0.82 |
-| `crew_first` | 51 % | 0 % | 0.00 | 0.76 | 0.48 | 0.29 |
-| `paranoid` | 63 % | 91 % | 0.40 | 0.55 | 0.40 | 0.51 |
+| Política | Órdenes cumplidas | Hunde al buque civil | Culpa | Cohesión | Casco | Supervivencia | Dread máx. |
+|---|---|---|---|---|---|---|---|
+| `mission_first` | 79 % | 97 % | 0.70 | 0.24 | 0.09 | 0.79 | 0.85 |
+| `crew_first` | 71 % | 0 % | 0.02 | 0.75 | 0.67 | 0.92 | 0.38 |
+| `paranoid` | 80 % | 95 % | 0.76 | 0.10 | 0.18 | 0.89 | 0.90 |
 
-Finales: `mission_first` 88 % `stained_victory`, 12 % pierde el barco; `crew_first`
-55 % `returned_under_a_cloud`, 32 % `mission_failed`, 13 % `returned`.
+Finales: `mission_first` 51 % `derelict`, 28 % `the_price`, 10 % `lost_with_all_hands`, 8 % `home_unaccounted`.
+`crew_first` 36 % `home_unaccounted`, 27 % `forgotten_post`, 14 % `returned_under_a_cloud`, 11 % `returned`, 10 % `the_price`.
+`paranoid` 49 % `the_price`, 39 % `derelict`.
+
+### El experimento controlado de la estación (300 semillas, mismo estado inicial)
+
+| Estrategia | Finales principales | Supervivencia |
+|---|---|---|
+| `hold` (mantener) | 44 % `court_martial` (el motín lo saca de allí), 19 % `home_unaccounted`, 16 % `deposed`, 14 % `the_price` | 0.93 |
+| `leave_now` | 80 % `court_martial`, 20 % `home_unaccounted` | 0.96 |
+| `listen_then_leave` | 32 % `forgotten_post`, 24 % `court_martial`, 23 % `home_unaccounted` | 0.93 |
+| `pay` (ofrenda) | 48 % `the_price`, 33 % `court_martial` | 0.90 |
+
+**Lo que se aprende:** con el mismo estado, la supervivencia casi no distingue las
+salidas (0.90–0.96). **Las salidas difieren en el veredicto, no en quién vive.** Eso es
+coherente con el diseño (no hay batalla), pero significa que el coste de cada salida
+es moral y legal, y que su peso tiene que sentirlo el jugador en el texto, no en una barra.
 
 Estos números son una **primera calibración**, no un objetivo. Lo que fijan los
-tests son las relaciones entre políticas, no los valores absolutos.
+tests son las relaciones entre estrategias, no los valores absolutos.
 
 ### La presencia no desaparece con buena gestión
 
-Dos mecanismos lo garantizan (criterio 8):
-
 - **Piso de atención:** `attention` nunca baja de `0.25 × clamp((horas_sumergido − 10) / 60)`.
-  Solo cuentan horas sumergido; salir a superficie pausa el reloj.
-- **Pulsos obligatorios:** los eventos marcados `"beat": true` manifiestan a la
-  presencia. Si pasan 14 ticks (desde el tick 8) sin ninguno, el siguiente sale
-  forzosamente de entre los pulsos cuyos requisitos se cumplen.
+- **Pulsos obligatorios:** los eventos `"beat": true` manifiestan a la presencia; si pasan
+  14 ticks sin ninguno, el siguiente sale de entre los pulsos cuyos requisitos se cumplen.
 
 ### Problemas abiertos (conocidos)
 
-- **Las políticas fijas siempre toman la misma decisión moral**, así que no dicen
-  nada sobre cómo decide un humano; solo que ambas salidas tienen precio. Hay que jugarlo.
-- **Obedecer es muy seguro:** `mission_first` pierde el barco solo el 12 %. La
-  deuda moral se paga en horror y culpa, pero el jugador competente la sobrevive.
-  Falta un castigo mecánico más directo (motín, sabotaje) en las misiones morales.
-- **`crew_first` fracasa ≥ 3 misiones un tercio de las veces.** El coste del
-  cuidado puede ser excesivo; solo un humano puede juzgarlo.
-- **`court_martial` es raro con las políticas fijas** (nadie rehúsa de plano); solo
-  aparece con el capitán aleatorio. No se sabe si el miedo al consejo de guerra
-  pesará en un jugador real.
-- **Los cuatro textos de misión son fijos** y la secuencia es siempre la misma.
-  Generar misiones morales variadas (otro buque, otro dilema) está pendiente.
+- **Las políticas fijas no son jugadores.** Las diferencias entre ellas vienen en buena parte
+  del estado con el que llegan a la estación; por eso existe el experimento controlado.
+  Hay que jugarlo a mano antes de fiarse de cualquier número.
+- **`hollow_victory` ya no se alcanza** en el simulador (el endgame lo desplaza) y `deposed`
+  y `court_martial` son raros con políticas fijas.
+- **Escuchar primero es casi siempre lo correcto** si el jugador cree en la posibilidad de
+  una paz ignorada. El único coste real es la exposición aérea y las 3 horas en superficie.
+  Falta un precio más pesado a escuchar (p. ej. oír cosas que no son la radio).
+- **La ofrenda nunca es necesaria para sobrevivir**: tiene que ser una tentación. En el
+  experimento no mejora la supervivencia. Quizá deba acelerar mucho más la salida cuando
+  la despensa está baja.
+- **El libro de existencias solo tiene sentido en la estación**; en las misiones 1–4 casi
+  no pesa (no llega a escasear).
+- **El mapa de contenido es corto**: 5 misiones fijas, 3 eventos de viaje y 1 escena de ofrenda.
 - **No está conectado al `QuestManager`** del juego (que hoy no se usa en el bucle):
-  `DreadBridge.begin_mission(id)` queda como punto de enganche.
-- Los pulsos se repiten (`footsteps_on_hull` ~2 veces por patrulla); faltan variantes de texto.
+  `DreadBridge.begin_mission(id)` es el punto de enganche. La estación aún no puede
+  arrancarse desde el juego en vivo (usa `begin_mission("m5_station")`, sin probar con tcod).
+- Los pulsos se repiten (`footsteps_on_hull`); faltan variantes de texto.
 
 ## 10. Qué cambia en el código existente
 
@@ -386,7 +473,106 @@ Más renderers/tilesets, más tipos de submarino, árbol de misiones históricas
 extra y cualquier diálogo largo. Hasta que los criterios de la sección 9 pasen,
 el trabajo va al estado y a los eventos, no a la capa visual.
 
-## 12. Referencias
+## 12. UX / UI
+
+> **Principio rector: el libro de existencias es honrado; las personas no.**
+> El jugador planifica con cifras fiables y decide con información que miente.
+
+Hay un prototipo jugable en terminal que aplica todo esto:
+`python -m dread.play` (interactivo) o `python -m dread.play --auto crew_first` (ver jugar a una política).
+La lógica de pantalla vive en `dread/hud.py` (funciones puras: mundo → texto) para que
+cualquier interfaz (la actual de tcod incluida) pueda consumirla.
+
+### 12.1 Reglas de información
+
+| Se muestra **exacto** | Se muestra **filtrado** | **Nunca** se muestra |
+|---|---|---|
+| Casco, víveres, agua, gasóleo, absorbente, CO₂, raciones, hombres a bordo | Cada hombre: lo que *dice* (cuatro frases) y lo que *se ve* (síntomas, con probabilidad) | `fear`, `guilt`, `trust`, `attention`, `moral_debt`, `orders_doubt`, `owed`, `war_over`, `notice_at`, nombres aprendidos |
+| Procedencia de las órdenes (canal, firma) | El sonar: lo que el operador decide contar | `mundane_*` / `uncanny_*` (solo en el epílogo) |
+| Consumo diario de víveres | El calendario: el cronómetro, el diario y el cocinero no coinciden | Probabilidades de cualquier tirada |
+
+**Ni un número sobre las personas.** Lo comprueba un test (`test_the_ledger_is_exact_and_the_people_are_not`).
+La brecha entre «dice que está bien» y «habla solo» es el juego.
+
+### 12.2 Pantalla del puente
+
+Una pantalla, de arriba abajo por orden de urgencia: **órdenes y reloj → libro de existencias
+→ los hombres → sonar → diario → menú de órdenes o decisión**. Captura real de una partida
+(día 5, en la estación, con el absorbente agotado y el aire «foul»):
+
+```
+==============================================================================
+ORDERS: Hold the sector until further notice
+Received: Received on a frequency the radio man swears he never tuned. It
+  repeats every six hours, word for word. The same call sign as the first
+  order. A different voice each time.
+Day 5  ·  chronometer 04:00  ·  control-room clock 04:00 less eleven minutes
+Day by the log: 5.  Day by the chronometer: 6.  The cook says it is later.
+==============================================================================
+LEDGER (exact)
+  Hull      [#########.]  89%      Diesel    [##########]  99%
+  Food      [######....]  60%  (-6%/day)    Rations   75%
+  Water     [#####.....]  53%  (-8%/day)    Absorbent [..........]   0%
+  Air       CO2 3.1% (foul)    Men aboard: 12
+
+THE MEN (what they say, what you can see)
+  Brandt   sonar    says he is fine.  Seen: repeats rumors.
+  Keller   torpedo  says he is fine.  Seen: nothing you can see.
+  Vogel    engine   says he is fine.  Seen: nothing you can see.
+  Hahn     helm     says he is fine.  Seen: nothing you can see.
+  Lenz     radio    says he is fine.  Seen: nothing you can see.
+  Ostrow   medic    says he is fine.  Seen: nothing you can see.
+  Weiss    cook     says he is fine.  Seen: nothing you can see.
+  Maier    deck     says he is fine.  Seen: nothing you can see.
+  Fuchs    sonar    says he is fine.  Seen: nothing you can see.
+  Reiter   torpedo  says he is fine.  Seen: nothing you can see.
+  Arndt    engine   says he is fine.  Seen: nothing you can see.
+  Kopp     helm     says he is fine.  Seen: nothing you can see.
+
+SONAR: ON
+  Brandt reports: "...-- sunk three days ago, still sending"
+
+LOG
+[089] A squall out of a clear sky, just long enough to fill every tank, and
+      gone. The sky is as empty as before.
+```
+
+Fíjate en lo que ocurre ahí: **el libro grita** (absorbente 0 %, aire 3,1 %) mientras
+**los hombres dicen que están bien**. Quien solo lee lo que le dicen, pierde.
+
+### 12.3 Modelo de interacción
+
+- **Tiempo:** `Enter` = una hora; `w` = esperar hasta que ocurra algo (máx. 12 h). La estación
+  se juega a **jornadas**, no a horas: `w` es el modo normal.
+- **Las decisiones detienen el reloj.** Una decisión es un modal con opciones numeradas, cada una
+  con su **coste en una línea** entre paréntesis (qué pierdes), no su efecto. No se avanza hasta responder.
+- **Las órdenes del capitán** son un menú numerado con una **pista de coste cualitativa**
+  («rápido ahora; lento después», «cuesta horas», «se acordará»). Cada orden cuesta; el
+  juego lo dice sin detallar.
+- **Las órdenes que nombran a un hombre** preguntan *¿cuál?* (confinar, liberar, forzar).
+- **Nada se explica.** No hay tooltips con porcentajes. El jugador aprende mirando.
+
+### 12.4 El epílogo
+
+Un solo final de pantalla: el texto del final, la frase del silencio, y **los dos informes lado a lado,
+fila por fila**: el oficial (todo explicable) a la izquierda, el diario (nada lo es) a la derecha.
+Sin árbitro: *«nadie ha pedido que se reconcilien»*.
+
+### 12.5 Cuando llegue a la interfaz gráfica (tcod)
+
+- **Paleta** (desaturada, según las convenciones del repo): azul marino profundo de fondo, gris
+  acero para la interfaz, **ámbar solo para alertas del libro** (aire, víveres, casco bajos), verde
+  sonar para el estado del sonar. **Nada se comunica solo por color**: cada alerta lleva texto.
+- **Paneles:** `hud.header` → barra superior; `hud.ledger` → panel fijo (siempre visible);
+  `hud.crew` → lista con scroll; `hud.sonar` → tira inferior; `hud.log_tail` → diario;
+  decisiones → modal centrado. Todas son listas de líneas, directamente consumibles.
+- **Audio:** el sonar *es* el terror. Los fantasmas son un canal de audio, no solo texto; y el
+  final es **el silencio** (cortar todo el audio del barco).
+- **Ritmo:** mostrar el ledger con cambios *sutiles* (barras que bajan despacio), no avisos
+  gritones; los avisos graves son del diario.
+- **Pendiente:** conectar estos paneles al `PanelManager` del juego; no se ha hecho.
+
+## 13. Referencias
 
 Lovecraft, *El templo*; McCammon, *The Night Boat*; Buchheim, *Das Boot*
 (rutina, claustrofobia real); Simmons, *El terror*; Crichton, *Esfera*;

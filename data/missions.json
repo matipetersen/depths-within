@@ -62,6 +62,22 @@
       "mundane_origin": "Standing return instructions the mate copied into the log and forgot.",
       "uncanny_origin": "Nobody wrote it. It was already in the log.",
       "window": 2.2
+    },
+    {
+      "id": "m5_station",
+      "kind": "hold",
+      "ticks": 1,
+      "moral": true,
+      "title": "Hold the sector until further notice",
+      "briefing": "Hold position in grid K-7 and protect the sector. Remain on station until further notice. Do not return to base. Do not break radio silence.",
+      "provenance": {
+        "channel": "Received on a frequency the radio man swears he never tuned. It repeats every six hours, word for word.",
+        "signed": "The same call sign as the first order. A different voice each time.",
+        "quality": 0.05
+      },
+      "mundane_origin": "A standing station order from a staff since reorganised or dissolved, or automated traffic left looping on a dead relay.",
+      "uncanny_origin": "It repeats because it is the one thing that wants the boat to stay.",
+      "window": 99
     }
   ]
 }

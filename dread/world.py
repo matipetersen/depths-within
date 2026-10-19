@@ -48,6 +48,16 @@ class DreadWorld:
         self.run = None
         self.mission_i = -1
         self.results = []
+        # The endgame's hidden truths come from their own dice so they never shift
+        # anything that happens earlier in a patrol (DESIGN.md section 8).
+        trng = random.Random(seed * 31 + 7)
+        war_over = trng.random() < 0.5
+        self.truth = {"war_over": war_over, "notice_at": None if war_over else trng.randint(50, 150)}
+        self.notice_at_override = None
+        self.vigil_ticks = 0
+        self.travel_left = 0
+        self.check_until = -1
+        self.starving = 0
         if self.missions:
             self._start_mission(0)
 
@@ -68,6 +78,22 @@ class DreadWorld:
     def sonar_off_ticks(self) -> int:
         return self.deck.sonar_off_ticks
 
+    @property
+    def names_known(self) -> int:
+        return len(self.deck.names_learned)
+
+    @property
+    def on_station(self) -> bool:
+        return self.run is not None and self.run.mission.kind == "hold"
+
+    @property
+    def notice_ready(self) -> float:
+        """1.0 once 'further notice' is due (it never is, if the war is over and nobody paid)."""
+        if not self.on_station or "notice_received" in self.ship.flags:
+            return 0.0
+        due = self.notice_at_override if self.notice_at_override is not None else self.truth["notice_at"]
+        return 1.0 if due is not None and self.vigil_ticks >= due else 0.0
+
     def act(self) -> int:
         d = self.dread()
         by_dread = 1 if d < 0.22 else 2 if d < 0.38 else 3
@@ -77,18 +103,22 @@ class DreadWorld:
     def finished(self) -> bool:
         f = self.ship.flags
         done = (self.mission_i >= len(self.missions)) if self.missions else self.ship.progress >= 1.0
+        # Without missions the legacy window applies; with them, each mission has its
+        # own window (or none, on station) and this is only a safety net.
+        limit = self.patrol_ticks * HARD_LIMIT_FACTOR if not self.missions else 2000
         return (done or self.ship.hull <= 0.0 or "deposed" in f
-                or "aborted" in f or not self.active_crew()
-                or self.tick_no >= self.patrol_ticks * HARD_LIMIT_FACTOR)
+                or "aborted" in f or not self.active_crew() or self.tick_no >= limit)
 
     # -- player-facing views -------------------------------------------------
     def report(self, observer_skill: float = 0.6) -> List[dict]:
         """What the captain gets to see: reported stress and *observed* symptoms."""
         medic = any(c.role == "medic" for c in self.active_crew())
         p = min(0.95, observer_skill + (0.25 if medic else 0.0))
+        # Looking must never change the patrol: observe with dice of its own, fixed per tick.
+        look = random.Random(self.tick_no * 7919 + 17)
         rows = []
         for c in self.active_crew():
-            seen = [s for s in c.symptoms() if self.rng.random() < p]
+            seen = [s for s in c.symptoms() if look.random() < p]
             rows.append({"name": c.name, "role": c.role, "says": round(c.reported(self.ship.cohesion), 2),
                          "symptoms": seen})
         return rows
@@ -124,10 +154,14 @@ class DreadWorld:
         if not s.surfaced:
             s.hours_submerged += 1
         self._physics()
+        self._resources()
+        self._voyage()
         self._rumors()
         self.deck.tick(self)
         self._mission()
         self._mission_flow()
+        if self.on_station:
+            self.vigil_ticks += 1
         self._mutiny()
         ev = self.engine.select(self)
         if ev is not None:
@@ -154,7 +188,9 @@ class DreadWorld:
         routine, cohesion = s.routine, s.cohesion
         for c in live:
             on_watch = (self.tick_no // 4) % 3 == c.section
-            if on_watch:
+            if s.stand_down:
+                c.fatigue = clamp(c.fatigue + (0.005 if on_watch else -0.03))
+            elif on_watch:
                 c.fatigue = clamp(c.fatigue + 0.015)
             elif s.rest_cancelled:
                 c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE)
@@ -187,8 +223,10 @@ class DreadWorld:
                                                 + 0.25 * (1 - mean("fatigue"))), 0.05)
         s.readiness = clamp(1.05 - 0.4 * mean("fatigue") - 0.3 * (1 - s.discipline)
                             + (0.35 if s.rest_cancelled else 0.0), 0.0, 1.4)
-        if mean("fatigue") > 0.6:      # exhausted crews cause accidents
-            s.hull = clamp(s.hull - 0.004)
+        if mean("fatigue") > 0.6 and not s.stand_down:   # exhausted crews cause accidents
+            s.hull = clamp(s.hull - 0.004 * clamp((mean("fatigue") - 0.5) / 0.4))
+        elif mean("fatigue") < (0.8 if s.stand_down else 0.5) and s.hull < 1.0:
+            s.hull = clamp(s.hull + 0.0015)             # damage control, when there are hands to do it
         if s.rest_cancelled:
             for c in live:
                 c.trust = clamp(c.trust - 0.004)
@@ -198,6 +236,12 @@ class DreadWorld:
         for c in live:
             c.trust = clamp(c.trust - 0.0012 * s.orders_doubt)
             c.guilt = clamp(c.guilt + 0.0008 * s.moral_debt)
+        if s.stand_down:
+            s.discipline = clamp(s.discipline - 0.002)
+            s.attention = clamp(s.attention + 0.004)         # a sleeping boat is an unwatched one
+            if mean("fatigue") < 0.3:
+                s.stand_down = False
+                self.log.append(f"[{self.tick_no:03d}] The boat wakes. Normal watches resume.")
         # the presence
         d = self.dread()
         da = (0.003 * sum(1 for c in live if c.isolated) + 0.012 * d + 0.01 * s.moral_debt
@@ -214,6 +258,95 @@ class DreadWorld:
                 if self.rng.random() < 0.15 * s.attention and not c.name_known:
                     c.name_known = True
                     self.deck.names_learned.add(c.id)
+
+    # -- the ledger -----------------------------------------------------------
+    def _resources(self):
+        s, live = self.ship, self.active_crew()
+        share = len(live) / 12
+        s.food = clamp(s.food - 0.0036 * share * s.rations)
+        s.water = clamp(s.water - 0.0042 * share * s.rations)
+        if s.surfaced:
+            s.fuel = clamp(s.fuel - 0.006)
+        if self.ship.surfaced and self.tick_no >= self.check_until > 0 and "checking" in s.flags:
+            s.flags.discard("checking")
+            s.surfaced = False
+        if s.food < 0.2 or s.water < 0.2:
+            for c in live:                       # hunger makes people blame the captain
+                c.fear = clamp(c.fear + 0.004)
+                c.fatigue = clamp(c.fatigue + 0.003)
+                c.trust = clamp(c.trust - 0.002)
+        if s.food <= 0 or s.water <= 0:
+            self.starving += 1
+            if self.starving % 8 == 0 and live:
+                victim = max(live, key=lambda c: c.fatigue)
+                victim.alive = False
+                self.log.append(f"[{self.tick_no:03d}] {victim.name} does not wake. Nobody says what he died of.")
+                for c in self.active_crew():
+                    c.fear = clamp(c.fear + 0.06)
+                    c.guilt = clamp(c.guilt + 0.04)
+        else:
+            self.starving = 0
+
+    # -- the exits (DESIGN.md section 8) --------------------------------------
+    def leave_station(self) -> str:
+        s = self.ship
+        if not self.on_station:
+            return "There is no station to leave."
+        if s.returning:
+            return "We are already under way."
+        if s.fuel < 0.25 or "adrift" in s.flags:
+            return "Not enough diesel for the passage. We would drift. Surface and charge first."
+        s.returning = True
+        self.travel_left = 18
+        s.flags.add("left_station")
+        lawful = "notice_received" in s.flags or "peace_known" in s.flags
+        if not lawful:
+            s.flags.add("orders_defied")              # the order said: until further notice
+        s.surfaced = False
+        return ("Setting course for base." if lawful
+                else "Setting course for base. There has been no notice; everyone knows it.")
+
+    def check_world(self) -> str:
+        s = self.ship
+        s.surfaced = True
+        s.flags.add("checking")
+        self.check_until = self.tick_no + 3
+        s.noise = clamp(s.noise + 0.1)
+        s.attention = clamp(s.attention - 0.1)
+        for c in self.active_crew():
+            c.fear = clamp(c.fear - 0.04)
+        if self.truth["war_over"]:
+            s.flags.add("peace_known")
+            return ("On the surface the radio plays dance music. A voice reads the date: "
+                    "eleven months past an armistice nobody told us about.")
+        return "On the surface, static. Under it something that might be music, or someone counting."
+
+    def _voyage(self):
+        s = self.ship
+        if not s.returning:
+            return
+        s.fuel = clamp(s.fuel - 0.012)
+        self.travel_left -= 1
+        if s.fuel <= 0:
+            s.returning = False
+            s.flags.add("adrift")
+            self.log.append(f"[{self.tick_no:03d}] The engines die. We are adrift.")
+        elif self.travel_left <= 0:
+            self._arrive()
+
+    def _arrive(self):
+        s = self.ship
+        s.returning = False
+        p = min(0.8, 0.08 + 0.35 * s.owed + 0.2 * ("survivors_taken" in s.flags or "extra_man" in s.flags)
+                + 0.03 * self.names_known)
+        if self.rng.random() < p:
+            s.flags.add("home_unaccounted")
+            self.log.append(f"[{self.tick_no:03d}] The pier is there. The count on the gangway does not match the roll, "
+                            "and nobody can say which of us is the extra.")
+        else:
+            self.log.append(f"[{self.tick_no:03d}] The pier is there. Lines are passed. The roll is called, and it is right.")
+        lawful = "notice_received" in s.flags or "peace_known" in s.flags
+        self.resolve_mission("success" if lawful else "left")
 
     def _rumors(self):
         s, live = self.ship, self.active_crew()
@@ -275,6 +408,11 @@ class DreadWorld:
         if run is None or run.outcome is not None:
             return
         m = run.mission
+        if m.kind == "hold":
+            if self.vigil_ticks > 480:                       # nothing ever ends a vigil by itself
+                self.ship.flags.add("derelict")
+                self.resolve_mission("failed")
+            return
         if self.tick_no > run.deadline:
             self.log.append(f"[{self.tick_no:03d}] The window for '{m.title}' has closed.")
             self.resolve_mission("failed")
@@ -304,14 +442,14 @@ class DreadWorld:
 
     def _mission(self):
         s = self.ship
-        speed = s.readiness * (0.5 if s.silent_running else 1.0) * (0.0 if s.surfaced else 1.0)
+        speed = s.readiness * (0.5 if s.silent_running else 1.0) * (0.0 if s.surfaced else 1.0) * (0.3 if s.stand_down else 1.0)
         if self.run is not None:
-            if self.run.outcome is None:
+            if self.run.outcome is None and self.run.mission.kind != "hold":
                 s.progress = clamp(s.progress + speed / (self.run.mission.ticks * PACE) - self.time_cost)
         else:
             s.progress = clamp(s.progress + speed / (self.patrol_ticks * PACE) - self.time_cost)
         self.time_cost = 0.0
-        if s.surfaced and self.rng.random() < 0.08:
+        if s.surfaced and self.rng.random() < 0.08 and not (self.truth["war_over"] and self.vigil_ticks > 0):
             self.log.append(f"[{self.tick_no:03d}] Aircraft overhead. We are exposed.")
             s.hull = clamp(s.hull - 0.12)
             for c in self.active_crew():

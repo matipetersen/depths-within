@@ -56,7 +56,7 @@ def test_hull_damage_is_mirrored_to_the_submarine():
     b = DreadBridge(None, seed=1)
     b.world.ship.hull = 0.1                                # stale value must be overwritten
     b.tick(100.0, sub)
-    assert 0.7 < sub.hull <= 0.8
+    assert 0.7 < sub.hull <= 0.81      # starts from the submarine's 0.8, not the stale 0.1 (minus/plus damage control)
 
 
 def test_stage_comes_from_state_not_days():

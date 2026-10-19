@@ -12,6 +12,7 @@ from collections import Counter
 from typing import Dict, List
 
 from . import orders as O
+from .endings import classify_ending  # noqa: F401  (re-exported)
 from .world import DreadWorld
 
 PRIORITY = {
@@ -22,9 +23,52 @@ PRIORITY = {
 AVOID = {"mission_first": {"abort", "retreat"}, "crew_first": set(), "paranoid": {"abort"}}
 
 
-def pick_choice(policy: str, pending, prng=None) -> str:
+def vigil_choice(policy: str, w: DreadWorld, pending) -> str:
+    """The endgame's decisions depend on the ledger, so the policies read it."""
+    ev, s = pending.event_id, w.ship
+    keys = {c.key for c in pending.choices}
+
+    def pick(*prefs):
+        return next((k for k in prefs if k in keys), pending.choices[0].key)
+
+    if ev == "station_council":
+        checked = getattr(w, "_policy_checked", False)
+        if policy == "mission_first":
+            return pick("hold")
+        if policy == "crew_first":
+            if "peace_known" in s.flags or "notice_received" in s.flags or s.food < 0.3 or s.water < 0.3:
+                return pick("leave", "hold")
+            if not checked and w.vigil_ticks >= 16:
+                w._policy_checked = True
+                return pick("check", "hold")
+            return pick("hold_tight" if s.rations > 0.75 else "hold", "hold")
+        if not checked:                                   # paranoid wants to know first
+            w._policy_checked = True
+            return pick("check", "hold")
+        return pick("leave" if ("peace_known" in s.flags or "notice_received" in s.flags) else "hold", "hold")
+    if ev == "offering_proposal":
+        return pick({"mission_first": "forbid", "crew_first": "forbid", "paranoid": "name_him"}[policy])
+    if ev == "further_notice":
+        return pick("verify" if policy == "paranoid" else "obey")
+    if ev in ("sea_gives_fish", "sea_gives_rain"):
+        want = policy == "mission_first" or (policy == "crew_first" and min(s.food, s.water) < 0.4)
+        return pick("accept" if want else "refuse", "drink" if want else "wary")
+    if ev == "larder_short":
+        return pick("amnesty" if policy == "crew_first" else "lock")
+    if ev == "voyage_charts_wrong":
+        return pick("reckoning")
+    return pending.choices[0].key
+
+
+VIGIL_EVENTS = {"station_council", "offering_proposal", "further_notice", "sea_gives_fish",
+                "sea_gives_rain", "larder_short", "voyage_charts_wrong"}
+
+
+def pick_choice(policy: str, pending, prng=None, world=None) -> str:
     if policy == "random":
         return prng.choice(pending.choices).key
+    if world is not None and pending.event_id in VIGIL_EVENTS:
+        return vigil_choice(policy, world, pending)
     ranked = sorted(pending.choices,
                     key=lambda c: (bool(set(c.tags) & AVOID[policy]),
                                    min((PRIORITY[policy].index(t) for t in c.tags if t in PRIORITY[policy]),
@@ -46,9 +90,20 @@ def issue_orders(policy: str, w: DreadWorld, prng=None):
            (policy == "crew_first" and run.mission.quality < 0.4):
             w.log.append(f"[{w.tick_no:03d}] {O.verify_orders(w)}")
     fatigue = sum(c.fatigue for c in live) / len(live)
+    if w.on_station and fatigue > 0.6 and not s.stand_down and policy != "paranoid":
+        O.stand_down(w)                       # nothing to rush on station: let a broken crew sleep
     if policy == "mission_first":
+        if w.on_station:                       # nothing to rush on station: normal watches, fresh air
+            if s.rest_cancelled:
+                O.grant_rest(w)
+            if s.routine < 0.4 and w.tick_no % 4 == 0:
+                O.hold_ritual(w)
+            if not s.surfaced and s.co2 > 0.03 and w.tick_no % 8 == 0:
+                O.surface(w)
+            elif s.surfaced and "checking" not in s.flags and (s.co2 < 0.012 or w.tick_no % 8 in (3, 4)):
+                O.dive(w)
         # push hard, ease off only when the crew is close to collapse
-        if w.tick_no > 3 and fatigue < 0.75 and not s.rest_cancelled:
+        elif w.tick_no > 3 and fatigue < 0.75 and not s.rest_cancelled:
             O.cancel_rest(w)
         elif fatigue > 0.85 and s.rest_cancelled:
             O.grant_rest(w)
@@ -100,33 +155,6 @@ def random_orders(w: DreadWorld, prng: random.Random):
         O.ORDERS[choice](w)
 
 
-def classify_ending(w: DreadWorld, initial_crew: int) -> str:
-    s = w.ship
-    survivors = len(w.active_crew())
-    if s.hull <= 0 or survivors == 0:
-        return "lost_with_all_hands"
-    if "deposed" in s.flags:
-        return "deposed"
-    if "aborted" in s.flags:
-        return "turned_back"
-    done = sum(1 for r in w.results if r["outcome"] in ("success", "altered"))
-    if "civilian_sunk" in s.flags:
-        return "stained_victory"             # the crew knows, whatever HQ's ledger says
-    # Disobedience only counts if the orders are on record. Sometimes there is no
-    # record at all (m4_unrecorded): nobody can court-martial you for an order
-    # that, as far as anyone can prove, was never given.
-    on_record = "orders_unrecorded" not in s.flags
-    if "orders_defied" in s.flags and on_record:
-        return "court_martial"
-    if done >= 3:
-        if s.cohesion < 0.3 or survivors < initial_crew * 0.6:
-            return "hollow_victory"
-        if "orders_bent" in s.flags and on_record:
-            return "returned_under_a_cloud"    # HQ will have questions about the log
-        return "returned"
-    return "mission_failed"
-
-
 def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = False) -> Dict:
     w = DreadWorld(seed=seed, patrol_ticks=patrol_ticks)
     prng = random.Random(seed * 7919 + 13)      # the captain's own dice, apart from the world's
@@ -134,7 +162,7 @@ def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = F
     min_hull_by_24 = 1.0
     while not w.finished:
         if w.pending is not None:
-            w.choose(pick_choice(policy, w.pending, prng))
+            w.choose(pick_choice(policy, w.pending, prng, w))
             continue
         issue_orders(policy, w, prng)
         w.tick()
@@ -190,6 +218,67 @@ def summarize(policy: str, seeds: List[int], patrol_ticks: int = 72) -> Dict:
         "endings": {k: v / n for k, v in endings.most_common()},
         "dominant_ending": endings.most_common(1)[0][1] / n,
     }
+
+
+STATION_STRATEGIES = ("hold", "leave_now", "listen_then_leave", "pay")
+
+
+def run_station(strategy: str, seed: int, max_ticks: int = 700) -> Dict:
+    """Start every strategy from the SAME state on station and compare only the exit.
+
+    The full-patrol policies arrive on station in very different shape, which
+    hides whether the exits themselves are balanced (DESIGN.md section 9, criterion 9).
+    """
+    w = DreadWorld(seed=seed)
+    w._start_mission(4)
+    w.tick_no = 100
+    s = w.ship
+    s.hull, s.food, s.water, s.fuel, s.scrubber = 0.7, 0.62, 0.6, 0.8, 0.5
+    s.owed, s.moral_debt, s.co2 = 0.1, 0.1, 0.012
+    for c in w.crew:
+        c.fear, c.fatigue, c.guilt, c.trust = 0.25, 0.3, 0.1, 0.55
+    w.deck.names_learned.update({1, 2})
+    initial = len(w.crew)
+    checked = False
+    for _ in range(max_ticks):
+        if w.finished:
+            break
+        if w.pending is not None:
+            ev, keys = w.pending.event_id, {c.key for c in w.pending.choices}
+            pick = lambda *prefs: next((k for k in prefs if k in keys), w.pending.choices[0].key)
+            if ev == "station_council":
+                if strategy == "leave_now":
+                    key = pick("leave")
+                elif strategy == "listen_then_leave":
+                    if not checked:
+                        checked = True
+                        key = pick("check")
+                    elif "peace_known" in s.flags or "notice_received" in s.flags or s.food < 0.25 or s.water < 0.25:
+                        key = pick("leave")
+                    else:
+                        key = pick("hold_tight" if s.rations > 0.75 else "hold")
+                else:
+                    key = pick("hold")
+            elif ev == "offering_proposal":
+                key = pick("look_away" if strategy == "pay" else "forbid")
+            elif ev == "further_notice":
+                key = pick("obey")
+            else:
+                key = vigil_choice("crew_first", w, w.pending) if ev in VIGIL_EVENTS else w.pending.choices[0].key
+            w.choose(key)
+            continue
+        if w.on_station and strategy == "leave_now" and not s.returning and s.fuel >= 0.25:
+            w.log.append(w.leave_station())
+        live = w.active_crew()
+        if live and sum(c.fatigue for c in live) / len(live) > 0.6 and not s.stand_down:
+            O.stand_down(w)
+        if not s.surfaced and s.co2 > 0.03 and w.tick_no % 8 == 0:
+            O.surface(w)
+        elif s.surfaced and "checking" not in s.flags and (s.co2 < 0.012 or w.tick_no % 8 in (3, 4)):
+            O.dive(w)
+        w.tick()
+    return {"strategy": strategy, "seed": seed, "ending": classify_ending(w, initial),
+            "survivors": len(w.active_crew()), "initial": initial, "ticks": w.tick_no - 100}
 
 
 def main(argv=None):

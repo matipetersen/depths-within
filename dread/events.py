@@ -187,6 +187,11 @@ def _who(spec, world, target):
         return [c for c in world.active_crew() if target is None or c.id != target.id]
     if spec.startswith("role:"):
         return [c for c in world.active_crew() if c.role == spec[5:]]
+    if spec.startswith(("highest:", "lowest:")):
+        kind, stat = spec.split(":")
+        pool = world.active_crew()
+        pick = max if kind == "highest" else min
+        return [pick(pool, key=lambda c: getattr(c, stat))] if pool else []
     raise ValueError(f"unknown who {spec!r}")
 
 
@@ -239,6 +244,14 @@ def apply_effects(effects: List[dict], world, target=None):
                 c.alive = False
         elif op == "combat":
             world.combat(fx["severity"])
+        elif op == "leave_station":
+            world.log.append(f"[{world.tick_no:03d}] {world.leave_station()}")
+        elif op == "check_world":
+            world.log.append(f"[{world.tick_no:03d}] {world.check_world()}")
+        elif op == "summon_notice":
+            world.notice_at_override = world.vigil_ticks + 6
+        elif op == "travel_delay":
+            world.travel_left = max(1, world.travel_left + fx["value"])
         elif op == "set":
             setattr(ship, fx["stat"], fx["value"])
         elif op == "time":

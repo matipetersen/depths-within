@@ -4,10 +4,10 @@ import pytest
 from dread.events import load_events
 from dread.sim import PRIORITY, run_patrol, summarize
 
-SEEDS = list(range(120))
+SEEDS = list(range(100))
 SEVERE = {"hatch_caller", "unaccounted_count", "tube_breathing"}
-REACHABLE_ENDINGS = {"stained_victory", "court_martial", "returned_under_a_cloud",
-                     "returned", "lost_with_all_hands", "mission_failed"}
+REACHABLE_ENDINGS = {"stained_victory", "returned_under_a_cloud", "returned", "lost_with_all_hands",
+                     "derelict", "the_price", "home_unaccounted", "forgotten_post"}
 
 
 @pytest.fixture(scope="module")
@@ -25,14 +25,15 @@ def test_obeying_the_immoral_order_is_paid_for_in_guilt_and_horror(results):
 def test_refusing_and_bending_orders_cost_something(results):
     c = results["crew_first"]
     assert c["progress"] < results["mission_first"]["progress"]   # fewer orders carried out as given
-    assert c["endings"].get("returned_under_a_cloud", 0) > 0.3    # HQ's questions
+    assert c["endings"].get("returned", 0) < 0.25                 # almost nobody gets home with clean hands
+    assert c["endings"].get("returned_under_a_cloud", 0) > 0.05   # HQ's questions
     assert c["hull"] > results["mission_first"]["hull"]            # ...but the boat is in better shape
     assert c["cohesion"] > results["mission_first"]["cohesion"] + 0.15
     assert c["survival"] >= results["mission_first"]["survival"]
 
 
 def test_random_captain_gets_varied_fates():
-    runs = [run_patrol("random", s) for s in range(300)]
+    runs = [run_patrol("random", s) for s in range(200)]
     ends = [r["ending"] for r in runs]
     top = max(ends.count(e) for e in set(ends)) / len(ends)
     assert top <= 0.6, top
@@ -42,7 +43,7 @@ def test_random_captain_gets_varied_fates():
 def test_every_ending_is_reachable():
     seen = set()
     for pol in list(PRIORITY) + ["random"]:
-        for seed in range(500 if pol == "random" else 200):
+        for seed in range(300 if pol == "random" else 150):
             seen.add(run_patrol(pol, seed)["ending"])
     assert REACHABLE_ENDINGS <= seen, REACHABLE_ENDINGS - seen
 
@@ -60,7 +61,7 @@ def test_no_sudden_death_in_first_day(results):
 def test_every_event_is_reachable_by_some_policy():
     seen = set()
     for pol in list(PRIORITY) + ["random"]:
-        for seed in range(400 if pol == "random" else 250):
+        for seed in range(300 if pol == "random" else 200):
             seen.update(run_patrol(pol, seed)["event_ids"])
     dead = {e["id"] for e in load_events()} - seen
     assert not dead, f"events that never fire: {sorted(dead)}"

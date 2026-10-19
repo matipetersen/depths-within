@@ -15,7 +15,7 @@ def _play(w, policy="crew_first", max_ticks=400):
     from dread.sim import issue_orders, pick_choice
     while not w.finished and w.tick_no < max_ticks:
         if w.pending:
-            w.choose(pick_choice(policy, w.pending))
+            w.choose(pick_choice(policy, w.pending, None, w))
         else:
             issue_orders(policy, w)
             w.tick()
@@ -172,7 +172,10 @@ def test_orders_may_or_may_not_be_on_record():
 def test_debrief_reveals_both_origins_after_the_patrol():
     w = _play(DreadWorld(seed=3))
     d = "\n".join(w.debrief())
-    for m in w.missions:
+    by_id = {m.id: m for m in w.missions}
+    assert w.results
+    for r in w.results:
+        m = by_id[r["mission"]]
         assert m.mundane_origin in d and m.uncanny_origin in d
 
 
