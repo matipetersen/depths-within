@@ -9,6 +9,16 @@ python main.py
 
 The game will start with the hotkey system enabled. You'll see the quick reference automatically.
 
+## The Captain's Bridge (the horror/story layer)
+
+Inside the window press **TAB** for the captain's bridge: an exact ledger, the men (what they
+say vs. what you can see), the sonar room, the log and the orders menu. Type an order number and
+press **ENTER**; **ENTER/SPACE** waits an hour, **W** waits for news. Decisions stop the clock:
+answer with their number. See `DESIGN.md` section 12.5.
+
+Without a window: `python tools/dread_preview.py out_dir` saves PNG screenshots of a scripted patrol,
+and `python -m dread.play` plays the same layer in a plain terminal.
+
 ## First Time Playing
 
 ### Basic Commands

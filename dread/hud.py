@@ -133,15 +133,28 @@ def orders_menu(items) -> List[str]:
     return out
 
 
-def decision(pending) -> List[str]:
-    title = re.sub(r"^m\d_", "", pending.event_id).replace("_", " ").upper()
-    out = ["!" * WIDTH, f"CAPTAIN: {title}", textwrap.fill(pending.text, WIDTH)]
-    for i, c in enumerate(pending.choices, 1):
-        out.append(textwrap.fill(f"  {i}. {c.text}", WIDTH, subsequent_indent="     "))
-        if c.cost:
-            out.append(textwrap.fill(f"       ({c.cost})", WIDTH, subsequent_indent="        "))
+def _decision_lines(title: str, text: str, options) -> List[str]:
+    out = ["!" * WIDTH, f"CAPTAIN: {title}", textwrap.fill(text, WIDTH)]
+    for i, (label, cost) in enumerate(options, 1):
+        out.append(textwrap.fill(f"  {i}. {label}", WIDTH, subsequent_indent="     "))
+        if cost:
+            out.append(textwrap.fill(f"       ({cost})", WIDTH, subsequent_indent="        "))
     out.append("!" * WIDTH)
     return out
+
+
+def decision(pending) -> List[str]:
+    title = re.sub(r"^m\d_", "", pending.event_id).replace("_", " ").upper()
+    return _decision_lines(title, pending.text, [(c.text, c.cost) for c in pending.choices])
+
+
+def decision_from(d) -> List[str]:
+    """The same, from the game's ``engine.decisions.Decision`` (dread or legacy)."""
+    if getattr(d, "source", "") == "dread":
+        title = re.sub(r"^m\d_", "", d.id).replace("_", " ").upper()
+    else:
+        title = d.title.upper()
+    return _decision_lines(title, d.description, [(o.text, o.tooltip) for o in d.options])
 
 
 def screen(w, pending=None, items=None, notice: str = "") -> str:

@@ -228,9 +228,9 @@ class HorrorManager:
         self.metrics.deepest_dive = max(self.metrics.deepest_dive, current_depth)
         results['messages'].extend(self.dread.tick(current_depth, submarine))
         self.metrics.average_crew_sanity = self.dread.mean_sanity()
-        old, self.current_stage = self.current_stage, self._derive_stage()
-        if self.current_stage != old:
-            results['messages'].append(self._get_stage_transition_message(self.current_stage))
+        # Deliberately silent about the stage: announcing "THE TRUTH IS UNDENIABLE" would
+        # both leak a hidden value and confirm the supernatural (DESIGN.md sections 2, 12).
+        self.current_stage = self._derive_stage()
         return results
 
     def advance_turn(self, time_passed_hours: float, current_depth: float, submarine=None) -> Dict[str, any]:

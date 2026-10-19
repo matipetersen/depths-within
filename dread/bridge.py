@@ -55,12 +55,17 @@ def crew_from_roster(roster, rng: random.Random) -> List[Crew]:
 
 
 class DreadBridge:
-    def __init__(self, roster=None, seed: Optional[int] = None, events=None):
+    def __init__(self, roster=None, seed: Optional[int] = None, events=None, missions=()):
+        """``missions=()`` runs no missions (the game supplies its own);
+        ``missions=None`` runs the whole five-mission sequence of data/missions.json."""
         rng = random.Random(seed)
         self.world = DreadWorld(crew=crew_from_roster(roster, rng), seed=rng.randrange(2 ** 31),
                                 patrol_ticks=10 ** 6, events=events, use_schedule=False,
-                                missions=[])
+                                missions=missions if missions is None else list(missions))
+        self.initial = len(self.world.crew)
         self._decision = None
+        self._decision_for = None
+        self._logged = 0
 
     # -- state mirrored from the game ---------------------------------------
     def stage(self) -> str:
@@ -77,15 +82,26 @@ class DreadBridge:
     def tick(self, depth: float = 100.0, submarine=None) -> List[str]:
         """Advance one hour. While a decision is pending the world holds still."""
         w = self.world
-        if w.pending is not None:
+        if w.pending is not None or w.finished:
             return []
-        w.ship.surfaced = depth < 10
+        # listening to the world is a surfacing in the story even if the boat stays deep
+        w.ship.surfaced = depth < 10 or ("checking" in w.ship.flags and w.tick_no < w.check_until)
         if submarine is not None and hasattr(submarine, "hull"):
             w.ship.hull = clamp(float(submarine.hull))
-        lines = w.tick()
+        w.tick()
         if submarine is not None and hasattr(submarine, "hull"):
             submarine.hull = w.ship.hull
+        lines = w.log[self._logged:]            # includes the briefing written before the first tick
+        self._logged = len(w.log)
         return lines
+
+    @property
+    def finished(self) -> bool:
+        return self.world.finished
+
+    def ending(self) -> str:
+        from .endings import classify_ending
+        return classify_ending(self.world, self.initial)
 
     # -- missions -----------------------------------------------------------
     def begin_mission(self, mission_id: str):
@@ -115,8 +131,12 @@ class DreadBridge:
         p = self.world.pending
         if p is None:
             self._decision = None
+            self._decision_for = None
             return None
-        if self._decision is None:
+        # One Decision per pending event. (Keyed on the event, not on "was called while idle":
+        # the game asks again only once the next event is already waiting.)
+        if self._decision is None or self._decision_for is not p:
+            self._decision_for = p
             keys = {str(i + 1): c for i, c in enumerate(p.choices)}
             options = [DecisionOption(key=k, text=c.text, tooltip=c.cost,
                                       success_message=f"{c.text} ({c.cost})" if c.cost else c.text)

@@ -52,10 +52,9 @@ class PanelManager:
         oxygen = getattr(game.submarine.systems, 'oxygen', 1.0)
         noise = getattr(game.submarine.systems, 'noise_level', 1.0)
         
-        # Horror Stage
-        horror_stage = "NORMAL"
-        if hasattr(game, 'horror_manager') and game.horror_manager:
-            horror_stage = game.horror_manager.current_stage.name
+        # Day. (There is deliberately no horror stage on screen: it is a hidden value,
+        # and naming it would tell the captain what the men will not. DESIGN.md section 12.)
+        day = turn // 24 + 1
         
         # Colors
         c_good = (100, 255, 100)
@@ -84,7 +83,7 @@ class PanelManager:
         console.print(x_cursor, y_stat, f"Noise: {noise:.1f}", fg=noise_col)
         x_cursor += 15
         
-        console.print(x_cursor, y_stat, f"Stage: {horror_stage}", fg=(255, 150, 255))
+        console.print(x_cursor, y_stat, f"Day {day}", fg=(150, 170, 190))
 
         # === 2. TACTICAL MAP (Left) ===
         map_x = 0
@@ -269,13 +268,11 @@ class PanelManager:
         # Controls Hint (Left side of bottom panel)
         hints = [
             "ARROWS: Move",
-            "P: Active Ping",
-            "X: Silent Run",
+            "SPACE/W: Wait (W=news)",
+            "TAB: Captain's bridge",
             "-/=: Dive/Rise",
-            "T: Target",
-            "F: Fire Torp",
-            "H: Help (All Cmds)",
-            "Q: Quit"
+            "P: Ping  X: Silent",
+            "H: Help  Q: Quit"
         ]
         for i, hint in enumerate(hints):
             console.print(2, log_y + 1 + i, hint, fg=(255, 255, 255))
@@ -365,6 +362,14 @@ class PanelManager:
                     for px, py in points[1:-1]: # Skip start/end
                         if map_x < px < map_x + tactical_w and map_y < py < map_y + main_h:
                             console.print(px, py, '.', fg=(255, 100, 100))
+
+        self.render_dread(console, game)
+
+    def render_dread(self, console, game):
+        """The captain's bridge, decision modal and ending screen go on top of everything."""
+        ui = getattr(game, 'dread_ui', None)
+        if ui is not None:
+            ui.render(console, game)
 
     def _old_render(self, console, game):
         # ...existing code...

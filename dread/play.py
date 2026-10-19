@@ -35,7 +35,13 @@ class Item:
     needs_crew: bool = False
 
 
-def available_orders(w: DreadWorld) -> List[Item]:
+def _game_depth(game, meters: int, text: str) -> str:
+    game.target_depth = meters
+    return text
+
+
+def available_orders(w: DreadWorld, game=None) -> List[Item]:
+    """``game``: when the HUD runs inside the real game, depth is the game's, not the story's."""
     s = w.ship
     items: List[Item] = []
     if s.sonar_on:
@@ -53,12 +59,15 @@ def available_orders(w: DreadWorld) -> List[Item]:
     items.append(Item("Speak to the crew over the intercom", "works in proportion to what they still believe", lambda: O.address_crew(w)))
     items.append(Item("Break out fresh absorbent", f"{s.scrubber * 100:.0f}% left", lambda: O.scrub_air(w)))
     if s.surfaced:
-        items.append(Item("Dive", "", lambda: O.dive(w)))
+        items.append(Item("Dive", "", (lambda: _game_depth(game, 60, "Diving.")) if game else (lambda: O.dive(w))))
     else:
-        items.append(Item("Surface for air", "air, and the sky can see you", lambda: O.surface(w)))
-    items.append(Item("Silent running" if not s.silent_running else "Resume normal running",
-                      "quiet in a fight; slow in a race", lambda: O.silent_running(w, not s.silent_running)))
-    items.append(Item("One active ping", "information; and a sound the water carries", lambda: O.active_ping(w)))
+        items.append(Item("Surface for air", "air, and the sky can see you",
+                          (lambda: _game_depth(game, 0, "Blowing ballast. The boat climbs.")) if game
+                          else (lambda: O.surface(w))))
+    if game is None:       # in the real game, silent running and pings are the X and P keys
+        items.append(Item("Silent running" if not s.silent_running else "Resume normal running",
+                          "quiet in a fight; slow in a race", lambda: O.silent_running(w, not s.silent_running)))
+        items.append(Item("One active ping", "information; and a sound the water carries", lambda: O.active_ping(w)))
     if w.run is not None and "verified" not in w.run.phase_fired:
         items.append(Item("Ask headquarters to confirm the orders", "an answer is not the same as a source",
                           lambda: O.verify_orders(w)))
@@ -87,13 +96,24 @@ def _set_rations(w, level):
 class Session:
     """Everything the UI does, as text in and text out, so it can be tested."""
 
-    def __init__(self, seed: int = 0, policy: Optional[str] = None):
-        self.w = DreadWorld(seed=seed)
-        self.initial = len(self.w.crew)
+    def __init__(self, seed: int = 0, policy: Optional[str] = None, world: Optional[DreadWorld] = None,
+                 advance: Optional[Callable[[], None]] = None, answer: Optional[Callable[[int], None]] = None,
+                 game=None, initial: Optional[int] = None):
+        """Standalone by default. Inside the real game the world, the clock and the
+        decision modal belong to the game, so it passes them in."""
+        self.w = world if world is not None else DreadWorld(seed=seed)
+        self.initial = initial if initial is not None else len(self.w.crew)
         self.policy = policy
         self.over = False
         self.awaiting = None       # an order that needs a man picked
         self.ending: Optional[str] = None
+        self.notice = ""           # the last thing an order or an error said
+        self._advance_fn = advance or self.w.tick
+        self._answer_fn = answer
+        self.game = game
+
+    def orders(self) -> List[Item]:
+        return available_orders(self.w, self.game)
 
     # -- rendering ----------------------------------------------------------
     def view(self, notice: str = "") -> str:
@@ -104,7 +124,8 @@ class Session:
             names = [f"  {i}. {c.name} ({c.role})" for i, c in enumerate(self._pickable(), 1)]
             return "\n".join(["Which man?"] + names)
         pending = w.pending
-        items = None if pending else available_orders(w)
+        items = None if pending else self.orders()
+        self.notice = notice or self.notice
         return hud.screen(w, pending, items, notice)
 
     def _pickable(self):
@@ -117,6 +138,7 @@ class Session:
     # -- one input ----------------------------------------------------------
     def handle(self, cmd: str) -> str:
         cmd = cmd.strip().lower()
+        self.notice = ""
         w = self.w
         if self.over:
             return self.view()
@@ -141,12 +163,15 @@ class Session:
     def _answer(self, cmd: str) -> str:
         p = self.w.pending
         if cmd.isdigit() and 1 <= int(cmd) <= len(p.choices):
-            self.w.choose(p.choices[int(cmd) - 1].key)
+            if self._answer_fn is not None:
+                self._answer_fn(int(cmd))
+            else:
+                self.w.choose(p.choices[int(cmd) - 1].key)
             return self._after(self.view())
         return self.view(f"A decision is waiting. Choose 1-{len(p.choices)}.")
 
     def _order(self, n: int) -> str:
-        items = available_orders(self.w)
+        items = self.orders()
         if not 1 <= n <= len(items):
             return self.view(f"There is no order {n}.")
         item = items[n - 1]
@@ -171,7 +196,7 @@ class Session:
         for _ in range(hours):
             if w.finished or w.pending is not None:
                 break
-            w.tick()
+            self._advance_fn()
             if stop_on_news and (w.pending is not None or len(w.log) > seen):
                 break
         return self._after(self.view())

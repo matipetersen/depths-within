@@ -121,3 +121,19 @@ def test_bridge_end_mission_resolves_it():
     b.end_mission("failed")
     assert b.world.results[-1]["outcome"] == "failed"
     assert b.world.run is None
+
+
+def test_each_pending_event_gets_its_own_decision():
+    """Regression: the cached Decision of event A used to be served again for event B."""
+    b = DreadBridge(None, seed=1)
+    w = b.world
+    w.engine.fire(w.engine.events["clock_slow"], w)
+    first = b.pending_decision()
+    DecisionManager().resolve_option(first, "1", object())
+    assert w.pending is None
+    w.engine.fire(w.engine.events["echo_follows"], w)       # a different event, different keys
+    second = b.pending_decision()
+    assert second is not first and second.id == "echo_follows"
+    assert [o.text for o in second.options] != [o.text for o in first.options]
+    DecisionManager().resolve_option(second, "2", object())
+    assert w.pending is None

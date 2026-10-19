@@ -558,19 +558,49 @@ Un solo final de pantalla: el texto del final, la frase del silencio, y **los do
 fila por fila**: el oficial (todo explicable) a la izquierda, el diario (nada lo es) a la derecha.
 Sin árbitro: *«nadie ha pedido que se reconcilien»*.
 
-### 12.5 Cuando llegue a la interfaz gráfica (tcod)
+### 12.5 Conectado a la ventana de tcod (MVP)
 
-- **Paleta** (desaturada, según las convenciones del repo): azul marino profundo de fondo, gris
-  acero para la interfaz, **ámbar solo para alertas del libro** (aire, víveres, casco bajos), verde
-  sonar para el estado del sonar. **Nada se comunica solo por color**: cada alerta lleva texto.
-- **Paneles:** `hud.header` → barra superior; `hud.ledger` → panel fijo (siempre visible);
-  `hud.crew` → lista con scroll; `hud.sonar` → tira inferior; `hud.log_tail` → diario;
-  decisiones → modal centrado. Todas son listas de líneas, directamente consumibles.
-- **Audio:** el sonar *es* el terror. Los fantasmas son un canal de audio, no solo texto; y el
-  final es **el silencio** (cortar todo el audio del barco).
-- **Ritmo:** mostrar el ledger con cambios *sutiles* (barras que bajan despacio), no avisos
-  gritones; los avisos graves son del diario.
-- **Pendiente:** conectar estos paneles al `PanelManager` del juego; no se ha hecho.
+El HUD ya está conectado al juego real. **Cómo probarlo:** `python main.py --quick` (o `python main.py`)
+y, dentro de la ventana:
+
+| Tecla | Qué hace |
+|---|---|
+| `TAB` | abre/cierra el **puente del capitán** (libro de existencias, los hombres, el sonar, el diario, las órdenes) |
+| número + `Enter` | da esa orden (dos dígitos como máximo); `Enter`/`Espacio` en el puente = esperar una hora |
+| `W` | esperar hasta que ocurra algo (máx. 12 h); funciona también en el mapa |
+| `1`–`9` ante una decisión | responde; **el reloj se detiene hasta que se responde** |
+| `Esc` en el puente | vuelve al mapa; `Q` sale |
+| al acabar la patrulla | `↑↓` / `RePág AvPág` para leer el epílogo; `Q` sale |
+
+`DREAD_MISSIONS=0` ejecuta el modelo de horror sin la historia de las cinco misiones.
+Sin ventana (CI, SSH, entorno en la nube): `python tools/dread_preview.py DIRECTORIO` juega
+una patrulla por el juego real y guarda PNG de lo que dibujaría la ventana.
+
+**Dónde está cada cosa:** `dread/hud.py` produce el texto (funciones puras); `ui/dread_ui.py` lo coloca,
+le asigna color y encamina las teclas; `engine/game.py` le cede las teclas antes que al mapa;
+`ui/panels/panel_manager.py` dibuja la capa encima del mapa.
+
+**Cambios hechos al pasarlo a la ventana (todos por las reglas de la sección 12.1):**
+- La cabecera mostraba `Stage: <etapa de horror>`: **un valor oculto**. Ahora muestra el día.
+- Al cambiar de etapa el modelo anunciaba «THE TRUTH IS UNDENIABLE. SOMETHING IS DOWN HERE WITH US»:
+  filtraba la etapa *y* confirmaba lo sobrenatural. En el modelo nuevo no se anuncia nada.
+- La tecla `B` también imprimía la etapa. Ahora imprime el día.
+- **El modo gráfico no tenía forma de responder decisiones** (`1`–`4` son velocidades). Ahora hay un modal.
+- Paleta: azul marino, gris acero, ámbar solo para alarmas del libro; ninguna información va solo en color.
+
+**Limitaciones conocidas del MVP:**
+- **Dos libros de existencias conviven.** La cabecera del mapa sigue mostrando las baterías y el O₂ del
+  simulador táctico; el puente muestra los víveres, el gasóleo, el absorbente y el CO₂ del modelo de
+  horror. No están unificados.
+- **Las misiones son una capa narrativa.** Hundir «al acorazado» en la historia no exige hundir un buque en el
+  mapa táctico, ni al revés. Los combates de destructores programados están desactivados en el juego en vivo.
+- **Sumergirse arranca el reloj:** el juego empieza en superficie; se fija una profundidad objetivo de 60 m para
+  que la patrulla corra desde el primer momento. En superficie no avanza la misión.
+- **Probado sin abrir la ventana SDL** (consola de tcod sin pantalla + capturas PNG + 13 pruebas de teclas y
+  pantalla). Falta jugarlo en un escritorio de verdad: tamaño de fuente, ratón, redimensionado.
+- La paleta no se ha comprobado contra daltonismo.
+- Faltan el **audio** (los fantasmas del sonar son texto; el silencio final no se oye) y un panel del
+  puente que no tape el mapa táctico.
 
 ## 13. Referencias
 
