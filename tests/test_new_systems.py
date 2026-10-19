@@ -454,7 +454,11 @@ def test_integrated_scenario():
     print(f"  Night bonus: +{night_bonus:.0%}")
     print(f"  Total effectiveness: {adjusted_effectiveness:.0%}")
     
-    assert adjusted_effectiveness > effectiveness, "Night should boost stealth missions"
+    # effectiveness is capped at 1.0, so a strict increase is impossible for a maxed diver
+    assert night_bonus > 0, "Night should offer a stealth bonus"
+    assert adjusted_effectiveness >= effectiveness, "Night must never reduce stealth missions"
+    if effectiveness < 1.0:
+        assert adjusted_effectiveness > effectiveness, "Night should boost stealth missions"
     
     print(f"\n✓ Integrated scenario working correctly")
 
