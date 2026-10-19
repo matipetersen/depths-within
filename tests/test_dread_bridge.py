@@ -97,3 +97,27 @@ def test_game_loop_smoke():
             resolved += 1
     assert resolved > 0
     assert not [e for e in g.logger.entries if "[horror] error" in str(e["text"]) or "[dread]" in str(e["text"])]
+
+
+def test_bridge_can_start_a_mission_that_drives_its_own_events():
+    b = DreadBridge(None, seed=2)
+    assert b.world.run is None                         # the live game supplies its own missions
+    m = b.begin_mission("m3_hospital_ship")
+    assert b.world.run.mission.id == m.id
+    b.world.ship.progress = 1.0
+    for _ in range(3):
+        b.tick()
+        if b.world.pending:
+            break
+    d = b.pending_decision()
+    assert d is not None and d.id.startswith("m3_")        # earliest phase fires first: m3_envelope
+    with pytest.raises(KeyError):
+        b.begin_mission("nope")
+
+
+def test_bridge_end_mission_resolves_it():
+    b = DreadBridge(None, seed=2)
+    b.begin_mission("m1_battleship")
+    b.end_mission("failed")
+    assert b.world.results[-1]["outcome"] == "failed"
+    assert b.world.run is None

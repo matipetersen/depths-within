@@ -3,6 +3,7 @@ import random
 from typing import List, Optional
 
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
+from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
 from .state import Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 
@@ -25,7 +26,7 @@ def default_crew(rng: random.Random, names=DEFAULT_NAMES) -> List[Crew]:
 class DreadWorld:
     def __init__(self, crew: Optional[List[Crew]] = None, seed: int = 0,
                  patrol_ticks: int = 72, events: Optional[List[dict]] = None,
-                 use_schedule: bool = True):
+                 use_schedule: bool = True, missions=None):
         self.rng = random.Random(seed)
         self.crew = crew if crew is not None else default_crew(self.rng)
         self.ship = Ship()
@@ -41,6 +42,14 @@ class DreadWorld:
         self.mutiny_clock = 0
         self.time_cost = 0.0      # progress lost to rituals etc., applied next tick
         self.peak_dread = 0.0
+        # Missions (DESIGN.md section 7). missions=[] disables them (the live game
+        # supplies its own); None loads the default sequence.
+        self.missions = load_missions() if missions is None else list(missions)
+        self.run = None
+        self.mission_i = -1
+        self.results = []
+        if self.missions:
+            self._start_mission(0)
 
     # -- accessors ----------------------------------------------------------
     def active_crew(self) -> List[Crew]:
@@ -67,7 +76,8 @@ class DreadWorld:
     @property
     def finished(self) -> bool:
         f = self.ship.flags
-        return (self.ship.progress >= 1.0 or self.ship.hull <= 0.0 or "deposed" in f
+        done = (self.mission_i >= len(self.missions)) if self.missions else self.ship.progress >= 1.0
+        return (done or self.ship.hull <= 0.0 or "deposed" in f
                 or "aborted" in f or not self.active_crew()
                 or self.tick_no >= self.patrol_ticks * HARD_LIMIT_FACTOR)
 
@@ -117,6 +127,7 @@ class DreadWorld:
         self._rumors()
         self.deck.tick(self)
         self._mission()
+        self._mission_flow()
         self._mutiny()
         ev = self.engine.select(self)
         if ev is not None:
@@ -181,9 +192,15 @@ class DreadWorld:
         if s.rest_cancelled:
             for c in live:
                 c.trust = clamp(c.trust - 0.004)
+        # doubtful orders erode trust; what the boat has done feeds guilt and the presence
+        floor = 0.3 * (1 - self.run.mission.quality) if self.run is not None else 0.0
+        s.orders_doubt = max(floor, s.orders_doubt - 0.002)
+        for c in live:
+            c.trust = clamp(c.trust - 0.0012 * s.orders_doubt)
+            c.guilt = clamp(c.guilt + 0.0008 * s.moral_debt)
         # the presence
         d = self.dread()
-        da = (0.003 * sum(1 for c in live if c.isolated) + 0.012 * d
+        da = (0.003 * sum(1 for c in live if c.isolated) + 0.012 * d + 0.01 * s.moral_debt
               - 0.004 * routine * s.cohesion - 0.001)
         if s.surfaced:
             da -= 0.03
@@ -227,10 +244,72 @@ class DreadWorld:
                         c.believes.discard(rid)
                 del s.rumors[rid]
 
+    # -- missions -------------------------------------------------------------
+    def _start_mission(self, i: int):
+        self.mission_i = i
+        m = self.missions[i]
+        self.run = MissionRun(m, self.tick_no)
+        s = self.ship
+        s.progress = 0.0
+        s.orders_doubt = clamp(max(s.orders_doubt * 0.5, (1 - m.quality) * 0.6 + (0.15 if m.moral else 0.0)))
+        self.log.append(f"[{self.tick_no:03d}] ORDERS: {m.title}. {m.briefing}")
+        self.log.append(f"[{self.tick_no:03d}]   Received: {provenance_line(m)}")
+
+    def resolve_mission(self, outcome: str):
+        run = self.run
+        if run is None or run.outcome is not None:
+            return
+        run.outcome = outcome
+        m = run.mission
+        self.results.append({"mission": m.id, "outcome": outcome, "tick": self.tick_no})
+        self.ship.flags.add(f"outcome:{m.id}:{outcome}")
+        self.log.append(f"[{self.tick_no:03d}] Mission '{m.title}': {outcome}.")
+        if self.mission_i + 1 < len(self.missions):
+            self._start_mission(self.mission_i + 1)
+        else:
+            self.mission_i += 1
+            self.run = None
+
+    def _mission_flow(self):
+        run = self.run
+        if run is None or run.outcome is not None:
+            return
+        m = run.mission
+        if self.tick_no > run.deadline:
+            self.log.append(f"[{self.tick_no:03d}] The window for '{m.title}' has closed.")
+            self.resolve_mission("failed")
+        elif self.ship.progress >= 1.0:
+            final = [e for e in self.engine.events.values()
+                     if e.get("mission") == m.id and e.get("at_progress", 0) >= 1.0
+                     and e["id"] not in run.phase_fired]
+            if not final:
+                self.resolve_mission("success")
+
+    def debrief(self) -> List[str]:
+        """After the patrol: everything the captain was never told (DESIGN.md 2, 8)."""
+        out = []
+        by_id = {m.id: m for m in self.missions}
+        for r in self.results:
+            m = by_id[r["mission"]]
+            out += [f"{m.title}: {r['outcome']} (tick {r['tick']})",
+                    f"  Received: {provenance_line(m)}",
+                    f"  Plausibly: {m.mundane_origin}",
+                    f"  Or: {m.uncanny_origin}"]
+        for f in self.fired:
+            ev = self.engine.events[f.id]
+            if ev.get("beat") or ev.get("mission"):
+                out += [f"[{f.tick:03d}] {f.id}: {'explicable' if f.mundane_ok else 'NOT explicable'}",
+                        f"  Plausibly: {ev['mundane_cause']}", f"  Or: {ev['uncanny_cause']}"]
+        return out
+
     def _mission(self):
         s = self.ship
         speed = s.readiness * (0.5 if s.silent_running else 1.0) * (0.0 if s.surfaced else 1.0)
-        s.progress = clamp(s.progress + speed / (self.patrol_ticks * PACE) - self.time_cost)
+        if self.run is not None:
+            if self.run.outcome is None:
+                s.progress = clamp(s.progress + speed / (self.run.mission.ticks * PACE) - self.time_cost)
+        else:
+            s.progress = clamp(s.progress + speed / (self.patrol_ticks * PACE) - self.time_cost)
         self.time_cost = 0.0
         if s.surfaced and self.rng.random() < 0.08:
             self.log.append(f"[{self.tick_no:03d}] Aircraft overhead. We are exposed.")

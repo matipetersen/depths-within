@@ -91,6 +91,8 @@ class Ship:
     noise: float = 0.1
     attention: float = 0.0    # hidden: the presence's interest (DESIGN.md 2)
     progress: float = 0.0     # mission progress 0..1
+    orders_doubt: float = 0.0 # how little the crew trusts where the orders came from
+    moral_debt: float = 0.0   # hidden: what the boat has done that it cannot undo
     scrubber: float = 1.0     # remaining CO2 absorbent
     sonar_on: bool = True
     silent_running: bool = False

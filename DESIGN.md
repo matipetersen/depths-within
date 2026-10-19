@@ -166,6 +166,7 @@ Cada orden (`dread/orders.py`) tiene beneficio inmediato **y** un costo oculto.
 | `surface` | `co2`, miedo y `attention`↓ | riesgo aéreo; progreso casi nulo |
 | `active_ping` | información real | `noise`↑, `attention`↑ |
 | `silent_running` | `noise`↓ en combate | progreso ×0.5 |
+| `verify_orders` | puede bajar `orders_doubt` | ruido, atención, tiempo; puede contradecir; una vez por misión |
 
 ## 6. Eventos
 
@@ -182,6 +183,14 @@ text            lo que ve el jugador
 effects         lista de operaciones sobre el estado
 choices?        opciones: key, text, tags, requires, effects, cost
 ```
+
+Un evento se dispara por **dos tipos de disparador**:
+
+1. **Por estado** (`requires`): el pool aleatorio, filtrado por acto, enfriamiento y condiciones.
+2. **Por misión** (`mission` + `at_progress`): se dispara cuando el avance de esa
+   misión cruza el umbral, una vez por misión, ignorando enfriamientos. Un evento
+   con `mission` pero sin `at_progress` es del pool aleatorio, pero solo mientras
+   esa misión está en curso.
 
 Reglas:
 
@@ -208,78 +217,150 @@ tiempo solo impide que el acto III aparezca el primer día; nunca lo provoca.
 - **Acto II — Grietas.** Desaparición, rumores, órdenes costosas, primer motín en gestación.
 - **Acto III — Sin salida.** Eventos "solo inexplicables", la presencia más audible, la tripulación se destruye o el capitán escoge qué salvar.
 
+### 7.1 Misiones: el segundo disparador
+
+La patrulla es una **secuencia de misiones** (`data/missions.json`), cada una con
+su ritmo, su ventana de tiempo y sus propios eventos (sección 6). Lo que ocurre
+en cada una:
+
+| Misión | Tipo | Qué pasa |
+|---|---|---|
+| 1. Hundir al acorazado | destruir | Contacto (acechar o forzar) y ataque final; el riesgo depende de la disponibilidad y de cómo se acercó. |
+| 2. Encontrar el convoy y reportar | patrulla | Avistamiento: reportar ya (ruido, escoltas), seguir y reportar al anochecer (tiempo) o callar. El acuse de HQ nombra un barco que no estaba en el convoy. |
+| 3. Hundir el vapor *Santa Lucía* | **moral** | Las órdenes dicen que las cruces rojas son un engaño. Tres salidas: hundirlo, detenerlo y dejar que salgan los botes, o negarse. |
+| 4. Volver por la ruta norte | **moral** | Sin paradas ni contacto. Náufragos en el agua: pasar de largo o rescatarlos (¿y quién es el duodécimo?). |
+
+Cada misión tiene su ventana (`ticks × 1.25`; las morales `× 2.2`: el reloj no
+debe robar el dilema). Si se cierra, la misión **fracasa** y empieza la siguiente.
+
+### 7.2 El origen de las órdenes nunca se resuelve
+
+> **Las órdenes llegan de algún sitio, pero no se sabe bien de dónde.**
+
+Cada misión se presenta con su **procedencia** (canal, firma, calidad 0–1):
+
+| Misión | Procedencia | Calidad |
+|---|---|---|
+| 1 | Sobre sellado, entregado en el muelle, contrafirmado | 0.90 |
+| 2 | Relevo de radio; la señal se reconoce, la frecuencia no | 0.60 |
+| 3 | Encontrado en la caja fuerte del capitán; nadie recuerda cuándo llegó; la letra parece suya | 0.35 |
+| 4 | Sin canal registrado; está en el diario con la fecha de hoy | 0.15 |
+
+**La procedencia se degrada a medida que avanza la patrulla**: cuanto más se
+hunde el barco, menos claro es quién manda. Reglas:
+
+- Cada misión declara `mundane_origin` y `uncanny_origin`; el validador exige
+  ambos (misma regla de oro que los eventos). Solo el *debrief* (`world.debrief()`)
+  los muestra, al final.
+- `orders_doubt` (0–1): cuánto desconfía la tripulación del origen. Sube con baja
+  calidad y con las misiones morales; desgasta `trust` cada tick.
+- **`verify_orders`**: pedir confirmación por radio, una vez por misión. Cuesta
+  ruido, atención y tiempo. La respuesta tranquiliza (más probable con buena
+  calidad), calla o **contradice** ("mismo indicativo, otro cifrado"). Nunca
+  dice quién las envió.
+- **Contraórdenes** (`orders_countermand`): una segunda señal anula la primera.
+- Consecuencia oculta: que unas órdenes *consten o no en los registros* es
+  incierto (`m4_unrecorded`, 50 %). Si no constan, no hay consejo de guerra por
+  desobedecerlas ni expediente por torcerlas. El capitán no puede saberlo al decidir.
+
+### 7.3 Misiones morales: deuda moral
+
+Las misiones morales ofrecen siempre tres salidas con etiquetas
+(`comply` / `alter` / `refuse`), y ninguna es gratis:
+
+| Salida | Beneficio | Costo |
+|---|---|---|
+| Cumplir | Misión cumplida; sin conflicto con el mando | `moral_debt`↑, culpa y miedo de todos, `trust`↓, rumor propio (*«hundimos un buque hospital»*) |
+| Torcer | La tripulación te sigue; poca deuda | Tiempo, exposición en superficie, riesgo de casco; `orders_bent` |
+| Negarse | Sin deuda moral; `trust`↑ | `discipline`↓, `orders_doubt`↑, `orders_defied` |
+
+**`moral_debt`** (oculta) alimenta la culpa de todos y a la presencia
+(`attention`). Lo que el barco ha hecho no se deshace y atrae lo que lo persigue.
+
 ## 8. Finales (estados, no escenas)
 
 Derivados del estado final (`dread/sim.py: classify_ending`):
 
-- `lost_with_all_hands`: casco en 0.
+- `lost_with_all_hands`: casco en 0 o sin tripulación.
 - `deposed`: motín consumado; el capitán pierde el mando.
-- `hollow_victory`: misión cumplida con cohesión < 0.3.
-- `returned`: misión cumplida y tripulación entera.
-- `turned_back`: se abortó la misión; la tripulación vive.
-- `unaccounted`: llega a puerto con más (o menos) tripulantes de los que salieron
-  (final del acto III, reservado).
+- `turned_back`: se abortó la patrulla.
+- `stained_victory`: se hundió al buque civil. **Gana el remordimiento, no el consejo de guerra:** la tripulación lo sabe aunque el registro no lo diga.
+- `court_martial`: se desobedeció una orden que *consta* en los registros.
+- `returned_under_a_cloud`: se torció una orden que *consta*; el mando hará preguntas sobre el diario.
+- `returned`: sin sangre en el diario ni expediente.
+- `hollow_victory`: misiones cumplidas con cohesión < 0.3 o menos del 60 % de la tripulación.
+- `mission_failed`: menos de 3 misiones cumplidas.
+- `unaccounted` (reservado): llega a puerto con más tripulantes de los que salieron.
 
 ## 9. Criterios de aceptación del bucle
 
 El simulador (`python -m dread.sim`) juega patrullas con políticas fijas
-(`mission_first`, `crew_first`, `paranoid`) sobre muchas semillas. El diseño es
-válido si:
+(`mission_first`, `crew_first`, `paranoid`) y un **capitán aleatorio** (`random`)
+sobre muchas semillas. El diseño es válido si:
 
-1. **Las políticas divergen en un trade-off real:** `mission_first` completa la
-   misión bastante más a menudo que `crew_first`, y `crew_first` deja mejor
-   cohesión, supervivencia y casco. Si una estrategia domina en todo, falta un dilema.
-2. **Ninguna política termina en el mismo final > 80 % de las semillas.**
-3. **Auditoría de ambigüedad:** ≥ 70 % de los eventos de actos I–II se disparan
+1. **Obedecer lo inmoral se paga:** `mission_first` hunde al buque civil casi
+   siempre y `crew_first` casi nunca; el primero acumula mucha más culpa y llega a
+   un pavor máximo mucho mayor. Lo que hizo el barco alimenta a la presencia.
+2. **Negarse y torcer también cuestan:** `crew_first` cumple menos órdenes tal como
+   se dieron y recibe más veces "bajo una nube", pero conserva casco, cohesión y supervivencia.
+3. **Finales variados:** el capitán aleatorio no acaba en el mismo final > 60 % de
+   las semillas, ve ≥ 5 finales distintos, y todo final alcanzable se alcanza.
+4. **Auditoría de ambigüedad:** ≥ 70 % de los eventos de actos I–II se disparan
    con la explicación mundana disponible (`mundane_when`).
-4. **Sin muerte súbita:** el casco nunca baja de 0.3 antes del tick 24 con ninguna política.
-5. **Sin contenido muerto:** cada evento del catálogo se dispara en alguna política.
-6. **Determinismo:** misma semilla, misma patrulla.
-7. **La presencia no desaparece con buena gestión:** toda política ve ≥ 2 pulsos
+5. **Sin muerte súbita:** el casco nunca baja de 0.3 antes del tick 24 con ninguna política.
+6. **Sin contenido muerto:** cada evento del catálogo se dispara en alguna política.
+7. **Determinismo:** misma semilla, misma patrulla.
+8. **La presencia no desaparece con buena gestión:** toda política ve ≥ 2 pulsos
    y el primero antes del tick 30 en ≥ 95 % de las semillas; los pulsos severos
    los gana quien juega mal.
 
-Todos son pruebas automáticas (`tests/test_dread_sim.py`).
+Todos son pruebas automáticas (`tests/test_dread_sim.py`, `tests/test_dread_missions.py`).
 
-### Calibración actual (300 semillas, 72 ticks)
+(El antiguo criterio "ninguna política termina en el mismo final > 80 %" se retiró:
+con misiones morales, el final de una política determinista lo decide una elección
+deliberada, que es justo lo que se quiere. La diversidad se mide con el capitán aleatorio.)
 
-| Política | Misión cumplida | Pierde el barco | Cohesión | Supervivencia | Casco | Dread máx. | Pulsos |
-|---|---|---|---|---|---|---|---|
-| `mission_first` | 55% | 8% | 0.47 | 0.90 | 0.18 | 0.73 | 10.1 (primero: tick 14) |
-| `crew_first` | 38% | 0% | 0.77 | 0.97 | 0.44 | 0.30 | 7.4 (primero: tick 15) |
-| `paranoid` | 60% | 32% | 0.60 | 0.95 | 0.14 | 0.44 | 8.1 (primero: tick 15) |
+### Calibración actual (300 semillas, 4 misiones)
+
+| Política | Órdenes cumplidas | Hunde al buque civil | Culpa | Cohesión | Casco | Dread máx. |
+|---|---|---|---|---|---|---|
+| `mission_first` | 76 % | 96 % | 0.42 | 0.46 | 0.20 | 0.82 |
+| `crew_first` | 51 % | 0 % | 0.00 | 0.76 | 0.48 | 0.29 |
+| `paranoid` | 63 % | 91 % | 0.40 | 0.55 | 0.40 | 0.51 |
+
+Finales: `mission_first` 88 % `stained_victory`, 12 % pierde el barco; `crew_first`
+55 % `returned_under_a_cloud`, 32 % `mission_failed`, 13 % `returned`.
 
 Estos números son una **primera calibración**, no un objetivo. Lo que fijan los
 tests son las relaciones entre políticas, no los valores absolutos.
 
 ### La presencia no desaparece con buena gestión
 
-Dos mecanismos lo garantizan (criterio 7):
+Dos mecanismos lo garantizan (criterio 8):
 
 - **Piso de atención:** `attention` nunca baja de `0.25 × clamp((horas_sumergido − 10) / 60)`.
-  El tiempo bajo el agua le da un punto de apoyo pase lo que pase. Solo cuentan
-  horas sumergido; salir a superficie pausa el reloj.
-- **Pulsos obligatorios:** los eventos marcados `"beat": true` son los que
-  manifiestan a la presencia. Si pasan 14 ticks (a partir del tick 8) sin
-  ninguno, el siguiente evento sale forzosamente de entre los pulsos cuyos
-  requisitos se cumplen. Hay pulsos de requisitos bajos (`footsteps_on_hull`,
-  `extra_place_set`, `clock_slow`) para que el juego cuidadoso los vea.
-
-El jugador cuidadoso ve pulsos leves y repetidos (pasos en el casco, un lugar de más
-en la mesa). Los severos (`hatch_caller`, `unaccounted_count`, `tube_breathing`)
-los gana quien juega mal.
+  Solo cuentan horas sumergido; salir a superficie pausa el reloj.
+- **Pulsos obligatorios:** los eventos marcados `"beat": true` manifiestan a la
+  presencia. Si pasan 14 ticks (desde el tick 8) sin ninguno, el siguiente sale
+  forzosamente de entre los pulsos cuyos requisitos se cumplen.
 
 ### Problemas abiertos (conocidos)
 
-- **`crew_first` fracasa la misión ~60 %.** El costo en tiempo del cuidado
-  (rituales, superficie, búsquedas) puede ser excesivo. Falta ver si el jugador
-  humano lo percibe como justo.
-- **`paranoid` pierde el barco ~un tercio de las veces** por quedarse sordo ante
-  contactos reales. Es la lección buscada, pero conviene revisar si es demasiado dura.
-- **Pulsos repetidos:** `footsteps_on_hull` sale ~2 veces por patrulla con el mismo
-  texto. Es repetición deliberada, pero hace falta más variantes de texto.
-- Las políticas son simples. Un jugador humano combinará órdenes de formas que
-  el simulador no cubre; hay que jugar la patrulla a mano antes de fiarse de estos números.
+- **Las políticas fijas siempre toman la misma decisión moral**, así que no dicen
+  nada sobre cómo decide un humano; solo que ambas salidas tienen precio. Hay que jugarlo.
+- **Obedecer es muy seguro:** `mission_first` pierde el barco solo el 12 %. La
+  deuda moral se paga en horror y culpa, pero el jugador competente la sobrevive.
+  Falta un castigo mecánico más directo (motín, sabotaje) en las misiones morales.
+- **`crew_first` fracasa ≥ 3 misiones un tercio de las veces.** El coste del
+  cuidado puede ser excesivo; solo un humano puede juzgarlo.
+- **`court_martial` es raro con las políticas fijas** (nadie rehúsa de plano); solo
+  aparece con el capitán aleatorio. No se sabe si el miedo al consejo de guerra
+  pesará en un jugador real.
+- **Los cuatro textos de misión son fijos** y la secuencia es siempre la misma.
+  Generar misiones morales variadas (otro buque, otro dilema) está pendiente.
+- **No está conectado al `QuestManager`** del juego (que hoy no se usa en el bucle):
+  `DreadBridge.begin_mission(id)` queda como punto de enganche.
+- Los pulsos se repiten (`footsteps_on_hull` ~2 veces por patrulla); faltan variantes de texto.
 
 ## 10. Qué cambia en el código existente
 

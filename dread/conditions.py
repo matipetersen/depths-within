@@ -7,6 +7,8 @@ Forms (all JSON-serializable):
     {"crew_where": {"role": "sonar", "stat": "fear", "op": ">=", "value": 0.5}}
     {"phantom": "voice"}              # a phantom of that kind exists
     {"rumor": "marked", "believers_gte": 3}
+    {"mission": "m3_hospital_ship"}   # the mission in progress is that one (or one of a list)
+    {"outcome": {"mission": "m3_hospital_ship", "is": "refused"}}
     {"never": true}                   # always false (act III "unexplained" events)
     {"all": [...]}  {"any": [...]}  {"not": {...}}
 """
@@ -68,6 +70,12 @@ def evaluate(cond, world) -> bool:
                 continue
             return True
         return False
+    if "mission" in cond:
+        want = cond["mission"] if isinstance(cond["mission"], list) else [cond["mission"]]
+        return world.run is not None and world.run.mission.id in want
+    if "outcome" in cond:
+        o = cond["outcome"]
+        return f"outcome:{o['mission']}:{o['is']}" in world.ship.flags
     if "phantom" in cond:
         return any(p.kind == cond["phantom"] for p in world.deck.phantoms)
     if "rumor" in cond:

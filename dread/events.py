@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from .conditions import evaluate
+from .conditions import evaluate, resolve_path
 from .state import Rumor, clamp
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "events.json")
@@ -87,6 +87,15 @@ class EventEngine:
     def select(self, world) -> Optional[dict]:
         t = world.tick_no
         act = world.act()
+        # Mission phases are the second trigger (after state): fired by progress.
+        run = world.run
+        if run is not None:
+            due = [e for e in self.events.values()
+                   if e.get("mission") == run.mission.id and "at_progress" in e
+                   and e["id"] not in run.phase_fired
+                   and world.ship.progress >= e["at_progress"] and evaluate(e.get("requires"), world)]
+            if due:
+                return min(due, key=lambda e: e["at_progress"])
         scheduled = [e for e in self.events.values()
                      if self.use_schedule and t in e.get("schedule", [])
                      and self._ready(e, t, act, world, check_global=False)]
@@ -110,6 +119,12 @@ class EventEngine:
         return world.rng.choices(cands, weights=weights, k=1)[0]
 
     def _ready(self, ev, t, act, world, check_global=True) -> bool:
+        if "at_progress" in ev:
+            return False                       # phase events fire from select(), not the pool
+        if "mission" in ev:
+            ms = ev["mission"] if isinstance(ev["mission"], list) else [ev["mission"]]
+            if world.run is None or world.run.mission.id not in ms:
+                return False
         if "schedule" in ev and not self.use_schedule:
             return False
         if act not in ev["acts"] and "schedule" not in ev:
@@ -125,6 +140,8 @@ class EventEngine:
         t = world.tick_no
         self.last_fired[ev["id"]] = t
         self.last_any = t
+        if "at_progress" in ev and world.run is not None:
+            world.run.phase_fired.add(ev["id"])
         target = self._pick_target(ev.get("target"), world)
         world.event_target = target
         mundane_ok = evaluate(ev.get("mundane_when"), world)
@@ -230,6 +247,23 @@ def apply_effects(effects: List[dict], world, target=None):
             r = ship.rumors.get(fx["id"])
             if r is not None:
                 r.intensity = clamp(r.intensity + fx["value"])
+        elif op == "verify_orders":
+            from .orders import verify_orders
+            world.log.append(f"[{world.tick_no:03d}] {verify_orders(world)}")
+        elif op == "mission_outcome":
+            world.resolve_mission(fx["value"])
+        elif op == "if":
+            apply_effects(fx["then"] if evaluate(fx["cond"], world) else fx.get("else", []), world, target)
+        elif op == "chance":
+            p = fx["p"]
+            if "mod" in fx:
+                m = fx["mod"]
+                p += m["k"] * (resolve_path(m["path"], world) - m.get("ref", 0.0))
+            for flag, bonus in fx.get("if_flag", {}).items():
+                if flag in ship.flags:
+                    p += bonus
+            apply_effects(fx["then"] if world.rng.random() < clamp(p, 0.02, 0.98) else fx.get("else", []),
+                          world, target)
         elif op == "mute_phantoms":
             world.deck.mute_all()
         elif op == "log":

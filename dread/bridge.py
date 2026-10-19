@@ -58,7 +58,8 @@ class DreadBridge:
     def __init__(self, roster=None, seed: Optional[int] = None, events=None):
         rng = random.Random(seed)
         self.world = DreadWorld(crew=crew_from_roster(roster, rng), seed=rng.randrange(2 ** 31),
-                                patrol_ticks=10 ** 6, events=events, use_schedule=False)
+                                patrol_ticks=10 ** 6, events=events, use_schedule=False,
+                                missions=[])
         self._decision = None
 
     # -- state mirrored from the game ---------------------------------------
@@ -85,6 +86,27 @@ class DreadBridge:
         if submarine is not None and hasattr(submarine, "hull"):
             submarine.hull = w.ship.hull
         return lines
+
+    # -- missions -----------------------------------------------------------
+    def begin_mission(self, mission_id: str):
+        """Start one of data/missions.json on the live boat.
+
+        The game's own quest system can call this when a mission is accepted. The
+        mission's phase events then fire as ``progress`` advances (one game hour
+        per tick) and its moral decisions arrive as ordinary captain's decisions.
+        """
+        from .missions import load_missions
+        found = next((m for m in load_missions() if m.id == mission_id), None)
+        if found is None:
+            raise KeyError(mission_id)
+        w = self.world
+        w.missions = [found]
+        w._start_mission(0)
+        return found
+
+    def end_mission(self, outcome: str = "failed"):
+        """Close the current mission from outside (e.g. the quest was abandoned)."""
+        self.world.resolve_mission(outcome)
 
     # -- decisions ----------------------------------------------------------
     def pending_decision(self):

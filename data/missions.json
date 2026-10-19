@@ -1,0 +1,67 @@
+{
+  "_comment": "Mission sequence. Orders come from somewhere, but where is never settled. Every mission carries a mundane and an uncanny account of its origin (DESIGN.md section 7); the player sees neither, only the provenance.",
+  "missions": [
+    {
+      "id": "m1_battleship",
+      "kind": "destroy",
+      "ticks": 24,
+      "moral": false,
+      "title": "Sink the battleship",
+      "briefing": "Intercept and destroy a capital ship expected on the northern lane. Heavy escort likely.",
+      "provenance": {
+        "channel": "Sealed envelope, handed over on the pier before sailing.",
+        "signed": "Operations staff, countersigned.",
+        "quality": 0.9
+      },
+      "mundane_origin": "A routine operations plan drawn up by the staff from agent reports.",
+      "uncanny_origin": "The countersignature belongs to an officer who left the staff roll two years ago."
+    },
+    {
+      "id": "m2_convoy",
+      "kind": "patrol_report",
+      "ticks": 24,
+      "moral": false,
+      "title": "Find the convoy and report",
+      "briefing": "Patrol the grid and locate the enemy convoy. Report position and composition. Do not engage.",
+      "provenance": {
+        "channel": "Radio relay, received on the third watch.",
+        "signed": "No signature. Call sign recognised, frequency is not.",
+        "quality": 0.6
+      },
+      "mundane_origin": "A relay station on a backup frequency after the usual one was jammed.",
+      "uncanny_origin": "The call sign belongs to a station that was shelled out of existence in spring."
+    },
+    {
+      "id": "m3_hospital_ship",
+      "kind": "destroy",
+      "ticks": 14,
+      "moral": true,
+      "title": "Sink the steamer Santa Lucia",
+      "briefing": "A supply steamer is carrying munitions to the front under false hospital markings. Sink her. Ignore the markings; they are a ruse.",
+      "provenance": {
+        "channel": "Found in the captain's cabin safe. Nobody remembers it arriving.",
+        "signed": "Illegible. The handwriting looks like your own.",
+        "quality": 0.35
+      },
+      "mundane_origin": "An order slipped to the captain by a rival staff faction, or enemy deception designed to make a boat commit a war crime.",
+      "uncanny_origin": "It was written in the captain's own hand by something that wanted the ship sunk.",
+      "window": 2.2
+    },
+    {
+      "id": "m4_return_lane",
+      "kind": "return",
+      "ticks": 10,
+      "moral": true,
+      "title": "Return by the northern lane",
+      "briefing": "Return to base by the northern lane. Make no stops and no contact. Radio silence is absolute.",
+      "provenance": {
+        "channel": "No channel recorded. It is in the log under today's date.",
+        "signed": "None.",
+        "quality": 0.15
+      },
+      "mundane_origin": "Standing return instructions the mate copied into the log and forgot.",
+      "uncanny_origin": "Nobody wrote it. It was already in the log.",
+      "window": 2.2
+    }
+  ]
+}

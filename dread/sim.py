@@ -7,6 +7,7 @@ It exists to answer one question before any more content is written: do the
 captain's choices actually trade off against each other? (DESIGN.md section 9.)
 """
 import argparse
+import random
 from collections import Counter
 from typing import Dict, List
 
@@ -14,14 +15,16 @@ from . import orders as O
 from .world import DreadWorld
 
 PRIORITY = {
-    "mission_first": ["mission", "listen", "paranoid", "care", "silence"],
-    "crew_first": ["care", "listen", "silence", "mission", "paranoid"],
-    "paranoid": ["paranoid", "silence", "mission", "care", "listen"],
+    "mission_first": ["comply", "mission", "attack", "report", "listen", "paranoid", "care", "silence"],
+    "crew_first": ["alter", "refuse", "care", "patient", "listen", "silence", "mission", "paranoid"],
+    "paranoid": ["verify", "paranoid", "comply", "silence", "mission", "care", "listen"],
 }
-AVOID = {"mission_first": {"abort"}, "crew_first": set(), "paranoid": {"abort"}}
+AVOID = {"mission_first": {"abort", "retreat"}, "crew_first": set(), "paranoid": {"abort"}}
 
 
-def pick_choice(policy: str, pending) -> str:
+def pick_choice(policy: str, pending, prng=None) -> str:
+    if policy == "random":
+        return prng.choice(pending.choices).key
     ranked = sorted(pending.choices,
                     key=lambda c: (bool(set(c.tags) & AVOID[policy]),
                                    min((PRIORITY[policy].index(t) for t in c.tags if t in PRIORITY[policy]),
@@ -29,11 +32,19 @@ def pick_choice(policy: str, pending) -> str:
     return ranked[0].key
 
 
-def issue_orders(policy: str, w: DreadWorld):
+def issue_orders(policy: str, w: DreadWorld, prng=None):
     s = w.ship
     live = w.active_crew()
     if not live:
         return
+    if policy == "random":
+        return random_orders(w, prng)
+    run = w.run
+    if run is not None and "verified" not in run.phase_fired:
+        # a captain who distrusts where the order came from asks, once per mission
+        if (policy == "paranoid" and run.mission.quality < 0.7) or \
+           (policy == "crew_first" and run.mission.quality < 0.4):
+            w.log.append(f"[{w.tick_no:03d}] {O.verify_orders(w)}")
     fatigue = sum(c.fatigue for c in live) / len(live)
     if policy == "mission_first":
         # push hard, ease off only when the crew is close to collapse
@@ -76,6 +87,19 @@ def issue_orders(policy: str, w: DreadWorld):
         raise ValueError(policy)
 
 
+def random_orders(w: DreadWorld, prng: random.Random):
+    """A captain with no plan: sometimes does something, sometimes not."""
+    if prng.random() > 0.15:
+        return
+    s, live = w.ship, w.active_crew()
+    choice = prng.choice(["cancel_rest", "grant_rest", "hold_ritual", "scrub_air", "silence_sonar",
+                          "restore_sonar", "surface", "dive", "isolate", "address_crew", "verify_orders"])
+    if choice == "isolate":
+        O.isolate(w, prng.choice(live).id)
+    else:
+        O.ORDERS[choice](w)
+
+
 def classify_ending(w: DreadWorld, initial_crew: int) -> str:
     s = w.ship
     survivors = len(w.active_crew())
@@ -85,22 +109,34 @@ def classify_ending(w: DreadWorld, initial_crew: int) -> str:
         return "deposed"
     if "aborted" in s.flags:
         return "turned_back"
-    if s.progress >= 1.0:
+    done = sum(1 for r in w.results if r["outcome"] in ("success", "altered"))
+    if "civilian_sunk" in s.flags:
+        return "stained_victory"             # the crew knows, whatever HQ's ledger says
+    # Disobedience only counts if the orders are on record. Sometimes there is no
+    # record at all (m4_unrecorded): nobody can court-martial you for an order
+    # that, as far as anyone can prove, was never given.
+    on_record = "orders_unrecorded" not in s.flags
+    if "orders_defied" in s.flags and on_record:
+        return "court_martial"
+    if done >= 3:
         if s.cohesion < 0.3 or survivors < initial_crew * 0.6:
             return "hollow_victory"
+        if "orders_bent" in s.flags and on_record:
+            return "returned_under_a_cloud"    # HQ will have questions about the log
         return "returned"
     return "mission_failed"
 
 
 def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = False) -> Dict:
     w = DreadWorld(seed=seed, patrol_ticks=patrol_ticks)
+    prng = random.Random(seed * 7919 + 13)      # the captain's own dice, apart from the world's
     initial = len(w.crew)
     min_hull_by_24 = 1.0
     while not w.finished:
         if w.pending is not None:
-            w.choose(pick_choice(policy, w.pending))
+            w.choose(pick_choice(policy, w.pending, prng))
             continue
-        issue_orders(policy, w)
+        issue_orders(policy, w, prng)
         w.tick()
         if w.tick_no <= 24:
             min_hull_by_24 = min(min_hull_by_24, w.ship.hull)
@@ -108,7 +144,12 @@ def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = F
     early = [f for f in w.fired if f.act in (1, 2) and not f.id.startswith("destroyer")]
     result = {
         "policy": policy, "seed": seed, "ending": classify_ending(w, initial),
-        "ticks": w.tick_no, "progress": round(w.ship.progress, 3), "hull": round(w.ship.hull, 3),
+        "ticks": w.tick_no, "progress": round(sum(1 for r in w.results if r["outcome"] == "success")
+                                              / max(1, len(w.missions)), 3),
+        "outcomes": {r["mission"]: r["outcome"] for r in w.results},
+        "civilian_sunk": "civilian_sunk" in w.ship.flags, "defied": "orders_defied" in w.ship.flags,
+        "bent": "orders_bent" in w.ship.flags, "doubt": round(w.ship.orders_doubt, 3),
+        "guilt": round(sum(c.guilt for c in w.active_crew()) / max(1, len(w.active_crew())), 3), "hull": round(w.ship.hull, 3),
         "survivors": len(w.active_crew()), "initial": initial,
         "cohesion": round(w.ship.cohesion, 3), "peak_dread": round(w.peak_dread, 3),
         "events": len(w.fired), "min_hull_by_24": round(min_hull_by_24, 3),
@@ -130,6 +171,10 @@ def summarize(policy: str, seeds: List[int], patrol_ticks: int = 72) -> Dict:
         "policy": policy, "n": n,
         "progress": sum(r["progress"] for r in runs) / n,
         "ticks": sum(r["ticks"] for r in runs) / n,
+        "civilian_rate": sum(r["civilian_sunk"] for r in runs) / n,
+        "defied_rate": sum(r["defied"] for r in runs) / n,
+        "bent_rate": sum(r["bent"] for r in runs) / n,
+        "guilt": sum(r["guilt"] for r in runs) / n,
         "hull": sum(r["hull"] for r in runs) / n,
         "cohesion": sum(r["cohesion"] for r in runs) / n,
         "survival": sum(r["survivors"] / r["initial"] for r in runs) / n,
@@ -149,7 +194,7 @@ def summarize(policy: str, seeds: List[int], patrol_ticks: int = 72) -> Dict:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--policy", default="all", choices=["all", *PRIORITY])
+    ap.add_argument("--policy", default="all", choices=["all", "random", *PRIORITY])
     ap.add_argument("--seeds", type=int, default=200)
     ap.add_argument("--log", action="store_true", help="print the log of seed 0")
     args = ap.parse_args(argv)
@@ -159,6 +204,7 @@ def main(argv=None):
         ends = ", ".join(f"{k} {v:.0%}" for k, v in s["endings"].items())
         print(f"{name:14s} progress {s['progress']:.2f}  ticks {s['ticks']:.0f}  hull {s['hull']:.2f}  cohesion {s['cohesion']:.2f}  "
               f"survival {s['survival']:.2f}  peak dread {s['peak_dread']:.2f}  "
+              f"civilian {s['civilian_rate']:.0%}  defied {s['defied_rate']:.0%}  guilt {s['guilt']:.2f}  "
               f"events {s['events']:.1f}  beats {s['beats']:.1f} (first t{s['first_beat']:.0f}, "
               f"covered {s['beat_coverage']:.0%})  ambiguity {s['ambiguity']:.0%}")
         print(f"{'':14s} endings: {ends}")

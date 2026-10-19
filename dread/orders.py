@@ -143,7 +143,30 @@ def silent_running(world, on=True):
     return "Silent running." if on else "Resuming normal running."
 
 
+def verify_orders(world):
+    """Ask for confirmation. The answer may reassure; it never says who really sent them."""
+    run = world.run
+    if run is None or "verified" in run.phase_fired:
+        return "Nothing more to verify."
+    run.phase_fired.add("verified")
+    s = world.ship
+    s.noise = clamp(s.noise + 0.15)
+    s.attention = clamp(s.attention + 0.03)
+    world.time_cost += 0.01
+    roll = world.rng.random()
+    if roll < run.mission.quality * 0.8:
+        s.orders_doubt = clamp(s.orders_doubt - 0.25)
+        return "A reply confirms the order, relayed through a station you cannot identify."
+    if roll < 0.8:
+        s.orders_doubt = clamp(s.orders_doubt + 0.05)
+        return "No acknowledgement."
+    s.orders_doubt = clamp(s.orders_doubt + 0.2)
+    s.flags.add("orders_contradicted")
+    return "The reply contradicts the order: same call sign, different cipher."
+
+
 ORDERS = {
+    "verify_orders": verify_orders,
     "silence_sonar": silence_sonar, "restore_sonar": restore_sonar, "isolate": isolate,
     "release": release, "force_compartment": force_compartment, "cancel_rest": cancel_rest,
     "grant_rest": grant_rest, "ration": ration, "hold_ritual": hold_ritual,

@@ -18,7 +18,7 @@
       "effects": [
         {
           "op": "combat",
-          "severity": 0.45
+          "severity": 0.35
         }
       ]
     },
@@ -39,7 +39,7 @@
       "effects": [
         {
           "op": "combat",
-          "severity": 0.6
+          "severity": 0.45
         }
       ]
     },
@@ -60,7 +60,7 @@
       "effects": [
         {
           "op": "combat",
-          "severity": 0.7
+          "severity": 0.55
         }
       ]
     },
@@ -2120,6 +2120,979 @@
           ]
         }
       ]
+    },
+    {
+      "id": "m1_contact",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m1_battleship",
+      "text": "Heavy screws, slow and steady, bearing north. A capital ship with a screen of three.",
+      "mundane_when": {},
+      "mundane_cause": "A real capital ship on a real transit.",
+      "uncanny_cause": "She is exactly where the order said, to the minute, as if she had been told to be.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "shadow",
+          "text": "Shadow her until dusk and take the shot from the beam.",
+          "tags": [
+            "care",
+            "patient"
+          ],
+          "cost": "Hours lost, and she may turn away before you are in position.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.1
+            },
+            {
+              "op": "flag",
+              "name": "m1_patient"
+            },
+            {
+              "op": "chance",
+              "p": 0.25,
+              "then": [
+                {
+                  "op": "flag",
+                  "name": "m1_lost_target"
+                }
+              ]
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "rush",
+          "text": "Close at flank speed and fire from the quarter.",
+          "tags": [
+            "mission",
+            "rush"
+          ],
+          "cost": "Noise, and tired men on the tubes.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.35
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.03
+            },
+            {
+              "op": "flag",
+              "name": "m1_rush"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m1_attack",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m1_battleship",
+      "text": "Range nine hundred yards. Tubes flooded, doors open. The whole boat holds its breath.",
+      "mundane_when": {},
+      "mundane_cause": "The war, as it is.",
+      "uncanny_cause": "Nobody on the boat remembers giving the order to flood the tubes.",
+      "effects": [],
+      "at_progress": 1.0,
+      "choices": [
+        {
+          "key": "spread",
+          "text": "Fire a full spread.",
+          "tags": [
+            "mission",
+            "attack"
+          ],
+          "cost": "If it misses, the screen is on top of you.",
+          "effects": [
+            {
+              "op": "chance",
+              "p": 0.6,
+              "mod": {
+                "path": "ship.readiness",
+                "k": 0.4,
+                "ref": 0.8
+              },
+              "if_flag": {
+                "m1_patient": 0.15,
+                "m1_rush": -0.05,
+                "m1_lost_target": -0.45
+              },
+              "then": [
+                {
+                  "op": "mission_outcome",
+                  "value": "success"
+                },
+                {
+                  "op": "flag",
+                  "name": "battleship_sunk"
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "guilt",
+                  "value": 0.02
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "fear",
+                  "value": 0.03
+                },
+                {
+                  "op": "ship",
+                  "stat": "noise",
+                  "value": 0.2
+                },
+                {
+                  "op": "ship",
+                  "stat": "hull",
+                  "value": -0.04
+                }
+              ],
+              "else": [
+                {
+                  "op": "combat",
+                  "severity": 0.45
+                },
+                {
+                  "op": "mission_outcome",
+                  "value": "failed"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "break_off",
+          "text": "Hold fire; the screen is too tight. Break off.",
+          "tags": [
+            "retreat"
+          ],
+          "cost": "The mission is lost.",
+          "effects": [
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.04
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m2_smoke",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "Smoke on the horizon, many columns of it. A convoy, and not a small one.",
+      "mundane_when": {},
+      "mundane_cause": "A real convoy on the expected route.",
+      "uncanny_cause": "The columns of smoke lean the wrong way for the wind.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "report_now",
+          "text": "Report by radio now, position and composition.",
+          "tags": [
+            "mission",
+            "report"
+          ],
+          "cost": "A transmitter on the water draws hunters.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.2
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            },
+            {
+              "op": "flag",
+              "name": "convoy_reported"
+            },
+            {
+              "op": "chance",
+              "p": 0.35,
+              "then": [
+                {
+                  "op": "combat",
+                  "severity": 0.4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "shadow_report",
+          "text": "Shadow them and report at dusk, from a clean position.",
+          "tags": [
+            "care",
+            "patient"
+          ],
+          "cost": "Time, and tired lookouts.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.05
+            },
+            {
+              "op": "flag",
+              "name": "convoy_reported"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "withhold",
+          "text": "Keep silent and keep away. Not worth the risk.",
+          "tags": [
+            "retreat"
+          ],
+          "cost": "There will be no report.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m2_ack",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "The relay window opens. The operator sits with his hand over the key.",
+      "mundane_when": {},
+      "mundane_cause": "The report window, and nothing more.",
+      "uncanny_cause": "Whoever answers is not the station you reported to.",
+      "effects": [
+        {
+          "op": "if",
+          "cond": {
+            "flag": "convoy_reported"
+          },
+          "then": [
+            {
+              "op": "log",
+              "text": "HQ acknowledges, and names a ship that was not in the convoy."
+            },
+            {
+              "op": "mission_outcome",
+              "value": "success"
+            }
+          ],
+          "else": [
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            }
+          ]
+        }
+      ],
+      "at_progress": 1.0
+    },
+    {
+      "id": "m2_wrong_frequency",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "The relay answers on a frequency nobody aboard has ever used. The radio man says his hands knew the dial setting.",
+      "mundane_when": {},
+      "mundane_cause": "A backup frequency table half-remembered by a tired operator.",
+      "uncanny_cause": "Something taught his hands.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        },
+        {
+          "op": "rumor",
+          "id": "dial",
+          "text": "The radio knows more than we told it.",
+          "intensity": 0.4,
+          "seed": "target"
+        }
+      ],
+      "target": {
+        "select": "random",
+        "role": "radio"
+      },
+      "beat": true,
+      "once": true
+    },
+    {
+      "id": "m3_envelope",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "The orders are in the cabin safe. The mate says you put them there yourself. You do not remember doing it.",
+      "mundane_when": {},
+      "mundane_cause": "Fatigue: you filed them and forgot.",
+      "uncanny_cause": "You did not write them. They are in your hand.",
+      "effects": [],
+      "at_progress": 0.05,
+      "choices": [
+        {
+          "key": "accept",
+          "text": "Take it at face value; the war has stranger paperwork.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You carry a doubt you will not name.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "ask",
+          "text": "Question the watch officers about who handled the safe.",
+          "tags": [
+            "care",
+            "verify"
+          ],
+          "cost": "The crew sees the captain doubting himself.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.02
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            },
+            {
+              "op": "rumor",
+              "id": "marked",
+              "text": "The captain doesn't know who gives his orders.",
+              "intensity": 0.3,
+              "seed": "random"
+            }
+          ]
+        },
+        {
+          "key": "radio",
+          "text": "Ask headquarters to confirm by radio.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "A transmitter on the water; an answer you may not like.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m3_sighting",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "Through the periscope: a white hull, red crosses, floodlit. Your orders said to expect a darkened steamer.",
+      "mundane_when": {},
+      "mundane_cause": "A hospital ship, or a supply ship dressed as one. Both exist in this war.",
+      "uncanny_cause": "She was lit for you.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.25
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        },
+        {
+          "op": "flag",
+          "name": "m3_crosses_seen"
+        }
+      ],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "look",
+          "text": "Hold the periscope up longer and read her.",
+          "tags": [
+            "care",
+            "identify"
+          ],
+          "cost": "Time exposed; the officer on the scope will remember what he saw.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "role:helm",
+              "stat": "guilt",
+              "value": 0.06
+            },
+            {
+              "op": "flag",
+              "name": "m3_confirmed_hospital"
+            }
+          ]
+        },
+        {
+          "key": "press",
+          "text": "Lower the periscope. The orders anticipated this.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You did not look. Everyone knows you did not look.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "radio",
+          "text": "Ask headquarters again.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "Another transmission.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m3_decision",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "Six hundred yards. The tubes are ready. Every man in the control room is looking at you and not at the target.",
+      "mundane_when": {},
+      "mundane_cause": "A decision, in a war that asks for them.",
+      "uncanny_cause": "She has not changed course. She has been waiting.",
+      "effects": [],
+      "at_progress": 1.0,
+      "choices": [
+        {
+          "key": "sink",
+          "text": "Sink her.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "You cannot unsink her.",
+          "effects": [
+            {
+              "op": "mission_outcome",
+              "value": "success"
+            },
+            {
+              "op": "flag",
+              "name": "civilian_sunk"
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.5
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.25
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.12
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.1
+            },
+            {
+              "op": "rumor",
+              "id": "santa_lucia",
+              "text": "We sank a hospital ship.",
+              "intensity": 0.8,
+              "seed": "all",
+              "drift": {
+                "guilt": 0.002
+              }
+            }
+          ]
+        },
+        {
+          "key": "alter",
+          "text": "Surface, stop her, and let her boats clear before you decide.",
+          "tags": [
+            "care",
+            "alter"
+          ],
+          "cost": "Exposed on the surface, in a war.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.08
+            },
+            {
+              "op": "chance",
+              "p": 0.6,
+              "then": [
+                {
+                  "op": "ship",
+                  "stat": "moral_debt",
+                  "value": 0.05
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "trust",
+                  "value": 0.06
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "guilt",
+                  "value": 0.02
+                }
+              ],
+              "else": [
+                {
+                  "op": "ship",
+                  "stat": "hull",
+                  "value": -0.1
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "fear",
+                  "value": 0.06
+                }
+              ]
+            },
+            {
+              "op": "flag",
+              "name": "orders_bent"
+            },
+            {
+              "op": "mission_outcome",
+              "value": "altered"
+            }
+          ]
+        },
+        {
+          "key": "refuse",
+          "text": "Withhold the shot and log your reasons.",
+          "tags": [
+            "care",
+            "refuse"
+          ],
+          "cost": "A refused order, in your hand, in the log.",
+          "effects": [
+            {
+              "op": "mission_outcome",
+              "value": "refused"
+            },
+            {
+              "op": "flag",
+              "name": "orders_defied"
+            },
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": -0.15
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "orders_countermand",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": [
+        "m3_hospital_ship",
+        "m4_return_lane"
+      ],
+      "text": "A second signal on the same call sign, in a different cipher. It countermands the first order.",
+      "mundane_when": {},
+      "mundane_cause": "A cipher book rotation, a staff reversal, or enemy deception built to make us mutiny.",
+      "uncanny_cause": "It is the same voice that wrote the first.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "obey_new",
+          "text": "Obey the new order; abort.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "If it was a trick, you abandoned a real order.",
+          "effects": [
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "keep_old",
+          "text": "Keep to the first order. Do not answer the second.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You have ignored a signal in front of the radio room.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.15
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "verify",
+          "text": "Ask which of the two is real.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "Whoever answers.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ],
+      "requires": {
+        "path": "ship.progress",
+        "op": ">=",
+        "value": 0.2
+      },
+      "once": true,
+      "cooldown": 40,
+      "beat": true
+    },
+    {
+      "id": "m4_survivors",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "Wreckage on the swell, and men in it, black with oil. Whoever sank her is gone. Your orders: no stops, no contact.",
+      "mundane_when": {},
+      "mundane_cause": "A freighter sunk by someone else, and a standing order against exposing the boat.",
+      "uncanny_cause": "The order knew they would be there.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "pass",
+          "text": "Hold your course. The orders are explicit.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "You hear them for an hour, through the hull.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.3
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.15
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.08
+            },
+            {
+              "op": "rumor",
+              "id": "water",
+              "text": "We left them in the water.",
+              "intensity": 0.6,
+              "seed": "all"
+            }
+          ]
+        },
+        {
+          "key": "rescue",
+          "text": "Stop and pull them out.",
+          "tags": [
+            "care",
+            "alter"
+          ],
+          "cost": "Exposed, slow, and against orders.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.07
+            },
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.1
+            },
+            {
+              "op": "chance",
+              "p": 0.3,
+              "then": [
+                {
+                  "op": "combat",
+                  "severity": 0.4
+                }
+              ]
+            },
+            {
+              "op": "flag",
+              "name": "survivors_taken"
+            },
+            {
+              "op": "flag",
+              "name": "orders_bent"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": -0.05
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m4_one_too_many",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "You count eleven men pulled from the water. The mate's tally says twelve, and nobody can say who gave the twelfth a blanket.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.3
+      },
+      "mundane_cause": "A miscount by exhausted men, in poor light, among strangers.",
+      "uncanny_cause": "It climbed aboard with them.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.08
+        },
+        {
+          "op": "rumor",
+          "id": "twelfth",
+          "text": "There is one more of them than there should be.",
+          "intensity": 0.6,
+          "seed": "random"
+        }
+      ],
+      "at_progress": 0.8,
+      "requires": {
+        "flag": "survivors_taken"
+      },
+      "beat": true
+    },
+    {
+      "id": "m4_unrecorded",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "At the rendezvous the harbour master turns the pages twice, then a third time.",
+      "mundane_when": {},
+      "mundane_cause": "Compartmentalised operations; a different ledger; a clerk's error.",
+      "uncanny_cause": "There was never an order. There was only the boat, going where it was told.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.3
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.04
+        },
+        {
+          "op": "chance",
+          "p": 0.5,
+          "then": [
+            {
+              "op": "flag",
+              "name": "orders_unrecorded"
+            }
+          ],
+          "else": [
+            {
+              "op": "flag",
+              "name": "orders_on_record"
+            },
+            {
+              "op": "log",
+              "text": "HQ has your orders on file, in a hand nobody there can name."
+            }
+          ]
+        },
+        {
+          "op": "mission_outcome",
+          "value": "success"
+        }
+      ],
+      "at_progress": 1.0
     }
   ]
 }
