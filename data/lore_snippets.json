@@ -1,0 +1,22 @@
+[
+  {
+    "type": "ambient_log",
+    "text": "The hull creaks as the sub descends past 100 meters. Somewhere aft, a wrench clatters to the deck. The men hold their breath, listening for the next depth charge."
+  },
+  {
+    "type": "crew_dialogue",
+    "text": "'I heard the British have a new sonar. They say it can hear a pin drop at a mile.'"
+  },
+  {
+    "type": "captain_log",
+    "text": "April 12, 1943: Sighted convoy at dawn. Fog thick, sonar bearings uncertain. Ordered silent running. Crew tense but steady."
+  },
+  {
+    "type": "rumor",
+    "text": "Some say a U-boat vanished near the Azores, never found. Only a garbled radio message: 'Strange lights below... hull vibrating.'"
+  },
+  {
+    "type": "system_log",
+    "text": "Battery at 40%. Oxygen scrubbers running hot. Recommend surfacing soon."
+  }
+]

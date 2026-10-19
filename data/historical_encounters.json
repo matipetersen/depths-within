@@ -1,0 +1,37 @@
+[
+  {
+    "title": "U-47 at Scapa Flow",
+    "date": "1939-10-14",
+    "region": "North Atlantic",
+    "participants": ["U-47", "HMS Royal Oak"],
+    "summary": "U-47, commanded by Günther Prien, infiltrated the British base at Scapa Flow and sank the battleship HMS Royal Oak, escaping under heavy pursuit."
+  },
+  {
+    "title": "USS Harder vs. Japanese Destroyers",
+    "date": "1944-06-06",
+    "region": "Western Pacific",
+    "participants": ["USS Harder", "Japanese destroyers"],
+    "summary": "Commander Samuel Dealey and USS Harder sank five Japanese destroyers in twelve days, becoming one of the most successful US submarine patrols."
+  },
+  {
+    "title": "Shch-303 Baltic Escape",
+    "date": "1942-03-15",
+    "region": "Baltic Sea",
+    "participants": ["Shch-303", "German patrols"],
+    "summary": "Soviet submarine Shch-303 evaded German patrols and minefields to return to Leningrad, with the crew suffering from cold and exhaustion."
+  },
+  {
+    "title": "HMS Upholder's Final Patrol",
+    "date": "1942-04-14",
+    "region": "Mediterranean",
+    "participants": ["HMS Upholder", "Axis convoy"],
+    "summary": "Lieutenant Commander Malcolm Wanklyn led HMS Upholder on a daring attack against an Axis convoy before being lost with all hands."
+  },
+  {
+    "title": "I-58 and the Sinking of USS Indianapolis",
+    "date": "1945-07-30",
+    "region": "Philippine Sea",
+    "participants": ["I-58", "USS Indianapolis"],
+    "summary": "Japanese submarine I-58 torpedoed and sank USS Indianapolis, leading to one of the worst naval disasters in US history."
+  }
+]

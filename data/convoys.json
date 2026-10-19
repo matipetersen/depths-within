@@ -1,0 +1,182 @@
+[
+  {
+    "id": "HX1",
+    "route": "Halifax to Liverpool",
+    "nation": "USA",
+    "composition": {
+      "merchant": 12,
+      "tanker": 2,
+      "troopship": 0
+    },
+    "escort": ["Town_Class_Destroyer", "Flower_Class_Corvette", "Flower_Class_Corvette"],
+    "departure_month": "all",
+    "frequency_days": 7,
+    "speed": 9,
+    "difficulty": "medium",
+    "year_start": 1941,
+    "year_end": 1945,
+    "description": "Fast transatlantic convoy. Regular schedule, heavily escorted."
+  },
+  {
+    "id": "SC1",
+    "route": "Sydney to Churchill",
+    "nation": "Canada",
+    "composition": {
+      "merchant": 30,
+      "tanker": 5,
+      "troopship": 2
+    },
+    "escort": ["Town_Class_Destroyer", "Flower_Class_Corvette", "Flower_Class_Corvette", "British_Minesweeper"],
+    "departure_month": "all",
+    "frequency_days": 14,
+    "speed": 8,
+    "difficulty": "hard",
+    "year_start": 1942,
+    "year_end": 1945,
+    "description": "Slow transatlantic convoy from Canada. High-value target with strong escort."
+  },
+  {
+    "id": "ON1",
+    "route": "Liverpool to Halifax",
+    "nation": "UK",
+    "composition": {
+      "merchant": 15,
+      "tanker": 3,
+      "troopship": 0
+    },
+    "escort": ["Tribal_Class_Destroyer", "Flower_Class_Corvette", "British_Minesweeper"],
+    "departure_month": "all",
+    "frequency_days": 7,
+    "speed": 10,
+    "difficulty": "medium",
+    "year_start": 1941,
+    "year_end": 1945,
+    "description": "Return transatlantic convoy. Often carries valuable cargo."
+  },
+  {
+    "id": "SL1",
+    "route": "Freetown to Liverpool",
+    "nation": "UK",
+    "composition": {
+      "merchant": 20,
+      "tanker": 2,
+      "troopship": 1
+    },
+    "escort": ["Town_Class_Destroyer", "Flower_Class_Corvette", "Flower_Class_Corvette"],
+    "departure_month": "all",
+    "frequency_days": 10,
+    "speed": 9,
+    "difficulty": "medium",
+    "year_start": 1941,
+    "year_end": 1944,
+    "description": "Slow convoy from Sierra Leone. High-value British goods and troops."
+  },
+  {
+    "id": "PQ1",
+    "route": "Iceland to Murmansk",
+    "nation": "UK",
+    "composition": {
+      "merchant": 25,
+      "tanker": 3,
+      "troopship": 1
+    },
+    "escort": ["Tribal_Class_Destroyer", "Town_Class_Destroyer", "Flower_Class_Corvette", "Flower_Class_Corvette"],
+    "departure_month": "all",
+    "frequency_days": 7,
+    "speed": 8,
+    "difficulty": "very_hard",
+    "year_start": 1941,
+    "year_end": 1944,
+    "description": "Brutal Arctic convoy to Soviet Union. Exposed to German aircraft and U-boats."
+  },
+  {
+    "id": "OP1",
+    "route": "Murmansk to Iceland",
+    "nation": "UK",
+    "composition": {
+      "merchant": 20,
+      "tanker": 0,
+      "troopship": 0
+    },
+    "escort": ["Tribal_Class_Destroyer", "Flower_Class_Corvette", "British_Minesweeper"],
+    "departure_month": "all",
+    "frequency_days": 14,
+    "speed": 8,
+    "difficulty": "hard",
+    "year_start": 1942,
+    "year_end": 1944,
+    "description": "Return Arctic convoy from Soviet Union. Often lighter but still dangerous."
+  },
+  {
+    "id": "UGS1",
+    "route": "United States to Mediterranean",
+    "nation": "USA",
+    "composition": {
+      "merchant": 40,
+      "tanker": 5,
+      "troopship": 3
+    },
+    "escort": ["Gearing_Class_Destroyer", "Town_Class_Destroyer", "Flower_Class_Corvette", "Flower_Class_Corvette", "Heavy_Cruiser"],
+    "departure_month": "all",
+    "frequency_days": 15,
+    "speed": 10,
+    "difficulty": "hard",
+    "year_start": 1943,
+    "year_end": 1945,
+    "description": "Large American convoy to Mediterranean theater. Well-armed escort."
+  },
+  {
+    "id": "TC1",
+    "route": "Panama Canal to Pacific Theater",
+    "nation": "USA",
+    "composition": {
+      "merchant": 15,
+      "tanker": 8,
+      "troopship": 2
+    },
+    "escort": ["Town_Class_Destroyer", "Gearing_Class_Destroyer", "Light_Cruiser"],
+    "departure_month": "all",
+    "frequency_days": 7,
+    "speed": 11,
+    "difficulty": "medium",
+    "year_start": 1942,
+    "year_end": 1945,
+    "description": "Transports to Pacific. Japanese submarine threat prominent."
+  },
+  {
+    "id": "JT1",
+    "route": "Rabaul to Manila",
+    "nation": "Japan",
+    "composition": {
+      "merchant": 10,
+      "tanker": 2,
+      "troopship": 2
+    },
+    "escort": ["Japanese_Destroyer", "Japanese_Patrol_Boat"],
+    "departure_month": "all",
+    "frequency_days": 7,
+    "speed": 12,
+    "difficulty": "medium",
+    "year_start": 1942,
+    "year_end": 1944,
+    "description": "Japanese inter-island convoy. Vulnerable to American submarines."
+  },
+  {
+    "id": "MT1",
+    "route": "Malta to Alexandria",
+    "nation": "UK",
+    "composition": {
+      "merchant": 8,
+      "tanker": 2,
+      "troopship": 0
+    },
+    "escort": ["Flower_Class_Corvette", "British_Minesweeper"],
+    "departure_month": "all",
+    "frequency_days": 10,
+    "speed": 10,
+    "difficulty": "hard",
+    "year_start": 1941,
+    "year_end": 1943,
+    "description": "Mediterranean convoy. Exposed to Italian submarines and Luftwaffe."
+  }
+]

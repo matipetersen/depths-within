@@ -1,0 +1,90 @@
+[
+  {
+    "id": "Germany",
+    "name": "Nazi Germany",
+    "color": "red",
+    "primary_faction": true,
+    "alignment": "axis",
+    "primary_navy": "Kriegsmarine",
+    "description": "German Naval Forces. Focus on submarines, commerce raiding, and aggressive tactics.",
+    "headquarters": "Kiel, Germany",
+    "founded": 1935
+  },
+  {
+    "id": "Japan",
+    "name": "Empire of Japan",
+    "color": "orange",
+    "primary_faction": true,
+    "alignment": "axis",
+    "primary_navy": "Imperial Japanese Navy",
+    "description": "Japanese Naval Forces. Heavy use of submarines for reconnaissance and commerce attack.",
+    "headquarters": "Tokyo, Japan",
+    "founded": 1868
+  },
+  {
+    "id": "Italy",
+    "name": "Fascist Italy",
+    "color": "yellow",
+    "primary_faction": true,
+    "alignment": "axis",
+    "primary_navy": "Regia Marina",
+    "description": "Italian Naval Forces. Moderate submarine force, Mediterranean-focused.",
+    "headquarters": "Rome, Italy",
+    "founded": 1861
+  },
+  {
+    "id": "USA",
+    "name": "United States",
+    "color": "blue",
+    "primary_faction": true,
+    "alignment": "allies",
+    "primary_navy": "United States Navy",
+    "description": "American Naval Forces. Industrial powerhouse with escort fleets and advanced torpedoes.",
+    "headquarters": "Washington DC, USA",
+    "founded": 1776
+  },
+  {
+    "id": "UK",
+    "name": "British Empire",
+    "color": "cyan",
+    "primary_faction": true,
+    "alignment": "allies",
+    "primary_navy": "Royal Navy",
+    "description": "British Naval Forces. Large escort fleet, destroyers, and advanced ASW tactics.",
+    "headquarters": "London, UK",
+    "founded": 1606
+  },
+  {
+    "id": "USSR",
+    "name": "Soviet Union",
+    "color": "magenta",
+    "primary_faction": false,
+    "alignment": "allies",
+    "primary_navy": "Soviet Navy",
+    "description": "Soviet Naval Forces. Limited submarine force, primarily Baltic and Arctic operations.",
+    "headquarters": "Moscow, USSR",
+    "founded": 1922
+  },
+  {
+    "id": "France",
+    "name": "Free France",
+    "color": "green",
+    "primary_faction": false,
+    "alignment": "allies",
+    "primary_navy": "French Navy",
+    "description": "French Naval Forces. Post-armistice, limited operations from North Africa.",
+    "headquarters": "Algiers, North Africa",
+    "founded": 1870
+  },
+  {
+    "id": "Poland",
+    "name": "Polish Government-in-Exile",
+    "color": "white",
+    "primary_faction": false,
+    "alignment": "allies",
+    "primary_navy": "Polish Navy",
+    "description": "Polish Naval Forces. Operates from British ports with limited resources.",
+    "headquarters": "London, UK",
+    "founded": 1919
+  }
+]

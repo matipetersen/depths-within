@@ -1,0 +1,156 @@
+[
+  {
+    "id": "north_atlantic",
+    "name": "North Atlantic",
+    "description": "Primary battleground for the Atlantic Convoy Campaign. Heavy German U-boat presence.",
+    "center": {"x": 50, "y": 50},
+    "depth_range": {"min": 2000, "max": 5000},
+    "convoys": ["HX1", "SC1", "ON1"],
+    "threat_level": "very_high",
+    "dominant_faction": "Germany",
+    "year_start": 1941,
+    "year_end": 1945,
+    "weather": {
+      "avg_visibility": 0.4,
+      "avg_sea_state": 5,
+      "storm_frequency": 0.15
+    },
+    "minefields": [
+      {"x": 20, "y": 30, "radius": 100, "nation": "Germany", "type": "acoustic"}
+    ]
+  },
+  {
+    "id": "south_atlantic",
+    "name": "South Atlantic",
+    "description": "Trade route around Africa. Moderate German threat, occasional commerce raiders.",
+    "center": {"x": 50, "y": 70},
+    "depth_range": {"min": 3000, "max": 6000},
+    "convoys": ["SL1"],
+    "threat_level": "medium",
+    "dominant_faction": "Germany",
+    "year_start": 1941,
+    "year_end": 1943,
+    "weather": {
+      "avg_visibility": 0.6,
+      "avg_sea_state": 4,
+      "storm_frequency": 0.1
+    },
+    "minefields": []
+  },
+  {
+    "id": "arctic",
+    "name": "Arctic",
+    "description": "Brutal route to Soviet Union. Extreme weather, German and Norwegian opposition.",
+    "center": {"x": 40, "y": 15},
+    "depth_range": {"min": 300, "max": 600},
+    "convoys": ["PQ1", "OP1"],
+    "threat_level": "extreme",
+    "dominant_faction": "Germany",
+    "year_start": 1941,
+    "year_end": 1944,
+    "weather": {
+      "avg_visibility": 0.3,
+      "avg_sea_state": 6,
+      "storm_frequency": 0.3
+    },
+    "minefields": [
+      {"x": 35, "y": 18, "radius": 80, "nation": "Germany", "type": "contact"},
+      {"x": 45, "y": 12, "radius": 100, "nation": "Norway", "type": "contact"}
+    ]
+  },
+  {
+    "id": "mediterranean",
+    "name": "Mediterranean",
+    "description": "Congested sea route. Italian and German submarines, aircraft, surface raiders.",
+    "center": {"x": 60, "y": 55},
+    "depth_range": {"min": 800, "max": 3000},
+    "convoys": ["MT1"],
+    "threat_level": "high",
+    "dominant_faction": "Italy",
+    "year_start": 1941,
+    "year_end": 1943,
+    "weather": {
+      "avg_visibility": 0.7,
+      "avg_sea_state": 3,
+      "storm_frequency": 0.08
+    },
+    "minefields": [
+      {"x": 62, "y": 52, "radius": 150, "nation": "Italy", "type": "acoustic"},
+      {"x": 58, "y": 57, "radius": 120, "nation": "Italy", "type": "contact"}
+    ]
+  },
+  {
+    "id": "panama_canal",
+    "name": "Panama Canal Zone",
+    "description": "Critical hub for trans-Pacific traffic. Occasional Japanese raiders.",
+    "center": {"x": 30, "y": 55},
+    "depth_range": {"min": 10, "max": 100},
+    "convoys": ["TC1"],
+    "threat_level": "medium",
+    "dominant_faction": "USA",
+    "year_start": 1942,
+    "year_end": 1945,
+    "weather": {
+      "avg_visibility": 0.5,
+      "avg_sea_state": 3,
+      "storm_frequency": 0.2
+    },
+    "minefields": []
+  },
+  {
+    "id": "western_pacific",
+    "name": "Western Pacific",
+    "description": "Japanese sphere of influence. Inter-island convoys and commerce routes. Heavy Allied submarine presence.",
+    "center": {"x": 85, "y": 60},
+    "depth_range": {"min": 1000, "max": 8000},
+    "convoys": ["JT1"],
+    "threat_level": "high",
+    "dominant_faction": "Japan",
+    "year_start": 1942,
+    "year_end": 1945,
+    "weather": {
+      "avg_visibility": 0.6,
+      "avg_sea_state": 4,
+      "storm_frequency": 0.15
+    },
+    "minefields": [
+      {"x": 87, "y": 58, "radius": 120, "nation": "Japan", "type": "contact"}
+    ]
+  },
+  {
+    "id": "eastern_pacific",
+    "name": "Eastern Pacific",
+    "description": "Open ocean hunting grounds. Japanese and American submarines duel for supremacy.",
+    "center": {"x": 60, "y": 70},
+    "depth_range": {"min": 3000, "max": 7000},
+    "convoys": [],
+    "threat_level": "high",
+    "dominant_faction": "USA",
+    "year_start": 1942,
+    "year_end": 1945,
+    "weather": {
+      "avg_visibility": 0.6,
+      "avg_sea_state": 4,
+      "storm_frequency": 0.12
+    },
+    "minefields": []
+  },
+  {
+    "id": "indian_ocean",
+    "name": "Indian Ocean",
+    "description": "Remote trade routes. German and Japanese commerce raiders, occasional Allied convoys.",
+    "center": {"x": 75, "y": 65},
+    "depth_range": {"min": 2000, "max": 7000},
+    "convoys": [],
+    "threat_level": "medium",
+    "dominant_faction": "Japan",
+    "year_start": 1942,
+    "year_end": 1944,
+    "weather": {
+      "avg_visibility": 0.7,
+      "avg_sea_state": 3,
+      "storm_frequency": 0.1
+    },
+    "minefields": []
+  }
+]

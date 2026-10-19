@@ -1,0 +1,46 @@
+{
+  "Germany": [
+    "Klaus", "Hans", "Fritz", "Werner", "Otto", "Karl", "Wilhelm", "Heinrich", "Erich", "Kurt",
+    "Hermann", "Ludwig", "Max", "Ernst", "Friedrich", "Georg", "Walter", "Paul", "Günther", "Josef",
+    "Helmut", "Rudolf", "Alfred", "Bruno", "Bernhard", "Franz", "Richard", "Anton", "Gerhard", "Albert"
+  ],
+  "USA": [
+    "John", "Mike", "Steve", "David", "Robert", "James", "William", "Thomas", "Richard", "Joseph",
+    "Charles", "Donald", "George", "Kenneth", "Paul", "Edward", "Frank", "Raymond", "Jack", "Walter",
+    "Harold", "Arthur", "Albert", "Eugene", "Samuel", "Roy", "Louis", "Carl", "Ralph", "Earl"
+  ],
+  "UK": [
+    "James", "William", "George", "Edward", "Thomas", "Charles", "Henry", "Arthur", "Frederick", "Albert",
+    "Harold", "Robert", "John", "Walter", "Alfred", "Ernest", "Sidney", "Herbert", "Stanley", "Leonard",
+    "Reginald", "Percy", "Edgar", "Cecil", "Frank", "Horace", "Victor", "Bernard", "Norman", "Wilfred"
+  ],
+  "Japan": [
+    "Takeshi", "Hiroshi", "Kenji", "Toshiro", "Kazuo", "Yoshio", "Masao", "Minoru", "Shigeru", "Fumio",
+    "Akira", "Toru", "Hideo", "Noboru", "Kiyoshi", "Susumu", "Tsutomu", "Tadao", "Haruo", "Shiro",
+    "Isamu", "Makoto", "Osamu", "Satoru", "Takeshi", "Yutaka", "Katsu", "Mitsuo", "Yasuo", "Yukio"
+  ],
+  "Italy": [
+    "Giuseppe", "Giovanni", "Antonio", "Mario", "Luigi", "Francesco", "Angelo", "Vincenzo", "Pietro", "Salvatore",
+    "Carlo", "Franco", "Bruno", "Paolo", "Marco", "Alessandro", "Sergio", "Roberto", "Maurizio", "Giorgio",
+    "Stefano", "Luciano", "Claudio", "Alberto", "Massimo", "Daniele", "Fabio", "Leonardo", "Emilio", "Domenico"
+  ],
+  "USSR": [
+    "Ivan", "Boris", "Vladimir", "Dmitri", "Sergei", "Alexei", "Nikolai", "Mikhail", "Pavel", "Andrei",
+    "Yuri", "Viktor", "Anatoly", "Valery", "Konstantin", "Leonid", "Grigory", "Fyodor", "Oleg", "Vasily",
+    "Pyotr", "Alexander", "Roman", "Maxim", "Igor", "Kirill", "Anton", "Vadim", "Ruslan", "Ilya"
+  ],
+  "France": [
+    "Jean", "Pierre", "Louis", "Jacques", "Paul", "Henri", "Marcel", "André", "Georges", "René",
+    "Maurice", "Michel", "François", "Albert", "Charles", "Joseph", "Lucien", "Raymond", "Roger", "Robert",
+    "Antoine", "Philippe", "Claude", "Bernard", "Gabriel", "Julien", "Étienne", "Émile", "Laurent", "Olivier"
+  ],
+  "Poland": [
+    "Jan", "Stanisław", "Andrzej", "Józef", "Tadeusz", "Jerzy", "Zbigniew", "Krzysztof", "Henryk", "Wojciech",
+    "Kazimierz", "Mieczysław", "Władysław", "Adam", "Piotr", "Stefan", "Marian", "Ryszard", "Tomasz", "Zdzisław",
+    "Marek", "Edward", "Bolesław", "Czesław", "Wiesław", "Roman", "Leszek", "Grzegorz", "Antoni", "Eugeniusz"
+  ],
+  "default": [
+    "John", "Mike", "Steve", "David", "Robert", "James", "William", "Thomas", "Richard", "Joseph",
+    "Klaus", "Hans", "Fritz", "Ivan", "Boris", "Jean", "Pierre", "Giuseppe", "Antonio", "Takeshi"
+  ]
+}
