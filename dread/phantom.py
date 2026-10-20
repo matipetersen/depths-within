@@ -87,7 +87,7 @@ class SonarDeck:
                     c = max(cand, key=lambda c: c.fear + c.fatigue)
                     p.audible_to.add(c.id)
             if ship.sonar_on:
-                for cid in p.audible_to:
+                for cid in sorted(p.audible_to):     # set order is undefined; the dice below must not depend on it
                     c = world.crew_by_id(cid)
                     if c is None or not c.active:
                         continue

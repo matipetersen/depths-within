@@ -602,6 +602,36 @@ le asigna color y encamina las teclas; `engine/game.py` le cede las teclas antes
 - Faltan el **audio** (los fantasmas del sonar son texto; el silencio final no se oye) y un panel del
   puente que no tape el mapa táctico.
 
+### 12.6 Versión táctil horizontal (navegador)
+
+`web/dread.html` es el juego completo en **una sola página** para jugar con el dedo en un móvil o tablet en
+horizontal. Se genera con `python tools/build_web.py` a partir de `web/engine.js`, `web/ui.js`, `web/style.css`
+y los datos (`data/events.json`, `data/missions.json`).
+
+**El motor es el de Python, portado, no reescrito.** `web/engine.js` sigue `dread/*.py` línea por línea y reproduce
+los números aleatorios de CPython (Mersenne Twister, `random()`, `choice()`, `choices()`, `randint()`, `uniform()`)
+y la suma compensada de floats de Python 3.12+. Con la misma semilla y las mismas entradas escribe **el mismo
+diario**. `tests/test_web_parity.py` lo comprueba: 28 patrullas con un capitán aleatorio fijo (≈1.600 líneas de
+diario, 8 finales distintos), línea por línea, y el libro de existencias cada 25 pasos. Para que fuera posible
+hubo que hacer determinista el Python (el orden de iteración de un `set` de enteros no está definido).
+
+**Pantalla (horizontal):** barra superior con la misión y su procedencia (toca para leer el briefing) y la hora;
+tres columnas: el **libro de existencias** (barras exactas; ámbar y rojo con la palabra *low* o *critical*),
+**los hombres** (lo que dicen y lo que se les nota) y el **diario**; bajo el diario, tres botones de pulgar:
+*Orders*, *Wait 1h* y *News ▶▶*. Las decisiones, las órdenes y el final son hojas que se deslizan encima.
+
+**Táctil:** todo objetivo ≥ 40 px (probado), `touch-action: manipulation`, sin hover, un toque accidental en los
+350 ms tras aparecer una decisión no cuenta, vibración y sonido opcionales (el zumbido del casco, un ping al
+llegar una decisión y **el silencio** al acabar), la pantalla se mantiene encendida, y si el móvil se sostiene en
+vertical aparece un aviso para girarlo.
+
+**Guardado:** una partida es su semilla más sus entradas (el motor es determinista), así que se guarda eso en
+`localStorage` y *Continuar* la reproduce exactamente tras cerrar la pestaña. Está probado.
+
+**Nada oculto en pantalla:** el motor entrega a la interfaz solo `Game.view()`, que no contiene variables ocultas;
+`tests/test_web_ui.py` recorre una patrulla leyendo el DOM y comprueba que no aparece ninguna (ni un número sobre
+los hombres).
+
 ## 13. Referencias
 
 Lovecraft, *El templo*; McCammon, *The Night Boat*; Buchheim, *Das Boot*

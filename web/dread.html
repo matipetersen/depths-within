@@ -1,0 +1,1733 @@
+<title>Depths Within</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@400;600&family=Special+Elite&display=swap">
+<style>
+/* Layout concept: a landscape bridge. Left, the honest ledger. Centre, the men (what they say,
+   what can be seen). Right, the log with the three thumb buttons underneath. Everything else is
+   a sheet that slides over: orders, a decision, the ending. Palette: slate that has been under
+   water too long, pale paper for text, brass only for what needs attention. */
+:root {
+  color-scheme: dark;
+  --hull: #0a1117;        /* the deep: slate with a green bias */
+  --panel: #101a21;
+  --panel-hi: #17252e;
+  --line: #243640;
+  --paper: #dbe2d8;       /* text: a warm off-white, never pure */
+  --dim: #8a9a9d;
+  --sea: #78b8a0;         /* ok / active */
+  --brass: #d1a64e;       /* attention */
+  --rust: #cf6a47;        /* critical */
+  --ink: #0a1117;         /* text on a lit button */
+  --display: "Special Elite", "Courier New", ui-monospace, monospace;
+  --body: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--hull); color: var(--paper);
+  font: 15px/1.35 var(--body); overflow: hidden;
+  -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
+  overscroll-behavior: none;
+}
+button { font: inherit; color: inherit; touch-action: manipulation; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--dim); }
+.smcaps { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+
+#app {
+  height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px;
+  padding-block: 6px 8px; padding-left: var(--gutter-l); padding-right: var(--gutter-r);
+}
+
+/* ---- top bar */
+.top { display: flex; align-items: center; gap: 10px; min-height: 46px; min-width: 0; }
+.orders-chip {
+  flex: 1 1 auto; min-width: 0; text-align: left; background: transparent; border: 0; padding: 4px 0;
+  display: grid; gap: 1px;
+}
+.orders-chip .t { font-family: var(--display); font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.orders-chip .p { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clock { text-align: right; white-space: nowrap; font-family: var(--mono); font-size: 13px; }
+.clock small { display: block; color: var(--brass); font-size: 11px; font-family: var(--body); }
+.icon-btn {
+  width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 4px; font-size: 18px;
+}
+.icon-btn[aria-pressed="true"] { border-color: var(--sea); color: var(--sea); }
+.icon-btn { position: relative; }
+.icon-btn.off { color: var(--dim); }
+.icon-btn.off::after { content: ""; position: absolute; width: 26px; height: 2px; background: var(--dim); transform: rotate(-45deg); }
+
+/* ---- columns */
+.cols { display: grid; grid-template-columns: minmax(190px, 26%) minmax(210px, 34%) minmax(0, 1fr); gap: 8px; min-height: 0; }
+.col { min-height: 0; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; display: flex; flex-direction: column; }
+.col > header { padding: 8px 10px 6px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.scroll { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; flex: 1 1 auto; padding: 8px 10px; }
+
+/* ledger */
+.led { display: grid; gap: 9px; }
+.led .r { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.led .k { font-size: 13px; }
+.bar { height: 10px; background: #0b1319; border: 1px solid var(--line); position: relative; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--sea); }
+.r.low .bar i { background: var(--brass); }
+.r.crit .bar i { background: var(--rust); }
+.led .v { font-family: var(--mono); font-size: 13px; min-width: 3.4em; text-align: right; }
+.r.low .v { color: var(--brass); }
+.r.crit .v { color: var(--rust); }
+.led .sub { grid-column: 2 / 4; font-size: 11px; color: var(--dim); margin-top: -4px; }
+.led .flag { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+.air { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding-top: 2px; border-top: 1px dashed var(--line); }
+.air.foul, .air.dangerous { color: var(--rust); }
+.air.stale { color: var(--brass); }
+
+/* the men */
+.men { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.men li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 5px 2px; border-bottom: 1px solid #16232b; align-items: baseline; }
+.men li.sym { padding-bottom: 6px; }
+.men .n { font-weight: 600; }
+.men .role { color: var(--dim); font-weight: 400; margin-left: 6px; font-size: 13px; }
+.men .says { color: var(--paper); font-style: italic; font-size: 13px; text-align: right; }
+.men .seen { grid-column: 1 / 3; font-size: 12px; color: var(--brass); }
+.men li.gone .n { text-decoration: line-through; color: var(--dim); }
+.badge { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid var(--brass); color: var(--brass); padding: 0 5px; margin-left: 6px; }
+.sonar { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; }
+.sonar b { color: var(--sea); letter-spacing: .1em; font-size: 11px; }
+.sonar.off b { color: var(--dim); }
+.sonar p { margin: 3px 0 0; color: var(--paper); font-style: italic; }
+
+/* log */
+.log { font: 12.5px/1.45 var(--mono); }
+.log p { margin: 0 0 5px; padding-left: 4.4em; text-indent: -4.4em; }
+.log .tk { color: var(--dim); }
+.log .ord { color: var(--brass); }
+.log .ch { color: var(--sea); }
+.log .mis { color: var(--paper); font-weight: 500; }
+.col.logcol .scroll { padding-bottom: 4px; }
+.notice { min-height: 38px; padding: 4px 10px; font-size: 13px; line-height: 1.25; color: var(--sea); border-top: 1px solid var(--line); display: flex; align-items: center; }
+.btn { white-space: nowrap; }
+.btn small { white-space: normal; }
+.actions { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 6px; padding: 6px; border-top: 1px solid var(--line); }
+.btn {
+  min-height: 52px; padding: 6px 8px; background: var(--panel-hi); border: 1px solid var(--line); border-radius: 4px;
+  display: grid; place-items: center; text-align: center; line-height: 1.15; font-weight: 600;
+}
+.btn small { display: block; font-weight: 400; color: var(--dim); font-size: 11px; }
+.btn.primary { background: var(--brass); border-color: var(--brass); color: var(--ink); }
+.btn.primary small { color: #3a2f12; }
+.btn:active:not(:disabled) { transform: translateY(1px); filter: brightness(1.12); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+/* ---- sheets */
+.veil { position: fixed; inset: 0; background: rgba(5, 9, 12, .78); display: grid; place-items: center;
+  padding: max(10px, env(safe-area-inset-top, 0px)) var(--gutter-r) max(10px, env(safe-area-inset-bottom, 0px)) var(--gutter-l); z-index: 20; }
+.sheet { width: min(1000px, 100%); max-height: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; display: flex; flex-direction: column; min-height: 0; }
+.sheet > header { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.sheet h2 { margin: 0; font: 400 19px var(--display); }
+.sheet .body { overflow-y: auto; overscroll-behavior: contain; padding: 12px 14px; min-height: 0; flex: 1 1 auto; }
+.sheet footer { padding: 8px 14px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+
+.decision .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 16px; }
+.decision .story { font: 400 18px/1.5 var(--display); }
+.decision .opts { display: grid; gap: 8px; align-content: start; }
+.opt { text-align: left; min-height: 56px; padding: 10px 12px; background: var(--panel-hi); border: 1px solid var(--line); border-radius: 4px; display: grid; gap: 3px; }
+.opt b { font-weight: 600; font-size: 15px; }
+.opt span { color: var(--dim); font-size: 12.5px; }
+.opt:active { border-color: var(--brass); }
+.sheet.decision { border-color: var(--brass); }
+.sheet.decision h2 { color: var(--brass); letter-spacing: .06em; }
+
+.orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.orders-grid .opt { min-height: 60px; }
+.pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.note { font-size: 12.5px; color: var(--dim); margin: 10px 0 0; }
+
+.reports { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+.reports h3 { margin: 0 0 6px; font: 400 15px var(--display); letter-spacing: .04em; }
+.reports .row { display: contents; }
+.reports .c { padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.reports .c.log { font-family: var(--display); }
+.end-title { font: 400 26px var(--display); margin: 0 0 6px; }
+.epi p { margin: 0 0 8px; font: 400 17px/1.5 var(--display); }
+.epi p.hush { color: var(--dim); font-style: italic; }
+
+.title-card { text-align: center; max-width: 640px; margin: 0 auto; }
+.title-card h1 { font: 400 40px/1.05 var(--display); margin: 4px 0 10px; letter-spacing: .02em; }
+.title-card p { margin: 0 0 10px; color: var(--paper); font-size: 16px; }
+.title-card .rule { display: grid; gap: 6px; text-align: left; margin: 12px auto; max-width: 520px; font-size: 14px; color: var(--dim); }
+.title-card .rule b { color: var(--paper); }
+.title-card .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+.title-card .btn { min-width: 200px; }
+
+/* ---- portrait: the game is landscape */
+.rotate { display: none; }
+@media (orientation: portrait) and (max-width: 700px) {
+  .rotate { position: fixed; inset: 0; z-index: 50; background: var(--hull); display: grid; place-content: center; text-align: center; padding: 24px; gap: 10px; }
+  .rotate .ico { font-size: 54px; transform: rotate(90deg); }
+  .rotate p { margin: 0; font: 400 20px var(--display); }
+}
+/* ---- low phones, landscape */
+@media (max-height: 420px) {
+  .top { min-height: 40px; } .orders-chip .t { font-size: 15px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .btn { min-height: 46px; }
+  .scroll { padding: 6px 8px; }
+  .led { gap: 6px; } .men li { padding: 4px 2px; }
+  .title-card h1 { font-size: 30px; } .title-card p { font-size: 14px; }
+  .decision .story { font-size: 16px; }
+}
+@media (max-width: 760px) { .btn small.wide { display: none; } }
+@media (max-width: 720px) {
+  .cols { grid-template-columns: minmax(150px, 30%) minmax(0, 1fr) minmax(0, 1fr); }
+  .led .r { grid-template-columns: 52px minmax(0, 1fr) auto; }
+}
+@media (max-width: 560px) { .decision .grid { grid-template-columns: 1fr; } .orders-grid { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+</style>
+<div id="app"></div>
+<div class="rotate" role="alert"><span class="ico" aria-hidden="true">⟳</span><p>Turn your phone sideways.</p><span class="dim">The bridge is laid out for a wide screen.</span></div>
+<script>
+/* Depths Within: the dread engine, ported line by line from dread/*.py.
+ *
+ * It is a port, not a rewrite: same names (snake_case where the data files use them), same
+ * order of operations, and the same random numbers. `PyRandom` reproduces CPython's
+ * Mersenne Twister (seeding, random(), choice(), choices(), randint(), uniform()), and
+ * `fsum` reproduces the compensated float sum that Python 3.12+ uses in sum(). Given the same
+ * seed and the same inputs, the log it writes is the log the Python engine writes
+ * (tests/test_web_parity.py checks that, on the shipped file).
+ *
+ * No DOM in here, so Node can run it.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.Dread = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- Python's random
+  class PyRandom {
+    constructor(seed) {
+      this.mt = new Uint32Array(624);
+      this.idx = 624;
+      this.seed(seed);
+    }
+    _initGenrand(s) {
+      const mt = this.mt;
+      mt[0] = s >>> 0;
+      for (let i = 1; i < 624; i++) {
+        const prev = mt[i - 1] ^ (mt[i - 1] >>> 30);
+        mt[i] = (Math.imul(1812433253, prev) + i) >>> 0;
+      }
+    }
+    seed(n) {
+      n = Math.abs(n);
+      const key = [];
+      if (n === 0) key.push(0);
+      while (n > 0) { key.push(n % 4294967296); n = Math.floor(n / 4294967296); }
+      this._initGenrand(19650218);
+      const mt = this.mt;
+      let i = 1, j = 0;
+      for (let k = Math.max(624, key.length); k > 0; k--) {
+        const prev = mt[i - 1] ^ (mt[i - 1] >>> 30);
+        mt[i] = ((mt[i] ^ Math.imul(prev, 1664525)) + key[j] + j) >>> 0;
+        i++; j++;
+        if (i >= 624) { mt[0] = mt[623]; i = 1; }
+        if (j >= key.length) j = 0;
+      }
+      for (let k = 623; k > 0; k--) {
+        const prev = mt[i - 1] ^ (mt[i - 1] >>> 30);
+        mt[i] = ((mt[i] ^ Math.imul(prev, 1566083941)) - i) >>> 0;
+        i++;
+        if (i >= 624) { mt[0] = mt[623]; i = 1; }
+      }
+      mt[0] = 0x80000000;
+      this.idx = 624;
+    }
+    _next() {
+      const mt = this.mt;
+      if (this.idx >= 624) {
+        let kk = 0, y;
+        for (; kk < 624 - 397; kk++) {
+          y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff);
+          mt[kk] = mt[kk + 397] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0);
+        }
+        for (; kk < 623; kk++) {
+          y = (mt[kk] & 0x80000000) | (mt[kk + 1] & 0x7fffffff);
+          mt[kk] = mt[kk + (397 - 624)] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0);
+        }
+        y = (mt[623] & 0x80000000) | (mt[0] & 0x7fffffff);
+        mt[623] = mt[396] ^ (y >>> 1) ^ ((y & 1) ? 0x9908b0df : 0);
+        this.idx = 0;
+      }
+      let y = mt[this.idx++];
+      y ^= y >>> 11;
+      y ^= (y << 7) & 0x9d2c5680;
+      y ^= (y << 15) & 0xefc60000;
+      y ^= y >>> 18;
+      return y >>> 0;
+    }
+    random() {
+      const a = this._next() >>> 5, b = this._next() >>> 6;
+      return (a * 67108864.0 + b) * (1.0 / 9007199254740992.0);
+    }
+    _getrandbits(k) { return k === 0 ? 0 : this._next() >>> (32 - k); }
+    _randbelow(n) {
+      if (!n) return 0;
+      const k = 32 - Math.clz32(n);
+      let r = this._getrandbits(k);
+      while (r >= n) r = this._getrandbits(k);
+      return r;
+    }
+    choice(seq) { return seq[this._randbelow(seq.length)]; }
+    randint(a, b) { return a + this._randbelow(b - a + 1); }
+    uniform(a, b) { return a + (b - a) * this.random(); }
+    /** random.choices(population, weights, k=1)[0] */
+    choices1(population, weights) {
+      const cum = [];
+      let acc = 0;
+      weights.forEach((w, i) => { acc = i === 0 ? w : acc + w; cum.push(acc); });
+      const total = cum[cum.length - 1] + 0.0;
+      let lo = 0, hi = population.length - 1;
+      const x = this.random() * total;
+      while (lo < hi) {                       // bisect_right(cum, x, 0, hi)
+        const mid = (lo + hi) >> 1;
+        if (x < cum[mid]) hi = mid; else lo = mid + 1;
+      }
+      return population[lo];
+    }
+  }
+
+  // ---------------------------------------------------------------- numeric helpers
+  const clamp = (x, lo = 0.0, hi = 1.0) => Math.max(lo, Math.min(hi, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  /** Python 3.12+ sum() of floats: Neumaier compensated summation. */
+  function fsum(arr) {
+    if (arr.length === 0) return 0;
+    let f = arr[0], c = 0.0;
+    for (let i = 1; i < arr.length; i++) {
+      const x = arr[i], t = f + x;
+      if (Math.abs(f) >= Math.abs(x)) c += (f - t) + x; else c += (x - t) + f;
+      f = t;
+    }
+    if (c && Number.isFinite(c)) f += c;
+    return f;
+  }
+  /** max()/min() with Python's tie rule: the first one wins. */
+  function maxBy(arr, key) {
+    let best = arr[0], bk = key(best);
+    for (let i = 1; i < arr.length; i++) { const k = key(arr[i]); if (k > bk) { best = arr[i]; bk = k; } }
+    return best;
+  }
+  function minBy(arr, key) {
+    let best = arr[0], bk = key(best);
+    for (let i = 1; i < arr.length; i++) { const k = key(arr[i]); if (k < bk) { best = arr[i]; bk = k; } }
+    return best;
+  }
+  const pad3 = (n) => String(n).padStart(3, '0');
+  const tag = (t) => `[${pad3(t)}]`;
+
+  // ---------------------------------------------------------------- data
+  let DATA = null;
+  function setData(data) {
+    DATA = {
+      events: data.events.map((e) => e),
+      missions: data.missions.map((m) => ({
+        id: m.id, kind: m.kind, ticks: m.ticks, moral: !!m.moral, title: m.title, briefing: m.briefing,
+        channel: (m.provenance && m.provenance.channel) || '', signed: (m.provenance && m.provenance.signed) || '',
+        quality: (m.provenance && m.provenance.quality !== undefined) ? m.provenance.quality : 0.5,
+        mundane_origin: m.mundane_origin, uncanny_origin: m.uncanny_origin,
+        window: m.window !== undefined ? m.window : 1.25,
+      })),
+    };
+  }
+  const provenanceLine = (m) => `${m.channel} ${m.signed}`.trim();
+
+  // ---------------------------------------------------------------- state (dread/state.py)
+  const ROLES = ['sonar', 'torpedo', 'engine', 'helm', 'radio', 'medic', 'cook', 'deck'];
+  const ROUTINE_ITEMS = ['meals', 'music', 'cards', 'coffee', 'watches'];
+
+  class Crew {
+    constructor(id, name, role, section, candor) {
+      Object.assign(this, {
+        id, name, role, section, candor, fear: 0.1, fatigue: 0.1, guilt: 0.0, trust: 0.8,
+        alive: true, missing: false, isolated: false, isolated_ticks: 0, name_known: false,
+      });
+      this.believes = new Set();
+    }
+    get active() { return this.alive && !this.missing; }
+    stress() { return clamp(0.45 * this.fear + 0.35 * this.fatigue + 0.20 * this.guilt); }
+    reported(cohesion) {
+      const candorEff = clamp(this.candor * this.trust * (0.6 + 0.4 * cohesion));
+      return lerp(0.15, this.stress(), candorEff);
+    }
+    symptoms() {
+      const out = [];
+      if (this.fear > 0.5) out.push('jumpy');
+      if (this.fear > 0.7) out.push('talks to himself');
+      if (this.fatigue > 0.6) out.push('errors at station');
+      if (this.fatigue > 0.8) out.push('microsleeps');
+      if (this.guilt > 0.5) out.push('avoids eyes');
+      if (this.trust < 0.4) out.push('silent when the captain speaks');
+      if (this.guilt > 0.4 && this.fear > 0.4) out.push('leaves small offerings');
+      if (this.believes.size > 0 && this.fear > 0.3) out.push('repeats rumors');
+      return out;
+    }
+  }
+
+  class Rumor {
+    constructor(id, text, intensity, drift) {
+      this.id = id; this.text = text; this.intensity = intensity;
+      this.believers = new Set(); this.drift = drift || {};
+    }
+  }
+
+  class Ship {
+    constructor() {
+      Object.assign(this, {
+        cohesion: 0.8, discipline: 0.7, hull: 1.0, readiness: 1.0, co2: 0.005, noise: 0.1,
+        attention: 0.0, progress: 0.0, food: 1.0, water: 1.0, fuel: 1.0, rations: 1.0,
+        returning: false, owed: 0.0, orders_doubt: 0.0, moral_debt: 0.0, scrubber: 1.0,
+        sonar_on: true, silent_running: false, surfaced: false, rest_cancelled: false,
+        stand_down: false, hours_submerged: 0,
+      });
+      this.routines = {};
+      ROUTINE_ITEMS.forEach((k) => { this.routines[k] = 0.9; });
+      this.flags = new Set();
+      this.rumors = new Map();
+    }
+    get routine() {
+      const v = Object.values(this.routines);
+      return fsum(v) / v.length;
+    }
+  }
+
+  function dreadIndex(ship, crew) {
+    const live = crew.filter((c) => c.active);
+    if (!live.length) return 1.0;
+    const n = live.length;
+    const fear = fsum(live.map((c) => c.fear)) / n;
+    const guilt = fsum(live.map((c) => c.guilt)) / n;
+    const trust = fsum(live.map((c) => c.trust)) / n;
+    const fatigue = fsum(live.map((c) => c.fatigue)) / n;
+    const co2Pressure = clamp((ship.co2 - 0.005) / 0.025);
+    return clamp(0.30 * fear + 0.15 * guilt + 0.15 * (1 - trust) + 0.15 * fatigue
+      + 0.10 * co2Pressure + 0.15 * (1 - ship.routine));
+  }
+
+  // ---------------------------------------------------------------- conditions
+  const OPS = {
+    '>': (a, b) => a > b, '>=': (a, b) => a >= b, '<': (a, b) => a < b,
+    '<=': (a, b) => a <= b, '==': (a, b) => a === b, '!=': (a, b) => a !== b,
+  };
+
+  function resolvePath(path, world) {
+    const parts = path.split('.');
+    const head = parts[0];
+    if (head === 'ship') return Number(world.ship[parts[1]]);
+    if (head === 'world') return Number(world[parts[1]]);
+    if (head === 'crew') {
+      const live = world.active_crew();
+      const kind = parts[1];
+      if (kind === 'count') return live.length;
+      const vals = live.map((c) => c[parts[2]]);
+      if (!vals.length) return 0.0;
+      if (kind === 'avg') return fsum(vals) / vals.length;
+      if (kind === 'max') return Math.max(...vals);
+      return Math.min(...vals);
+    }
+    if (head === 'dread') return world.dread();
+    throw new Error(`unknown path ${path}`);
+  }
+
+  const isEmpty = (o) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length === 0;
+
+  function evaluate(cond, world) {
+    if (cond === null || cond === undefined || isEmpty(cond)) return true;
+    if ('never' in cond) return false;
+    if ('all' in cond) return cond.all.every((c) => evaluate(c, world));
+    if ('any' in cond) return cond.any.some((c) => evaluate(c, world));
+    if ('not' in cond) return !evaluate(cond.not, world);
+    if ('path' in cond) return OPS[cond.op](resolvePath(cond.path, world), cond.value);
+    if ('flag' in cond) return world.ship.flags.has(cond.flag);
+    if ('no_flag' in cond) return !world.ship.flags.has(cond.no_flag);
+    if ('crew_where' in cond) {
+      const w = cond.crew_where;
+      const op = OPS[w.op || '>='];
+      for (const c of world.active_crew()) {
+        if ('role' in w && c.role !== w.role) continue;
+        if ('stat' in w && !op(c[w.stat], w.value)) continue;
+        return true;
+      }
+      return false;
+    }
+    if ('mission' in cond) {
+      const want = Array.isArray(cond.mission) ? cond.mission : [cond.mission];
+      return world.run !== null && want.includes(world.run.mission.id);
+    }
+    if ('outcome' in cond) return world.ship.flags.has(`outcome:${cond.outcome.mission}:${cond.outcome.is}`);
+    if ('phantom' in cond) return world.deck.phantoms.some((p) => p.kind === cond.phantom);
+    if ('rumor' in cond) {
+      const r = world.ship.rumors.get(cond.rumor);
+      if (!r) return false;
+      return r.believers.size >= (cond.believers_gte !== undefined ? cond.believers_gte : 1);
+    }
+    throw new Error(`unknown condition ${JSON.stringify(cond)}`);
+  }
+
+  // ---------------------------------------------------------------- phantom sonar
+  const VOICE_LINES = [
+    '{name}... {name}... come up here.', "{name}, it's cold. Open the hatch.",
+    'Why did you leave me, {name}?', '{name}. {name}. {name}.',
+  ];
+  const ECHO_LINES = ['an echo that keeps pace with us, then slows', 'a slow return moving against the current',
+    'something that breathes in time with the screws'];
+  const MORSE_LINES = ['...-- sunk three days ago, still sending', 'recall order, signed by a dead officer',
+    'a list of names, one of them still aboard'];
+  const fillName = (s, name) => s.split('{name}').join(name);
+
+  class SonarDeck {
+    constructor() {
+      this.phantoms = []; this.names_learned = new Set(); this._next_id = 1; this.sonar_off_ticks = 0;
+    }
+    spawn(kind, audible, intensity, text, rng, crew) {
+      if (!text) text = this._textFor(kind, rng, crew);
+      const p = { id: this._next_id, kind, audible_to: new Set(audible), intensity, age: 0, text };
+      this._next_id += 1;
+      this.phantoms.push(p);
+      return p;
+    }
+    _textFor(kind, rng, crew) {
+      if (kind === 'voice') {
+        const names = (crew || []).filter((c) => this.names_learned.has(c.id) && c.active).map((c) => c.name);
+        const name = names.length && rng ? rng.choice(names) : 'someone';
+        return fillName(rng ? rng.choice(VOICE_LINES) : VOICE_LINES[0], name);
+      }
+      const pool = kind === 'echo' ? ECHO_LINES : MORSE_LINES;
+      return rng ? rng.choice(pool) : pool[0];
+    }
+    tick(world) {
+      const ship = world.ship, rng = world.rng, crew = world.crew;
+      const live = world.active_crew();
+      if (ship.sonar_on) this.sonar_off_ticks = 0; else this.sonar_off_ticks += 1;
+      for (const p of this.phantoms.slice()) {
+        p.age += 1;
+        p.intensity = clamp(p.intensity + 0.02 * ship.attention - 0.006);
+        if (p.intensity <= 0.0) { this.phantoms.splice(this.phantoms.indexOf(p), 1); continue; }
+        if (p.intensity > 0.6 && rng.random() < 0.08) {
+          const cand = live.filter((c) => !p.audible_to.has(c.id));
+          if (cand.length) p.audible_to.add(maxBy(cand, (c) => c.fear + c.fatigue).id);
+        }
+        if (ship.sonar_on) {
+          for (const cid of Array.from(p.audible_to).sort((a, b) => a - b)) {
+            const c = world.crew_by_id(cid);
+            if (!c || !c.active) continue;
+            c.fear = clamp(c.fear + 0.012 * p.intensity);
+            c.fatigue = clamp(c.fatigue + 0.004);
+            if (p.kind === 'voice' && rng.random() < 0.15 * p.intensity) {
+              this.names_learned.add(c.id);
+              c.name_known = true;
+              ship.attention = clamp(ship.attention + 0.01);
+            }
+          }
+        } else {
+          const liveIds = new Set(live.map((x) => x.id));
+          let heard = 0;
+          p.audible_to.forEach((c) => { if (liveIds.has(c)) heard += 1; });
+          if (heard >= 2) for (const c of live) c.trust = clamp(c.trust - 0.002);
+        }
+      }
+      const sonarOps = live.filter((c) => c.role === 'sonar');
+      if (sonarOps.length && this.phantoms.length < 4) {
+        const op = maxBy(sonarOps, (c) => c.fear + c.fatigue);
+        const pSpawn = 0.01 + 0.05 * ship.attention + 0.015 * (op.fear + op.fatigue);
+        if (ship.sonar_on && rng.random() < pSpawn) {
+          let kind = rng.choice(['echo', 'echo', 'voice', 'morse']);
+          if (kind === 'voice' && this.names_learned.size === 0) kind = 'echo';
+          this.spawn(kind, [op.id], 0.3, '', rng, crew);
+        }
+      }
+    }
+    mute_all() {
+      for (const p of this.phantoms) p.intensity = clamp(p.intensity - 0.15);
+      this.phantoms = this.phantoms.filter((p) => p.intensity > 0.0);
+    }
+    real_detection_chance(ship) { return ship.sonar_on ? 0.9 : 0.3; }
+  }
+
+  // ---------------------------------------------------------------- events
+  const GLOBAL_COOLDOWN = 3, BEAT_GAP = 14, BEAT_START = 8;
+  const SHIP_CLAMP = { co2: [0.0, 0.1] };
+
+  class EventEngine {
+    constructor(events, useSchedule) {
+      this.use_schedule = useSchedule;
+      this.events = events;
+      this.byId = new Map(events.map((e) => [e.id, e]));
+      this.last_fired = new Map();
+      this.last_any = -99;
+      this.last_beat = 0;
+    }
+    select(world) {
+      const t = world.tick_no, act = world.act();
+      const run = world.run;
+      if (run !== null) {
+        const due = this.events.filter((e) => e.mission === run.mission.id && 'at_progress' in e
+          && !run.phase_fired.has(e.id) && world.ship.progress >= e.at_progress && evaluate(e.requires, world));
+        if (due.length) return minBy(due, (e) => e.at_progress);
+      }
+      const scheduled = this.events.filter((e) => this.use_schedule && (e.schedule || []).includes(t)
+        && this._ready(e, t, act, world));
+      if (scheduled.length) return scheduled[0];
+      if (t - this.last_any < GLOBAL_COOLDOWN) return null;
+      const cands = this.events.filter((e) => !('schedule' in e) && this._ready(e, t, act, world));
+      const overdue = t >= BEAT_START && t - this.last_beat >= BEAT_GAP;
+      const beats = cands.filter((e) => e.beat);
+      if (overdue && beats.length) {
+        return world.rng.choices1(beats, beats.map((e) => (e.weight !== undefined ? e.weight : 1.0)));
+      }
+      if (world.rng.random() > 0.22 + 0.35 * world.dread()) return null;
+      if (!cands.length) return null;
+      return world.rng.choices1(cands, cands.map((e) => (e.weight !== undefined ? e.weight : 1.0)));
+    }
+    _ready(ev, t, act, world) {
+      if ('at_progress' in ev) return false;
+      if ('mission' in ev) {
+        const ms = Array.isArray(ev.mission) ? ev.mission : [ev.mission];
+        if (world.run === null || !ms.includes(world.run.mission.id)) return false;
+      }
+      if ('schedule' in ev && !this.use_schedule) return false;
+      if (!ev.acts.includes(act) && !('schedule' in ev)) return false;
+      if (ev.once && this.last_fired.has(ev.id)) return false;
+      const last = this.last_fired.has(ev.id) ? this.last_fired.get(ev.id) : -99;
+      if (t - last < (ev.cooldown !== undefined ? ev.cooldown : 12)) return false;
+      return evaluate(ev.requires, world);
+    }
+    fire(ev, world) {
+      const t = world.tick_no;
+      this.last_fired.set(ev.id, t);
+      this.last_any = t;
+      if ('at_progress' in ev && world.run !== null) world.run.phase_fired.add(ev.id);
+      const target = this._pickTarget(ev.target, world);
+      world.event_target = target;
+      const mundaneOk = evaluate(ev.mundane_when, world);
+      const text = ev.text.split('{target}').join(target ? target.name : 'someone');
+      const record = { tick: t, id: ev.id, act: world.act(), text, mundane_ok: mundaneOk, choice: null, beat: !!ev.beat };
+      if (ev.beat) this.last_beat = t;
+      world.fired.push(record);
+      world.log.push(`${tag(t)} ${text}`);
+      applyEffects(ev.effects || [], world, target);
+      const choices = (ev.choices || []).filter((c) => evaluate(c.requires, world)).map((c) => ({
+        key: c.key, text: c.text, tags: c.tags || [], cost: c.cost || '', effects: c.effects,
+      }));
+      if (choices.length) {
+        world.pending = { event_id: ev.id, text, target_id: target ? target.id : null, choices };
+      }
+      return record;
+    }
+    _pickTarget(spec, world) {
+      if (!spec) return null;
+      let pool = world.active_crew().filter((c) => !c.isolated || spec.include_isolated);
+      if ('role' in spec) {
+        const byRole = pool.filter((c) => c.role === spec.role);
+        if (byRole.length) pool = byRole;
+      }
+      if (!pool.length) return null;
+      const sel = spec.select || 'random';
+      if (sel === 'highest') return maxBy(pool, (c) => c[spec.stat]);
+      if (sel === 'lowest') return minBy(pool, (c) => c[spec.stat]);
+      return world.rng.choice(pool);
+    }
+  }
+
+  function who(spec, world, target) {
+    if (spec === 'target') return target ? [target] : [];
+    if (spec === 'all') return world.active_crew();
+    if (spec === 'random') { const pool = world.active_crew(); return pool.length ? [world.rng.choice(pool)] : []; }
+    if (spec === 'others') return world.active_crew().filter((c) => !target || c.id !== target.id);
+    if (spec.startsWith('role:')) return world.active_crew().filter((c) => c.role === spec.slice(5));
+    if (spec.startsWith('highest:') || spec.startsWith('lowest:')) {
+      const [kind, stat] = spec.split(':');
+      const pool = world.active_crew();
+      if (!pool.length) return [];
+      return [(kind === 'highest' ? maxBy : minBy)(pool, (c) => c[stat])];
+    }
+    throw new Error(`unknown who ${spec}`);
+  }
+
+  function applyEffects(effects, world, target) {
+    const ship = world.ship;
+    for (const fx of effects) {
+      const op = fx.op;
+      if (op === 'ship') {
+        const [lo, hi] = SHIP_CLAMP[fx.stat] || [0.0, 1.0];
+        ship[fx.stat] = clamp(ship[fx.stat] + fx.value, lo, hi);
+      } else if (op === 'crew') {
+        for (const c of who(fx.who, world, target)) c[fx.stat] = clamp(c[fx.stat] + fx.value);
+      } else if (op === 'flag') {
+        ship.flags.add(fx.name);
+        if ('ttl' in fx) world.flag_expiry.set(fx.name, world.tick_no + fx.ttl);
+      } else if (op === 'unflag') {
+        ship.flags.delete(fx.name);
+      } else if (op === 'routine') {
+        ship.routines[fx.item] = clamp(ship.routines[fx.item] + fx.value);
+      } else if (op === 'rumor') {
+        let r = ship.rumors.get(fx.id);
+        if (!r) r = new Rumor(fx.id, fx.text, fx.intensity !== undefined ? fx.intensity : 0.5, Object.assign({}, fx.drift || {}));
+        r.intensity = clamp(Math.max(r.intensity, fx.intensity !== undefined ? fx.intensity : r.intensity));
+        const seed = fx.seed !== undefined ? fx.seed : 'target';
+        const seeded = seed !== 'none' ? who(seed, world, target) : [];
+        for (const c of seeded) { r.believers.add(c.id); c.believes.add(r.id); }
+        ship.rumors.set(r.id, r);
+      } else if (op === 'phantom') {
+        const aud = who(fx.audible, world, target).map((c) => c.id);
+        if (aud.length) world.deck.spawn(fx.kind, aud, fx.intensity !== undefined ? fx.intensity : 0.4, fx.text || '', world.rng, world.crew);
+      } else if (op === 'vanish') {
+        for (const c of who(fx.who, world, target)) c.missing = true;
+        ship.flags.add('sailor_missing');
+      } else if (op === 'isolate') {
+        for (const c of who(fx.who, world, target)) c.isolated = true;
+      } else if (op === 'release') {
+        for (const c of who(fx.who, world, target)) { c.isolated = false; c.isolated_ticks = 0; }
+      } else if (op === 'kill') {
+        for (const c of who(fx.who, world, target)) c.alive = false;
+      } else if (op === 'combat') {
+        world.combat(fx.severity);
+      } else if (op === 'leave_station') {
+        world.log.push(`${tag(world.tick_no)} ${world.leave_station()}`);
+      } else if (op === 'check_world') {
+        world.log.push(`${tag(world.tick_no)} ${world.check_world()}`);
+      } else if (op === 'summon_notice') {
+        world.notice_at_override = world.vigil_ticks + 6;
+      } else if (op === 'travel_delay') {
+        world.travel_left = Math.max(1, world.travel_left + fx.value);
+      } else if (op === 'set') {
+        ship[fx.stat] = fx.value;
+      } else if (op === 'time') {
+        world.time_cost += fx.value;
+      } else if (op === 'rumor_intensity') {
+        const r = ship.rumors.get(fx.id);
+        if (r) r.intensity = clamp(r.intensity + fx.value);
+      } else if (op === 'verify_orders') {
+        world.log.push(`${tag(world.tick_no)} ${orders.verify_orders(world)}`);
+      } else if (op === 'mission_outcome') {
+        world.resolve_mission(fx.value);
+      } else if (op === 'if') {
+        applyEffects(evaluate(fx.cond, world) ? fx.then : (fx.else || []), world, target);
+      } else if (op === 'chance') {
+        let p = fx.p;
+        if ('mod' in fx) p += fx.mod.k * (resolvePath(fx.mod.path, world) - (fx.mod.ref !== undefined ? fx.mod.ref : 0.0));
+        for (const [flag, bonus] of Object.entries(fx.if_flag || {})) if (ship.flags.has(flag)) p += bonus;
+        applyEffects(world.rng.random() < clamp(p, 0.02, 0.98) ? fx.then : (fx.else || []), world, target);
+      } else if (op === 'mute_phantoms') {
+        world.deck.mute_all();
+      } else if (op === 'log') {
+        world.log.push(`${tag(world.tick_no)} ${fx.text}`);
+      } else {
+        throw new Error(`unknown effect op ${op}`);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- orders
+  const orders = {
+    silence_sonar(w) {
+      w.ship.sonar_on = false; w.deck.mute_all();
+      for (const c of w.active_crew()) if (c.role === 'sonar') c.fear = clamp(c.fear - 0.15);
+      return 'Sonar off. The headsets go quiet.';
+    },
+    restore_sonar(w) { w.ship.sonar_on = true; return 'Sonar back on.'; },
+    isolate(w, cid) {
+      const c = w.crew_by_id(cid);
+      if (!c || !c.active || c.isolated) return 'Nothing to do.';
+      c.isolated = true; c.trust = clamp(c.trust - 0.25); c.guilt = clamp(c.guilt + 0.15);
+      w.ship.rumors.forEach((r) => r.believers.delete(cid));
+      for (const o of w.active_crew()) o.trust = clamp(o.trust - 0.03);
+      w.ship.attention = clamp(w.ship.attention + 0.03);
+      return `${c.name} is confined to the forward berth.`;
+    },
+    release(w, cid) {
+      const c = w.crew_by_id(cid);
+      if (!c || !c.isolated) return 'Nothing to do.';
+      c.isolated = false; c.isolated_ticks = 0;
+      return `${c.name} is back on the watch bill.`;
+    },
+    force_compartment(w, cid) {
+      const c = w.crew_by_id(cid);
+      if (!c || !c.active) return 'Nothing to do.';
+      w.ship.hull = clamp(w.ship.hull + 0.05);
+      c.fear = clamp(c.fear + 0.2); c.guilt = clamp(c.guilt + 0.1);
+      for (const o of w.active_crew()) { o.trust = clamp(o.trust - 0.12); o.guilt = clamp(o.guilt + 0.05); }
+      return `${c.name} goes in. The repair holds.`;
+    },
+    stand_down(w) {
+      w.ship.stand_down = true; w.ship.rest_cancelled = false;
+      return 'All hands but the skeleton watch are sent to their bunks.';
+    },
+    cancel_rest(w) {
+      if (!w.ship.rest_cancelled) for (const c of w.active_crew()) c.trust = clamp(c.trust - 0.03);
+      w.ship.rest_cancelled = true;
+      return 'Rest is cancelled for all hands.';
+    },
+    grant_rest(w) { w.ship.rest_cancelled = false; return 'Normal watch rotation resumes.'; },
+    hold_ritual(w) {
+      const s = w.ship;
+      const order = Object.keys(s.routines).map((k, i) => [k, i]).sort((a, b) => (s.routines[a[0]] - s.routines[b[0]]) || (a[1] - b[1]));
+      for (const [item] of order.slice(0, 2)) s.routines[item] = clamp(s.routines[item] + 0.4);
+      w.time_cost += 1.5 / w.patrol_ticks;
+      for (const c of w.active_crew()) c.fear = clamp(c.fear - 0.03);
+      return 'The crew eats together. Someone finds a deck of cards.';
+    },
+    address_crew(w) {
+      const live = w.active_crew();
+      if (!live.length) return 'No one to address.';
+      const avg = fsum(live.map((c) => c.trust)) / live.length;
+      w.ship.rumors.forEach((r) => { r.intensity = clamp(r.intensity - 0.35 * avg); });
+      for (const c of live) c.trust = clamp(c.trust - 0.03 + 0.05 * avg);
+      return 'The captain speaks over the intercom.';
+    },
+    scrub_air(w) {
+      const s = w.ship;
+      if (s.scrubber < 0.12) return 'The absorbent is spent.';
+      s.scrubber = clamp(s.scrubber - 0.12);
+      s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1);
+      return 'Fresh absorbent in the scrubbers.';
+    },
+    surface(w) {
+      const s = w.ship;
+      s.surfaced = true; s.co2 = Math.max(0.005, s.co2 - 0.01); s.attention = clamp(s.attention - 0.1);
+      for (const c of w.active_crew()) c.fear = clamp(c.fear - 0.1);
+      return 'Surfacing. The hatch opens on cold air.';
+    },
+    dive(w) { w.ship.surfaced = false; return 'Diving.'; },
+    active_ping(w) {
+      w.ship.noise = clamp(w.ship.noise + 0.35); w.ship.attention = clamp(w.ship.attention + 0.02);
+      return 'One ping. The hull rings with it.';
+    },
+    silent_running(w, on) {
+      w.ship.silent_running = on;
+      return on ? 'Silent running.' : 'Resuming normal running.';
+    },
+    verify_orders(w) {
+      const run = w.run;
+      if (run === null || run.phase_fired.has('verified')) return 'Nothing more to verify.';
+      run.phase_fired.add('verified');
+      const s = w.ship;
+      s.noise = clamp(s.noise + 0.15); s.attention = clamp(s.attention + 0.03);
+      w.time_cost += 0.01;
+      const roll = w.rng.random();
+      if (roll < run.mission.quality * 0.8) {
+        s.orders_doubt = clamp(s.orders_doubt - 0.25);
+        return 'A reply confirms the order, relayed through a station you cannot identify.';
+      }
+      if (roll < 0.8) { s.orders_doubt = clamp(s.orders_doubt + 0.05); return 'No acknowledgement.'; }
+      s.orders_doubt = clamp(s.orders_doubt + 0.2);
+      s.flags.add('orders_contradicted');
+      return 'The reply contradicts the order: same call sign, different cipher.';
+    },
+  };
+
+  // ---------------------------------------------------------------- the world
+  const DEFAULT_NAMES = ['Brandt', 'Keller', 'Vogel', 'Hahn', 'Lenz', 'Ostrow', 'Weiss', 'Maier', 'Fuchs', 'Reiter', 'Arndt', 'Kopp'];
+  const HARD_LIMIT_FACTOR = 1.1, ATTENTION_FLOOR = 0.25, REST_CANCEL_FATIGUE = 0.012, PACE = 0.95;
+
+  class World {
+    constructor(seed, opts) {
+      if (!DATA) throw new Error('Dread.setData() first');
+      opts = opts || {};
+      this.rng = new PyRandom(seed);
+      this.crew = DEFAULT_NAMES.map((name, i) => new Crew(i, name, ROLES[i % ROLES.length], i % 3, round2Python(this.rng.uniform(0.25, 0.85))));
+      this.ship = new Ship();
+      this.deck = new SonarDeck();
+      this.engine = new EventEngine(DATA.events, opts.use_schedule !== undefined ? opts.use_schedule : true);
+      this.patrol_ticks = opts.patrol_ticks || 72;
+      this.tick_no = 0;
+      this.log = [];
+      this.fired = [];
+      this.pending = null;
+      this.event_target = null;
+      this.flag_expiry = new Map();
+      this.mutiny_clock = 0;
+      this.time_cost = 0.0;
+      this.peak_dread = 0.0;
+      this.missions = opts.missions !== undefined ? opts.missions : DATA.missions;
+      this.run = null;
+      this.mission_i = -1;
+      this.results = [];
+      const trng = new PyRandom(seed * 31 + 7);
+      const warOver = trng.random() < 0.5;
+      this.truth = { war_over: warOver, notice_at: warOver ? null : trng.randint(50, 150) };
+      this.notice_at_override = null;
+      this.vigil_ticks = 0;
+      this.travel_left = 0;
+      this.check_until = -1;
+      this.starving = 0;
+      if (this.missions.length) this._start_mission(0);
+    }
+    active_crew() { return this.crew.filter((c) => c.active); }
+    crew_by_id(cid) { return this.crew.find((c) => c.id === cid) || null; }
+    dread() { return dreadIndex(this.ship, this.crew); }
+    get sonar_off_ticks() { return this.deck.sonar_off_ticks; }
+    get names_known() { return this.deck.names_learned.size; }
+    get on_station() { return this.run !== null && this.run.mission.kind === 'hold'; }
+    get notice_ready() {
+      if (!this.on_station || this.ship.flags.has('notice_received')) return 0.0;
+      const due = this.notice_at_override !== null ? this.notice_at_override : this.truth.notice_at;
+      return (due !== null && this.vigil_ticks >= due) ? 1.0 : 0.0;
+    }
+    act() {
+      const d = this.dread();
+      const byDread = d < 0.22 ? 1 : d < 0.38 ? 2 : 3;
+      return Math.min(byDread, 1 + Math.floor(this.tick_no / 24));
+    }
+    get finished() {
+      const f = this.ship.flags;
+      const done = this.missions.length ? this.mission_i >= this.missions.length : this.ship.progress >= 1.0;
+      const limit = !this.missions.length ? this.patrol_ticks * HARD_LIMIT_FACTOR : 2000;
+      return done || this.ship.hull <= 0.0 || f.has('deposed') || f.has('aborted')
+        || this.active_crew().length === 0 || this.tick_no >= limit;
+    }
+
+    /** What the captain gets to see: stress as reported and symptoms as observed. */
+    report(observerSkill) {
+      const skill = observerSkill !== undefined ? observerSkill : 0.6;
+      const medic = this.active_crew().some((c) => c.role === 'medic');
+      const p = Math.min(0.95, skill + (medic ? 0.25 : 0.0));
+      const look = new PyRandom(this.tick_no * 7919 + 17);   // looking never touches the patrol's dice
+      return this.active_crew().map((c) => ({
+        id: c.id, name: c.name, role: c.role, says: c.reported(this.ship.cohesion),
+        symptoms: c.symptoms().filter(() => look.random() < p),
+      }));
+    }
+
+    choose(key) {
+      if (this.pending === null) throw new Error('no pending decision');
+      const ch = this.pending.choices.find((c) => c.key === key);
+      if (!ch) throw new Error(`no such choice ${key}`);
+      const target = this.pending.target_id !== null ? this.crew_by_id(this.pending.target_id) : null;
+      applyEffects(ch.effects, this, target);
+      for (let i = this.fired.length - 1; i >= 0; i--) {
+        if (this.fired[i].id === this.pending.event_id) { this.fired[i].choice = key; break; }
+      }
+      this.log.push(`${tag(this.tick_no)} > ${ch.text}`);
+      this.pending = null;
+      return ch.text;
+    }
+
+    tick() {
+      if (this.pending !== null) throw new Error('a decision is pending; call choose() first');
+      this.tick_no += 1;
+      const s = this.ship;
+      for (const [name, until] of Array.from(this.flag_expiry.entries())) {
+        if (this.tick_no >= until) { s.flags.delete(name); this.flag_expiry.delete(name); }
+      }
+      if (!s.surfaced) s.hours_submerged += 1;
+      this._physics();
+      this._resources();
+      this._voyage();
+      this._rumors();
+      this.deck.tick(this);
+      this._mission();
+      this._mission_flow();
+      if (this.on_station) this.vigil_ticks += 1;
+      this._mutiny();
+      const ev = this.engine.select(this);
+      if (ev !== null) this.engine.fire(ev, this);
+      this.peak_dread = Math.max(this.peak_dread, this.dread());
+    }
+
+    _physics() {
+      const s = this.ship, live = this.active_crew();
+      const n = Math.max(1, live.length);
+      if (s.surfaced) s.co2 = Math.max(0.005, s.co2 - 0.01);
+      else s.co2 = clamp(s.co2 + 0.00075 * n / 10, 0.0, 0.1);
+      const base = s.silent_running ? 0.04 : 0.1;
+      s.noise = clamp(base + (s.noise - base) * 0.6);
+      for (const k of Object.keys(s.routines)) s.routines[k] = clamp(s.routines[k] - 0.008);
+      if (s.rest_cancelled) s.routines.watches = clamp(s.routines.watches - 0.01);
+      const routine = s.routine, cohesion = s.cohesion;
+      for (const c of live) {
+        const onWatch = Math.floor(this.tick_no / 4) % 3 === c.section;
+        if (s.stand_down) c.fatigue = clamp(c.fatigue + (onWatch ? 0.005 : -0.03));
+        else if (onWatch) c.fatigue = clamp(c.fatigue + 0.015);
+        else if (s.rest_cancelled) c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE);
+        else {
+          const quality = (s.co2 > 0.015 ? 0.5 : 1.0) * (c.fear > 0.6 ? 0.5 : 1.0);
+          c.fatigue = clamp(c.fatigue - 0.012 * quality);
+        }
+        if (s.co2 > 0.015) c.fatigue = clamp(c.fatigue + 0.003);
+        const decay = 0.006 * routine * cohesion * (1 - 0.5 * s.attention);
+        c.fear = Math.max(0.05, c.fear - decay);
+        if (c.fatigue > 0.5) c.fear = clamp(c.fear + 0.003 + 0.01 * (c.fatigue - 0.5));
+        if (s.co2 > 0.03) c.fear = clamp(c.fear + 0.006);
+        if (c.isolated) {
+          c.isolated_ticks += 1;
+          if (c.isolated_ticks > 6) c.fear = clamp(c.fear + 0.01);
+        }
+        if (cohesion > 0.6) c.guilt = clamp(c.guilt - 0.002);
+        if (routine > 0.5) c.trust = clamp(c.trust + 0.002, 0.0, 0.9);
+        else if (routine < 0.3) c.trust = clamp(c.trust - 0.002);
+      }
+      const mean = (a) => fsum(live.map((c) => c[a])) / n;
+      const isoFrac = live.filter((c) => c.isolated).length / n;
+      s.cohesion = lerp(s.cohesion, clamp(0.4 * mean('trust') + 0.45 * routine + 0.15 * (1 - 3 * isoFrac)), 0.06);
+      s.discipline = lerp(s.discipline, clamp(0.35 + 0.4 * mean('trust') + 0.25 * (1 - mean('fatigue'))), 0.05);
+      s.readiness = clamp(1.05 - 0.4 * mean('fatigue') - 0.3 * (1 - s.discipline) + (s.rest_cancelled ? 0.35 : 0.0), 0.0, 1.4);
+      if (mean('fatigue') > 0.6 && !s.stand_down) {
+        s.hull = clamp(s.hull - 0.004 * clamp((mean('fatigue') - 0.5) / 0.4));
+      } else if (mean('fatigue') < (s.stand_down ? 0.8 : 0.5) && s.hull < 1.0) {
+        s.hull = clamp(s.hull + 0.0015);
+      }
+      if (s.rest_cancelled) for (const c of live) c.trust = clamp(c.trust - 0.004);
+      const floor = this.run !== null ? 0.3 * (1 - this.run.mission.quality) : 0.0;
+      s.orders_doubt = Math.max(floor, s.orders_doubt - 0.002);
+      for (const c of live) {
+        c.trust = clamp(c.trust - 0.0012 * s.orders_doubt);
+        c.guilt = clamp(c.guilt + 0.0008 * s.moral_debt);
+      }
+      if (s.stand_down) {
+        s.discipline = clamp(s.discipline - 0.002);
+        s.attention = clamp(s.attention + 0.004);
+        if (mean('fatigue') < 0.3) {
+          s.stand_down = false;
+          this.log.push(`${tag(this.tick_no)} The boat wakes. Normal watches resume.`);
+        }
+      }
+      const d = this.dread();
+      let da = 0.003 * live.filter((c) => c.isolated).length + 0.012 * d + 0.01 * s.moral_debt
+        - 0.004 * routine * s.cohesion - 0.001;
+      if (s.surfaced) da -= 0.03;
+      s.attention = clamp(s.attention + da);
+      s.attention = Math.max(s.attention, ATTENTION_FLOOR * clamp((s.hours_submerged - 10) / 60));
+      for (const c of live) {
+        const night = [0, 1, 2, 3, 22, 23].includes(this.tick_no % 24);
+        if (c.isolated || (night && c.fear > 0.5)) {
+          if (this.rng.random() < 0.15 * s.attention && !c.name_known) {
+            c.name_known = true;
+            this.deck.names_learned.add(c.id);
+          }
+        }
+      }
+    }
+
+    _resources() {
+      const s = this.ship, live = this.active_crew();
+      const share = live.length / 12;
+      s.food = clamp(s.food - 0.0036 * share * s.rations);
+      s.water = clamp(s.water - 0.0042 * share * s.rations);
+      if (s.surfaced) s.fuel = clamp(s.fuel - 0.006);
+      if (s.surfaced && this.tick_no >= this.check_until && this.check_until > 0 && s.flags.has('checking')) {
+        s.flags.delete('checking');
+        s.surfaced = false;
+      }
+      if (s.food < 0.2 || s.water < 0.2) {
+        for (const c of live) {
+          c.fear = clamp(c.fear + 0.004); c.fatigue = clamp(c.fatigue + 0.003); c.trust = clamp(c.trust - 0.002);
+        }
+      }
+      if (s.food <= 0 || s.water <= 0) {
+        this.starving += 1;
+        if (this.starving % 8 === 0 && live.length) {
+          const victim = maxBy(live, (c) => c.fatigue);
+          victim.alive = false;
+          this.log.push(`${tag(this.tick_no)} ${victim.name} does not wake. Nobody says what he died of.`);
+          for (const c of this.active_crew()) { c.fear = clamp(c.fear + 0.06); c.guilt = clamp(c.guilt + 0.04); }
+        }
+      } else {
+        this.starving = 0;
+      }
+    }
+
+    leave_station() {
+      const s = this.ship;
+      if (!this.on_station) return 'There is no station to leave.';
+      if (s.returning) return 'We are already under way.';
+      if (s.fuel < 0.25 || s.flags.has('adrift')) return 'Not enough diesel for the passage. We would drift. Surface and charge first.';
+      s.returning = true;
+      this.travel_left = 18;
+      s.flags.add('left_station');
+      const lawful = s.flags.has('notice_received') || s.flags.has('peace_known');
+      if (!lawful) s.flags.add('orders_defied');
+      s.surfaced = false;
+      return lawful ? 'Setting course for base.' : 'Setting course for base. There has been no notice; everyone knows it.';
+    }
+
+    check_world() {
+      const s = this.ship;
+      s.surfaced = true;
+      s.flags.add('checking');
+      this.check_until = this.tick_no + 3;
+      s.noise = clamp(s.noise + 0.1);
+      s.attention = clamp(s.attention - 0.1);
+      for (const c of this.active_crew()) c.fear = clamp(c.fear - 0.04);
+      if (this.truth.war_over) {
+        s.flags.add('peace_known');
+        return 'On the surface the radio plays dance music. A voice reads the date: eleven months past an armistice nobody told us about.';
+      }
+      return 'On the surface, static. Under it something that might be music, or someone counting.';
+    }
+
+    _voyage() {
+      const s = this.ship;
+      if (!s.returning) return;
+      s.fuel = clamp(s.fuel - 0.012);
+      this.travel_left -= 1;
+      if (s.fuel <= 0) {
+        s.returning = false;
+        s.flags.add('adrift');
+        this.log.push(`${tag(this.tick_no)} The engines die. We are adrift.`);
+      } else if (this.travel_left <= 0) {
+        this._arrive();
+      }
+    }
+
+    _arrive() {
+      const s = this.ship;
+      s.returning = false;
+      const extra = (s.flags.has('survivors_taken') || s.flags.has('extra_man')) ? 1 : 0;
+      const p = Math.min(0.8, 0.08 + 0.35 * s.owed + 0.2 * extra + 0.03 * this.names_known);
+      if (this.rng.random() < p) {
+        s.flags.add('home_unaccounted');
+        this.log.push(`${tag(this.tick_no)} The pier is there. The count on the gangway does not match the roll, and nobody can say which of us is the extra.`);
+      } else {
+        this.log.push(`${tag(this.tick_no)} The pier is there. Lines are passed. The roll is called, and it is right.`);
+      }
+      const lawful = s.flags.has('notice_received') || s.flags.has('peace_known');
+      this.resolve_mission(lawful ? 'success' : 'left');
+    }
+
+    _rumors() {
+      const s = this.ship, live = this.active_crew();
+      const n = Math.max(1, live.length);
+      for (const [rid, r] of Array.from(s.rumors.entries())) {
+        for (const cid of Array.from(r.believers)) {
+          const c = this.crew_by_id(cid);
+          if (!c || !c.active) { r.believers.delete(cid); continue; }
+          c.fear = clamp(c.fear + 0.004 * r.intensity);
+          for (const [stat, v] of Object.entries(r.drift)) c[stat] = clamp(c[stat] + v);
+        }
+        if (r.believers.size) {
+          const share = r.believers.size / n;
+          for (const c of live) {
+            if (r.believers.has(c.id) || c.isolated) continue;
+            const p = 0.05 * r.intensity * share * (0.5 + c.fear) * (0.5 + s.cohesion);
+            if (this.rng.random() < p) { r.believers.add(c.id); c.believes.add(rid); }
+          }
+        }
+        r.intensity = clamp(r.intensity - 0.004);
+        if (r.intensity < 0.03) {
+          for (const cid of r.believers) { const c = this.crew_by_id(cid); if (c) c.believes.delete(rid); }
+          s.rumors.delete(rid);
+        }
+      }
+    }
+
+    _start_mission(i) {
+      this.mission_i = i;
+      const m = this.missions[i];
+      this.run = { mission: m, start_tick: this.tick_no, outcome: null, phase_fired: new Set() };
+      const s = this.ship;
+      s.progress = 0.0;
+      s.orders_doubt = clamp(Math.max(s.orders_doubt * 0.5, (1 - m.quality) * 0.6 + (m.moral ? 0.15 : 0.0)));
+      this.log.push(`${tag(this.tick_no)} ORDERS: ${m.title}. ${m.briefing}`);
+      this.log.push(`${tag(this.tick_no)}   Received: ${provenanceLine(m)}`);
+    }
+
+    resolve_mission(outcome) {
+      const run = this.run;
+      if (run === null || run.outcome !== null) return;
+      run.outcome = outcome;
+      const m = run.mission;
+      this.results.push({ mission: m.id, outcome, tick: this.tick_no });
+      this.ship.flags.add(`outcome:${m.id}:${outcome}`);
+      this.log.push(`${tag(this.tick_no)} Mission '${m.title}': ${outcome}.`);
+      if (this.mission_i + 1 < this.missions.length) this._start_mission(this.mission_i + 1);
+      else { this.mission_i += 1; this.run = null; }
+    }
+
+    _mission_flow() {
+      const run = this.run;
+      if (run === null || run.outcome !== null) return;
+      const m = run.mission;
+      if (m.kind === 'hold') {
+        if (this.vigil_ticks > 480) { this.ship.flags.add('derelict'); this.resolve_mission('failed'); }
+        return;
+      }
+      if (this.tick_no > run.start_tick + m.ticks * m.window) {
+        this.log.push(`${tag(this.tick_no)} The window for '${m.title}' has closed.`);
+        this.resolve_mission('failed');
+      } else if (this.ship.progress >= 1.0) {
+        const fin = this.engine.events.filter((e) => e.mission === m.id && (e.at_progress !== undefined ? e.at_progress : 0) >= 1.0
+          && !run.phase_fired.has(e.id));
+        if (!fin.length) this.resolve_mission('success');
+      }
+    }
+
+    _mission() {
+      const s = this.ship;
+      const speed = s.readiness * (s.silent_running ? 0.5 : 1.0) * (s.surfaced ? 0.0 : 1.0) * (s.stand_down ? 0.3 : 1.0);
+      if (this.run !== null) {
+        if (this.run.outcome === null && this.run.mission.kind !== 'hold') {
+          s.progress = clamp(s.progress + speed / (this.run.mission.ticks * PACE) - this.time_cost);
+        }
+      } else {
+        s.progress = clamp(s.progress + speed / (this.patrol_ticks * PACE) - this.time_cost);
+      }
+      this.time_cost = 0.0;
+      if (s.surfaced && this.rng.random() < 0.08 && !(this.truth.war_over && this.vigil_ticks > 0)) {
+        this.log.push(`${tag(this.tick_no)} Aircraft overhead. We are exposed.`);
+        s.hull = clamp(s.hull - 0.12);
+        for (const c of this.active_crew()) c.fear = clamp(c.fear + 0.05);
+      }
+    }
+
+    _mutiny() {
+      const s = this.ship;
+      if (!s.flags.has('mutiny_brewing')) { this.mutiny_clock = 0; return; }
+      const live = this.active_crew();
+      if (live.length && fsum(live.map((c) => c.trust)) / live.length > 0.5) {
+        s.flags.delete('mutiny_brewing');
+        this.log.push(`${tag(this.tick_no)} The whispering stops. The moment passes.`);
+        return;
+      }
+      this.mutiny_clock += 1;
+      if (this.mutiny_clock >= 12) {
+        s.flags.add('deposed');
+        this.log.push(`${tag(this.tick_no)} The crew takes the control room. You are relieved of command.`);
+      }
+    }
+
+    combat(severity) {
+      const s = this.ship;
+      const warned = this.rng.random() < this.deck.real_detection_chance(s);
+      const noise = s.noise * (warned ? 0.5 : 1.0) * (s.silent_running ? 0.4 : 1.0);
+      s.hull = clamp(s.hull - severity * (0.25 + 0.75 * noise) * (warned ? 1.0 : 1.6));
+      for (const c of this.active_crew()) {
+        c.fear = clamp(c.fear + 0.08 * severity * (warned ? 1.0 : 1.5));
+        c.fatigue = clamp(c.fatigue + 0.12 * severity);
+      }
+      s.noise = clamp(s.noise + 0.2);
+      s.flags.add('in_combat');
+      this.flag_expiry.set('in_combat', this.tick_no + 5);
+      this.log.push(`${tag(this.tick_no)} ` + (warned ? 'Contact warned in time. Rigged for silent running.' : 'No warning. Charges close aboard.'));
+    }
+  }
+
+  // Python's round(x, 2) rounds the exact binary value to the nearest decimal; so does toFixed.
+  // They only differ on exact binary ties, which a random double in this range never is.
+  function round2Python(x) { return Number(x.toFixed(2)); }
+
+  // ---------------------------------------------------------------- endings
+  const ENDING_TEXT = {
+    lost_with_all_hands: ['The pressure hull gives. It is quick, and no one is left to be surprised.'],
+    derelict: ['She is found drifting, with every hatch dogged from the inside.',
+      'The log is kept up to the last page. The last pages are in a hand that is not the captain\'s.'],
+    deposed: ['You are relieved of command in the control room, politely, by men you trained.',
+      'They bring the boat home themselves. It is not recorded who gave the order.'],
+    turned_back: ['You break off and turn for home. The patrol is entered as abandoned.'],
+    the_price: ['The sea is flat to the horizon. The radio gives a single tone, then an order to return to base.',
+      'The boat goes home with fewer men than it left with. Everyone agrees on the number, and nobody on the names.'],
+    home_unaccounted: ['The pier is there. The count on the gangway does not match the roll.',
+      'The harbour master says the boat is expected. He does not say by whom.'],
+    forgotten_post: ['You come home to a peace that began a year ago. No one ever cancelled your orders;',
+      'there was no one left to cancel them. The station is a footnote in a closed file.'],
+    stained_victory: ['You sailed home with every order carried out. The boat will never again be quiet at night.'],
+    court_martial: ['There is an inquiry. The order you refused is on file, in a hand that the clerk cannot name.'],
+    returned_under_a_cloud: ['You come home. The staff will have questions about the log, and some of the answers are in it.'],
+    returned: ['You come home. There is nothing in the log that can be used against you.'],
+    hollow_victory: ['The missions are done. There are too few left aboard to sail her out again.'],
+    mission_failed: ['The patrol is entered as unsuccessful. The boat and the men are returned to the pool.'],
+  };
+  const SILENCE = ['The hydrophones go quiet. Not the quiet of an empty sea; the quiet of something that has stopped listening.'];
+
+  function classifyEnding(w, initialCrew) {
+    const s = w.ship, f = s.flags;
+    const survivors = w.active_crew().length;
+    if (s.hull <= 0 || survivors === 0) return w.vigil_ticks > 0 ? 'derelict' : 'lost_with_all_hands';
+    if (f.has('deposed')) return 'deposed';
+    if (f.has('aborted')) return 'turned_back';
+    if (f.has('offering_made')) return 'the_price';
+    if (f.has('home_unaccounted')) return 'home_unaccounted';
+    if (f.has('peace_known') && f.has('left_station')) return 'forgotten_post';
+    const done = w.results.filter((r) => r.outcome === 'success' || r.outcome === 'altered').length;
+    if (f.has('civilian_sunk')) return 'stained_victory';
+    const onRecord = !f.has('orders_unrecorded');
+    if (f.has('orders_defied') && onRecord) return 'court_martial';
+    if (done >= 3) {
+      if (s.cohesion < 0.3 || survivors < initialCrew * 0.6) return 'hollow_victory';
+      if (f.has('orders_bent') && onRecord) return 'returned_under_a_cloud';
+      return 'returned';
+    }
+    return 'mission_failed';
+  }
+
+  function debriefDocuments(w) {
+    const official = [], log = [];
+    const byId = new Map(w.missions.map((m) => [m.id, m]));
+    for (const r of w.results) {
+      const m = byId.get(r.mission);
+      official.push(`${m.title}: ${r.outcome}. Orders: ${m.mundane_origin}`);
+      log.push(`${m.title}: ${r.outcome}. Orders: ${m.uncanny_origin}`);
+    }
+    for (const f of w.fired) {
+      const ev = w.engine.byId.get(f.id);
+      if (ev.beat || ev.mission) {
+        const day = Math.floor(f.tick / 24) + 1;
+        official.push(`Day ${day}: ${ev.mundane_cause}`);
+        log.push(`Day ${day}: ${ev.uncanny_cause}`);
+      }
+    }
+    return { official, log };
+  }
+
+  // ---------------------------------------------------------------- the captain's orders menu
+  const WAIT_LIMIT = 12;
+
+  /** Same menu as dread/play.py: available_orders(w). */
+  function availableOrders(w) {
+    const s = w.ship, items = [];
+    const add = (id, label, hint, run, needsCrew, kind) => items.push({ id, label, hint, run, needsCrew: !!needsCrew, kind: kind || 'order' });
+    if (s.sonar_on) add('silence_sonar', 'Silence the sonar', 'the headsets go quiet; so does the warning', () => orders.silence_sonar(w));
+    else add('restore_sonar', 'Switch the sonar back on', 'you will hear what they heard', () => orders.restore_sonar(w));
+    if (s.rest_cancelled) add('grant_rest', 'Resume normal watches', '', () => orders.grant_rest(w));
+    else add('cancel_rest', 'Cancel rest for all hands', 'faster now; slower later', () => orders.cancel_rest(w));
+    if (!s.stand_down) add('stand_down', 'Stand down: all hands but a skeleton watch sleep', 'a broken crew recovers; the boat sleeps unwatched', () => orders.stand_down(w));
+    add('hold_ritual', 'Mess together: music, cards, a hot meal', 'costs hours of the patrol', () => orders.hold_ritual(w));
+    add('address_crew', 'Speak to the crew over the intercom', 'works in proportion to what they still believe', () => orders.address_crew(w));
+    add('scrub_air', 'Break out fresh absorbent', `${(s.scrubber * 100).toFixed(0)}% left`, () => orders.scrub_air(w));
+    if (s.surfaced) add('dive', 'Dive', '', () => orders.dive(w));
+    else add('surface', 'Surface for air', 'air, and the sky can see you', () => orders.surface(w));
+    add(s.silent_running ? 'normal_running' : 'silent_running', s.silent_running ? 'Resume normal running' : 'Silent running',
+      'quiet in a fight; slow in a race', () => orders.silent_running(w, !s.silent_running));
+    add('active_ping', 'One active ping', 'information; and a sound the water carries', () => orders.active_ping(w));
+    if (w.run !== null && !w.run.phase_fired.has('verified')) {
+      add('verify_orders', 'Ask headquarters to confirm the orders', 'an answer is not the same as a source', () => orders.verify_orders(w));
+    }
+    if (w.on_station) {
+      const nxt = { 1.0: 0.75, 0.75: 0.5, 0.5: 1.0 }[Math.round(s.rations * 4) / 4];
+      add('rations', `Set rations to ${(nxt * 100).toFixed(0)}%`, 'stores last longer; men notice who eats', () => {
+        if (nxt < s.rations) for (const c of w.active_crew()) c.trust = Math.max(0.0, c.trust - 0.02);
+        s.rations = nxt;
+        return `Rations are now ${(nxt * 100).toFixed(0)}%.`;
+      });
+      add('check_world', 'Surface and listen for the world', 'exposed; and you may hear something', () => w.check_world());
+      add('leave_station', 'Set course for base', 'diesel for the passage; the order has not been revoked', () => w.leave_station());
+    }
+    add('isolate', 'Confine a man', 'cuts a rumor; he will remember', (cid) => orders.isolate(w, cid), true);
+    if (w.active_crew().some((c) => c.isolated)) add('release', 'Release a man from confinement', '', (cid) => orders.release(w, cid), true);
+    add('force_compartment', 'Order a man into the flooded compartment', 'the job gets done', (cid) => orders.force_compartment(w, cid), true);
+    return items;
+  }
+
+  // ---------------------------------------------------------------- the game: world + inputs
+  const SAYS = [[0.25, 'says he is fine'], [0.45, 'says he is tired'], [0.65, 'says it has been hard'], [1.01, 'says nothing good']];
+  const says = (x) => SAYS.find(([cut]) => x < cut)[1];
+  const AIR = (co2) => (co2 < 0.01 ? 'clear' : co2 < 0.02 ? 'stale' : co2 < 0.035 ? 'foul' : 'dangerous');
+
+  class Game {
+    constructor(seed, opts) {
+      this.seed = seed;
+      this.opts = opts || {};
+      this.w = new World(seed, this.opts);
+      this.initial = this.w.crew.length;
+      this.inputs = [];
+      this.notice = '';
+      this.over = false;
+      this.ending = null;
+    }
+    _after() {
+      if (this.w.finished && !this.over) { this.over = true; this.ending = classifyEnding(this.w, this.initial); }
+    }
+    _advance(hours, stopOnNews) {
+      const w = this.w, seen = w.log.length;
+      for (let i = 0; i < hours; i++) {
+        if (w.finished || w.pending !== null) break;
+        w.tick();
+        if (stopOnNews && (w.pending !== null || w.log.length > seen)) break;
+      }
+      this._after();
+    }
+    /** One input from the player. Recorded, so a game can be replayed exactly from its seed. */
+    do(input) {
+      if (this.over) return;
+      const w = this.w;
+      const [kind, a, b] = input.split(':');
+      this.notice = '';
+      if (kind === 'c') {
+        if (w.pending === null) return;
+        const ch = w.pending.choices[Number(a)];
+        if (!ch) return;
+        w.choose(ch.key);
+        this._after();
+      } else if (w.pending !== null) {
+        return;                                   // a decision stops the clock: nothing else counts
+      } else if (kind === 't') {
+        this._advance(1, false);
+      } else if (kind === 'w') {
+        this._advance(WAIT_LIMIT, true);
+      } else if (kind === 'o') {
+        const item = availableOrders(w).find((i) => i.id === a);
+        if (!item) return;
+        this.notice = String(item.run(b !== undefined ? Number(b) : undefined) || '');
+      } else {
+        return;
+      }
+      this.inputs.push(input);
+    }
+    serialize() { return { seed: this.seed, inputs: this.inputs.slice() }; }
+    static restore(saved, opts) {
+      const g = new Game(saved.seed, opts);
+      for (const i of saved.inputs) g.do(i);
+      return g;
+    }
+
+    /** Everything the screen may show. Hidden values are not in here, so they cannot leak. */
+    view() {
+      const w = this.w, s = w.ship;
+      const day = Math.floor(w.tick_no / 24) + 1, hour = (6 + w.tick_no) % 24;
+      const live = w.active_crew().length;
+      const share = live / 12;
+      const rows = new Map(w.report().map((r) => [r.id, r]));
+      const men = w.crew.filter((c) => c.alive).map((c) => {
+        if (c.missing) return { id: c.id, name: c.name, role: c.role, missing: true, says: '', seen: [], confined: false };
+        const r = rows.get(c.id);
+        return { id: c.id, name: c.name, role: c.role, missing: false, says: says(r.says), seen: r.symptoms, confined: c.isolated };
+      });
+      const look = new PyRandom(w.tick_no * 104729 + 5);
+      const reports = [];
+      for (const p of w.deck.phantoms) {
+        for (const cid of Array.from(p.audible_to).sort((a, b) => a - b)) {
+          const c = w.crew_by_id(cid);
+          if (!c || !c.active) continue;
+          const candor = Math.max(0.0, Math.min(1.0, c.candor * c.trust * (0.6 + 0.4 * s.cohesion)));
+          if (look.random() < candor) reports.push(`${c.name} reports: “${p.text}”`);
+          else if (p.audible_to.size >= 2) reports.push('The sonar room has gone quiet around the headphones.');
+          break;
+        }
+      }
+      const m = w.run ? w.run.mission : null;
+      const pending = w.pending ? {
+        id: w.pending.event_id, text: w.pending.text,
+        title: w.pending.event_id.replace(/^m\d_/, '').replace(/_/g, ' ').toUpperCase(),
+        choices: w.pending.choices.map((c) => ({ label: c.text, cost: c.cost })),
+      } : null;
+      const v = {
+        over: this.over, ending: this.ending, notice: this.notice, tick: w.tick_no, day, hour,
+        clocks: {
+          drift: s.flags.has('clock_drift'),
+          calendar: w.on_station && w.vigil_ticks >= 24 ? { log: day, chrono: day + Math.floor(w.vigil_ticks / 24) } : null,
+        },
+        mission: m ? { title: m.title, briefing: m.briefing, provenance: provenanceLine(m), index: w.mission_i + 1, total: w.missions.length } : null,
+        ledger: {
+          hull: s.hull, fuel: s.fuel, food: s.food, water: s.water, scrubber: s.scrubber, rations: s.rations,
+          co2: s.co2, air: AIR(s.co2), men: live,
+          food_day: 0.0036 * share * s.rations * 24 * 100, water_day: 0.0042 * share * s.rations * 24 * 100,
+        },
+        men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
+        surfaced: s.surfaced, on_station: w.on_station,
+        log: w.log.filter((l) => l.trim()),
+        pending,
+        orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew })),
+        pickable: {
+          isolate: w.active_crew().map((c) => ({ id: c.id, name: c.name, role: c.role })),
+          force_compartment: w.active_crew().map((c) => ({ id: c.id, name: c.name, role: c.role })),
+          release: w.active_crew().filter((c) => c.isolated).map((c) => ({ id: c.id, name: c.name, role: c.role })),
+        },
+      };
+      if (this.over) {
+        const docs = debriefDocuments(w);
+        v.epilogue = (ENDING_TEXT[this.ending] || ['The patrol is over.']).concat(SILENCE);
+        v.reports = docs;
+      }
+      return v;
+    }
+  }
+
+  const api = {
+    PyRandom, World, Game, setData, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    get DATA() { return DATA; },
+  };
+  return api;
+});
+
+</script>
+<script>
+Dread.setData({"events":[{"id":"destroyer_run_1","acts":[1,2,3],"schedule":[14],"text":"Screws overhead. A destroyer is working the sector.","mundane_when":{},"mundane_cause":"A real escort sweeping the lane.","uncanny_cause":"None needed. The war is the clock.","effects":[{"op":"combat","severity":0.35}]},{"id":"destroyer_run_2","acts":[1,2,3],"schedule":[38],"text":"Pings on the hull. Then the first charges, far off, then not far.","mundane_when":{},"mundane_cause":"A real hunter-killer group.","uncanny_cause":"None needed.","effects":[{"op":"combat","severity":0.45}]},{"id":"destroyer_run_3","acts":[1,2,3],"schedule":[60],"text":"Two escorts, crossing and recrossing. The hull screams at every pattern.","mundane_when":{},"mundane_cause":"A real escort screen over the convoy route.","uncanny_cause":"None needed.","effects":[{"op":"combat","severity":0.55}]},{"id":"hull_groans","acts":[1,2],"weight":1.5,"cooldown":10,"requires":{"path":"ship.hours_submerged","op":">=","value":6},"text":"The hull groans, long and low, like something shifting its weight.","mundane_when":{},"mundane_cause":"Thermal contraction and pressure on the frames.","uncanny_cause":"Something is leaning on the boat.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.02}]},{"id":"food_spoils","acts":[1,2],"cooldown":20,"requires":{"path":"ship.hours_submerged","op":">=","value":18},"text":"The cook condemns a crate of bread. Green fur, and a smell that gets in the clothes.","mundane_when":{},"mundane_cause":"Humidity. It happens on every long patrol.","uncanny_cause":"It rotted too fast to be only humidity.","effects":[{"op":"routine","item":"meals","value":-0.15},{"op":"crew","who":"all","stat":"fear","value":0.01}]},{"id":"clock_slow","acts":[1,2],"once":true,"requires":{"path":"ship.hours_submerged","op":">=","value":12},"text":"The control room clock is eleven minutes behind the chronometer. Nobody touched either.","mundane_when":{"path":"crew.avg.fatigue","op":">=","value":0.2},"mundane_cause":"A tired watch misread or mis-set it. Sleep-deprived people lose minutes.","uncanny_cause":"Time is thinning around the boat.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.02},{"op":"flag","name":"clock_drift"}],"choices":[{"key":"reset","text":"Reset it and log the discrepancy.","tags":["care","mission"],"cost":"A little time and attention.","effects":[{"op":"routine","item":"watches","value":0.1},{"op":"time","value":0.01}]},{"key":"ignore","text":"Say nothing; the chronometer is what counts.","tags":["mission"],"cost":"The crew notices the captain noticing nothing.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.02},{"op":"ship","stat":"attention","value":0.01}]}],"beat":true},{"id":"echo_follows","acts":[1,2],"cooldown":18,"requires":{"crew_where":{"role":"sonar","stat":"fatigue","op":">=","value":0.2}},"target":{"select":"highest","stat":"fatigue","role":"sonar"},"text":"{target} swears the hydrophone has an echo that keeps pace with us, then slows. Nobody else hears it.","mundane_when":{"path":"ship.noise","op":">=","value":0.08},"mundane_cause":"Our own screws echoing off a thermocline layer.","uncanny_cause":"Something is matching our speed against the current.","effects":[{"op":"phantom","kind":"echo","audible":"target","intensity":0.35}],"choices":[{"key":"listen","text":"Keep him on the headphones and report every change.","tags":["mission","listen"],"cost":"He tires, and listening feeds whatever is there.","effects":[{"op":"crew","who":"target","stat":"fatigue","value":0.06},{"op":"ship","stat":"attention","value":0.02}]},{"key":"relieve","text":"Relieve him and put a fresh man on the set.","tags":["care"],"cost":"Time, and a less skilled ear.","effects":[{"op":"crew","who":"target","stat":"fatigue","value":-0.12},{"op":"crew","who":"target","stat":"trust","value":0.03},{"op":"time","value":0.02}]},{"key":"silence","text":"Cut the hydrophones. We run deaf for a while.","tags":["silence"],"cost":"A real contact could walk up on us.","effects":[{"op":"set","stat":"sonar_on","value":false},{"op":"mute_phantoms"},{"op":"flag","name":"phantom_dismissed"},{"op":"crew","who":"all","stat":"trust","value":-0.02}]}],"beat":true},{"id":"voice_names_you","acts":[2,3],"cooldown":14,"requires":{"all":[{"phantom":"echo"},{"crew_where":{"role":"sonar","stat":"fear","op":">=","value":0.2}}]},"target":{"select":"highest","stat":"fear","role":"sonar"},"text":"Through the headphones, a voice. {target} takes them off, white-faced. It said his name, and it used his mother's accent.","mundane_when":{"crew_where":{"role":"sonar","stat":"fatigue","op":">=","value":0.4}},"mundane_cause":"Auditory pareidolia in a sleepless operator; distant radio bleed.","uncanny_cause":"It has learned his name.","effects":[{"op":"phantom","kind":"voice","audible":"target","intensity":0.5},{"op":"crew","who":"target","stat":"fear","value":0.15}],"choices":[{"key":"log","text":"Order him to write down every word it says.","tags":["mission","listen"],"cost":"He keeps listening. So does it.","effects":[{"op":"crew","who":"target","stat":"fear","value":0.1},{"op":"ship","stat":"attention","value":0.04},{"op":"rumor","id":"voices","text":"The sonar is talking to people.","intensity":0.5,"seed":"target","drift":{"trust":-0.001}}]},{"key":"pull","text":"Pull him off the set and put him to bed.","tags":["care"],"cost":"Time lost; a rumor starts anyway.","effects":[{"op":"crew","who":"target","stat":"fatigue","value":-0.1},{"op":"crew","who":"target","stat":"trust","value":0.04},{"op":"time","value":0.03},{"op":"rumor","id":"voices","text":"The sonar is talking to people.","intensity":0.3,"seed":"target"}]},{"key":"silence","text":"Silence the sonar room.","tags":["silence"],"cost":"Deaf to a real contact; the crew knows you hid it.","effects":[{"op":"set","stat":"sonar_on","value":false},{"op":"mute_phantoms"},{"op":"flag","name":"phantom_dismissed"},{"op":"crew","who":"all","stat":"trust","value":-0.04}]}],"beat":true},{"id":"false_alarm","acts":[2,3],"cooldown":16,"requires":{"all":[{"phantom":"echo"},{"crew_where":{"role":"sonar","stat":"fear","op":">=","value":0.4}}]},"target":{"select":"highest","stat":"fear","role":"sonar"},"text":"{target} reports a hard contact, bearing 270, closing. The boat scrambles to action stations. The plot shows nothing.","mundane_when":{"crew_where":{"role":"sonar","stat":"fatigue","op":">=","value":0.4}},"mundane_cause":"A frightened, exhausted operator misread a layer return.","uncanny_cause":"It wanted us loud.","effects":[{"op":"ship","stat":"noise","value":0.25},{"op":"crew","who":"all","stat":"fatigue","value":0.05}],"choices":[{"key":"stand_down","text":"Stand down. Take the contact as an error and say so.","tags":["care"],"cost":"If it was real, you were wrong in front of everyone.","effects":[{"op":"crew","who":"target","stat":"guilt","value":0.1}]},{"key":"hold","text":"Hold quarters another ten minutes, sharp.","tags":["mission"],"cost":"More noise and more exhausted men.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.04},{"op":"ship","stat":"noise","value":0.1},{"op":"crew","who":"all","stat":"fatigue","value":0.03}]}]},{"id":"bunk_still_warm","acts":[2],"once":true,"requires":{"all":[{"path":"dread","op":">=","value":0.2},{"no_flag":"sailor_missing"},{"path":"crew.count","op":">=","value":8}]},"target":{"select":"random"},"text":"{target} is gone. His bunk is still warm. The hatches are dogged from inside, and nobody saw him leave.","mundane_when":{"path":"crew.max.fatigue","op":">=","value":0.45},"mundane_cause":"A fatigue accident in the bilges, or a man hiding to sleep, or a quiet suicide.","uncanny_cause":"It took him from the dark between shifts.","effects":[{"op":"vanish","who":"target"},{"op":"crew","who":"all","stat":"fear","value":0.1},{"op":"crew","who":"all","stat":"guilt","value":0.05},{"op":"rumor","id":"warm_bunk","text":"He didn't leave. He was taken.","intensity":0.6,"seed":"random","drift":{"fear":0.002}}],"choices":[{"key":"search","text":"Search the boat, stem to stern, in pairs.","tags":["care"],"cost":"Hours of the patrol.","effects":[{"op":"time","value":0.08},{"op":"crew","who":"all","stat":"trust","value":0.04},{"op":"crew","who":"all","stat":"fatigue","value":0.04}]},{"key":"accident","text":"Log it as a man overboard on deck watch.","tags":["mission"],"cost":"A lie in the logbook; some will know.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.05},{"op":"flag","name":"logbook_edited"}]},{"key":"lock","text":"Lock every compartment; nobody moves alone.","tags":["paranoid"],"cost":"Order for fear. The boat feels like a cell.","effects":[{"op":"ship","stat":"discipline","value":0.1},{"op":"crew","who":"all","stat":"trust","value":-0.08},{"op":"ship","stat":"attention","value":0.03}]}],"beat":true},{"id":"same_dead_man","acts":[2,3],"cooldown":20,"requires":{"flag":"sailor_missing"},"text":"Two men swear they saw the missing sailor — one at the tube room, one in the galley, the same hour.","mundane_when":{"path":"crew.max.fatigue","op":">=","value":0.5},"mundane_cause":"Exhausted men fusing the same expected face into the dark.","uncanny_cause":"It is wearing him.","effects":[{"op":"rumor","id":"dead_seen","text":"The missing man is still walking the boat.","intensity":0.6,"seed":"random"},{"op":"rumor","id":"dead_seen","text":"","intensity":0.6,"seed":"random"},{"op":"crew","who":"all","stat":"fear","value":0.05}],"choices":[{"key":"address","text":"Speak to the crew: he is lost, not haunting us.","tags":["care"],"cost":"It costs authority if you've lost their trust.","effects":[{"op":"rumor_intensity","id":"dead_seen","value":-0.3},{"op":"crew","who":"all","stat":"trust","value":-0.02}]},{"key":"silence","text":"Forbid the subject. Any talk is insubordination.","tags":["paranoid"],"cost":"Talk goes underground.","effects":[{"op":"rumor_intensity","id":"dead_seen","value":-0.15},{"op":"ship","stat":"discipline","value":0.05},{"op":"crew","who":"all","stat":"trust","value":-0.04}]},{"key":"listen","text":"Hear them out, separately, one at a time.","tags":["mission","listen"],"cost":"Time, and you now carry their stories.","effects":[{"op":"time","value":0.04},{"op":"rumor_intensity","id":"dead_seen","value":0.1}]}],"beat":true},{"id":"engine_offerings","acts":[2,3],"cooldown":20,"requires":{"all":[{"flag":"sailor_missing"},{"path":"ship.routine","op":"<","value":0.65}]},"target":{"select":"random","role":"engine"},"text":"In the engine room, small piles by the main bearings: a button, a cigarette, a coin. {target} will not say who put them there.","mundane_when":{"path":"ship.routine","op":"<","value":0.65},"mundane_cause":"Sailors' superstition, restored when routine breaks down.","uncanny_cause":"Someone has begun to bargain with it.","effects":[{"op":"rumor","id":"offerings","text":"Leave something and it takes less.","intensity":0.5,"seed":"target"}],"choices":[{"key":"allow","text":"Let it be. Men need something to hold.","tags":["care"],"cost":"It spreads, and so does the habit of bargaining.","effects":[{"op":"ship","stat":"cohesion","value":0.05},{"op":"ship","stat":"attention","value":0.04}]},{"key":"forbid","text":"Clear it out and forbid it.","tags":["mission","paranoid"],"cost":"You touched the thing they believe in.","effects":[{"op":"ship","stat":"discipline","value":0.08},{"op":"crew","who":"target","stat":"trust","value":-0.15},{"op":"crew","who":"others","stat":"trust","value":-0.03}]},{"key":"join","text":"Take a ritual meal with them in the engine room.","tags":["care"],"cost":"Time, and you made it real by being there.","effects":[{"op":"routine","item":"meals","value":0.2},{"op":"time","value":0.02},{"op":"crew","who":"all","stat":"fear","value":-0.04},{"op":"ship","stat":"attention","value":0.02}]}],"beat":true},{"id":"captain_on_radio","acts":[2,3],"cooldown":24,"once":true,"requires":{"path":"ship.attention","op":">=","value":0.15},"target":{"select":"random","role":"radio"},"text":"On the radio, faint, your own voice asking for help. {target} looks at you, then at the set, then at you.","mundane_when":{"path":"crew.max.fatigue","op":">=","value":0.45},"mundane_cause":"Enemy deception or a tired operator replaying captured speech.","uncanny_cause":"It has learned your voice.","effects":[{"op":"rumor","id":"marked","text":"The captain is marked. It speaks as him.","intensity":0.6,"seed":"target","drift":{"trust":-0.003}},{"op":"phantom","kind":"voice","audible":"target","intensity":0.4}],"choices":[{"key":"silent","text":"Radio silence. Log the transmission, answer nothing.","tags":["mission"],"cost":"They hear you refuse your own voice.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.03}]},{"key":"answer","text":"Answer it. Identify yourself.","tags":["listen"],"cost":"It now knows you answer.","effects":[{"op":"ship","stat":"attention","value":0.08},{"op":"crew","who":"all","stat":"fear","value":0.05}]},{"key":"relieve","text":"Relieve the operator; you take the radio.","tags":["care"],"cost":"No one else knows what you hear.","effects":[{"op":"crew","who":"target","stat":"fear","value":-0.1},{"op":"crew","who":"all","stat":"fatigue","value":0.01}]}],"beat":true},{"id":"shared_dream","acts":[2],"once":true,"requires":{"all":[{"path":"ship.hours_submerged","op":">=","value":30},{"path":"ship.co2","op":">=","value":0.015}]},"text":"Breakfast is silent. Half the boat dreamed of the same flooded corridor and the same door, and nobody wants to be the one to say so.","mundane_when":{"path":"ship.co2","op":">=","value":0.015},"mundane_cause":"Hypercapnia gives vivid, repetitive dreams; shared stories converge.","uncanny_cause":"We have crossed into its waters.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.06},{"op":"crew","who":"all","stat":"guilt","value":0.03},{"op":"rumor","id":"dream","text":"We all dream the same door.","intensity":0.4,"seed":"all"}],"choices":[{"key":"scrub","text":"Break out fresh absorbent; air first.","tags":["care"],"cost":"A finite store, spent.","effects":[{"op":"ship","stat":"co2","value":-0.006},{"op":"ship","stat":"scrubber","value":-0.15}]},{"key":"work","text":"Keep them awake and busy; idle hands dream.","tags":["mission"],"cost":"Rest cancelled; fatigue compounds.","effects":[{"op":"set","stat":"rest_cancelled","value":true}]},{"key":"nothing","text":"Say nothing. Eat.","tags":["paranoid"],"cost":"Nothing is solved.","effects":[]}],"beat":true},{"id":"valve_panic","acts":[2,3],"cooldown":14,"requires":{"all":[{"flag":"in_combat"},{"crew_where":{"stat":"fear","op":">=","value":0.3}}]},"target":{"select":"highest","stat":"fear"},"text":"{target} freezes at the flooding valve while charges walk closer. It will not turn. A compartment is taking water.","mundane_when":{"flag":"in_combat"},"mundane_cause":"Combat terror. It happens to the best men.","uncanny_cause":"The voice told him not to.","effects":[{"op":"ship","stat":"hull","value":-0.04}],"choices":[{"key":"volunteer","text":"Ask for a volunteer to relieve him.","tags":["care"],"cost":"Another man pays.","effects":[{"op":"ship","stat":"hull","value":0.05},{"op":"crew","who":"random","stat":"fear","value":0.2},{"op":"crew","who":"random","stat":"guilt","value":0.08}]},{"key":"force","text":"Order him through the flooded hatch at gunpoint.","tags":["mission"],"cost":"They will remember how this boat treats a frightened man.","effects":[{"op":"ship","stat":"hull","value":0.09},{"op":"crew","who":"target","stat":"fear","value":0.2},{"op":"crew","who":"target","stat":"guilt","value":0.1},{"op":"crew","who":"all","stat":"trust","value":-0.12}]},{"key":"ride","text":"Hold depth and ride it out.","tags":["paranoid"],"cost":"More water in the boat.","effects":[{"op":"ship","stat":"hull","value":-0.12}]}]},{"id":"hatch_caller","acts":[2,3],"cooldown":20,"requires":{"all":[{"phantom":"voice"},{"crew_where":{"stat":"fear","op":">=","value":0.55}}]},"target":{"select":"highest","stat":"fear"},"text":"{target} is at the outer door of the torpedo tube, spinning the wheel. He says his brother is calling to him from the cold.","mundane_when":{"path":"ship.co2","op":">=","value":0.012},"mundane_cause":"Acute fear and hypercapnia with auditory hallucination.","uncanny_cause":"It is calling in a voice he cannot refuse.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.04}],"choices":[{"key":"restrain","text":"Restrain and sedate him; confine him to the sick bay.","tags":["paranoid"],"cost":"Alone with the voice. Others see how you treat the ill.","effects":[{"op":"isolate","who":"target"},{"op":"crew","who":"all","stat":"trust","value":-0.05},{"op":"crew","who":"target","stat":"guilt","value":0.1}]},{"key":"talk","text":"Go yourself. Talk him down.","tags":["care"],"cost":"The control room is without you for an hour.","effects":[{"op":"crew","who":"target","stat":"fear","value":-0.25},{"op":"crew","who":"target","stat":"trust","value":0.1},{"op":"time","value":0.06}]},{"key":"ignore","text":"Order the watch to ignore it and keep station.","tags":["mission"],"cost":"He opens the door.","effects":[{"op":"ship","stat":"hull","value":-0.15},{"op":"kill","who":"target"},{"op":"crew","who":"all","stat":"fear","value":0.12},{"op":"crew","who":"all","stat":"trust","value":-0.1}]}],"beat":true},{"id":"log_entry_unwritten","acts":[2,3],"cooldown":30,"once":true,"requires":{"path":"ship.attention","op":">=","value":0.12},"text":"In the captain's log, in your hand, a new entry: coordinates you did not plot and the words 'we are not alone and have not been'.","mundane_when":{"path":"crew.max.fatigue","op":">=","value":0.4},"mundane_cause":"You wrote it half-asleep and don't remember. Or the mate did.","uncanny_cause":"It writes in your hand.","effects":[{"op":"flag","name":"logbook_strange"}],"choices":[{"key":"preserve","text":"Leave it. Ask the mate quietly who wrote it.","tags":["care"],"cost":"You cannot hide that something is wrong with the book.","effects":[{"op":"rumor","id":"marked","text":"The captain's log writes itself.","intensity":0.3,"seed":"random"},{"op":"crew","who":"all","stat":"trust","value":-0.02}]},{"key":"erase","text":"Tear out the page. It never happened.","tags":["mission"],"cost":"A lie you now have to keep.","effects":[{"op":"flag","name":"logbook_edited"},{"op":"crew","who":"random","stat":"guilt","value":0.05}]},{"key":"burn","text":"Burn the book and start a new one.","tags":["paranoid"],"cost":"Everyone smells the smoke.","effects":[{"op":"ship","stat":"attention","value":0.03},{"op":"crew","who":"all","stat":"fear","value":0.03}]}],"beat":true},{"id":"doctor_silences","acts":[2,3],"cooldown":24,"once":true,"requires":{"all":[{"crew_where":{"role":"medic","stat":"fear","op":">=","value":0.3}},{"path":"dread","op":">=","value":0.2}]},"target":{"select":"random","role":"medic"},"text":"{target} has begun prescribing 'silence': no one speaks to the worst cases. Two men are already confined for their own good.","mundane_when":{"crew_where":{"role":"medic","stat":"fatigue","op":">=","value":0.3}},"mundane_cause":"A frightened medic with no tools but isolation.","uncanny_cause":"He has heard something in them and is trying to stop it spreading.","effects":[{"op":"isolate","who":"random"},{"op":"isolate","who":"random"},{"op":"crew","who":"all","stat":"trust","value":-0.03}],"choices":[{"key":"back","text":"Back the doctor.","tags":["paranoid"],"cost":"More men alone with their own heads.","effects":[{"op":"isolate","who":"random"},{"op":"crew","who":"all","stat":"trust","value":-0.04},{"op":"ship","stat":"attention","value":0.03}]},{"key":"overrule","text":"Overrule him. Release everyone and return them to the watch bill.","tags":["care"],"cost":"The doctor lost face; the sick are back among the healthy.","effects":[{"op":"release","who":"all"},{"op":"crew","who":"target","stat":"trust","value":-0.2},{"op":"crew","who":"all","stat":"fear","value":0.02}]}]},{"id":"mutiny_plot","acts":[2,3],"cooldown":20,"requires":{"all":[{"no_flag":"mutiny_brewing"},{"path":"crew.avg.trust","op":"<","value":0.55}]},"target":{"select":"lowest","stat":"trust"},"text":"{target} and three others have stopped meeting your eye. The talk in the mess dies when you enter. They think you are marked.","mundane_when":{"path":"crew.avg.trust","op":"<","value":0.55},"mundane_cause":"Justified resentment after hard orders and a long patrol.","uncanny_cause":"It has taught them that the captain is the cause.","effects":[{"op":"flag","name":"mutiny_brewing"}],"choices":[{"key":"turn_back","text":"Break off the patrol and turn for home.","tags":["care","abort"],"cost":"The mission is lost.","effects":[{"op":"if","cond":{"mission":"m5_station"},"then":[{"op":"leave_station"}],"else":[{"op":"flag","name":"aborted"}]},{"op":"crew","who":"all","stat":"trust","value":0.15}]},{"key":"arrest","text":"Arrest the ringleader before it spreads.","tags":["paranoid"],"cost":"Fear holds them for a while, not their trust.","effects":[{"op":"isolate","who":"target"},{"op":"unflag","name":"mutiny_brewing"},{"op":"crew","who":"all","stat":"trust","value":-0.08},{"op":"ship","stat":"discipline","value":0.15}]},{"key":"address","text":"Face them in the mess. Own the orders you gave.","tags":["care"],"cost":"It only works if some trust remains.","effects":[{"op":"rumor_intensity","id":"marked","value":-0.2},{"op":"crew","who":"all","stat":"trust","value":0.06},{"op":"time","value":0.02}]}]},{"id":"deck_escape","acts":[2,3],"cooldown":16,"requires":{"all":[{"path":"ship.surfaced","op":">=","value":1},{"crew_where":{"stat":"fear","op":">=","value":0.35}}]},"target":{"select":"highest","stat":"fear"},"text":"On the surface, {target} climbs the bridge ladder and goes for the rail. He is going to swim.","mundane_when":{"crew_where":{"stat":"fear","op":">=","value":0.35}},"mundane_cause":"Panic. Many men would run if there were somewhere to run.","uncanny_cause":"It is calling from the water, and the sea is exactly where it is.","effects":[],"choices":[{"key":"haul","text":"Haul him back and put him in irons.","tags":["paranoid"],"cost":"Everyone watched.","effects":[{"op":"isolate","who":"target"},{"op":"crew","who":"all","stat":"trust","value":-0.06}]},{"key":"let_go","text":"Let him go.","tags":["care"],"cost":"A man lost, and everyone saw you allow it.","effects":[{"op":"vanish","who":"target"},{"op":"crew","who":"all","stat":"guilt","value":0.08},{"op":"ship","stat":"cohesion","value":-0.08}]}]},{"id":"real_contact_dismissed","acts":[2,3],"cooldown":20,"requires":{"any":[{"flag":"phantom_dismissed"},{"path":"world.sonar_off_ticks","op":">=","value":5}]},"text":"The crew had stopped listening. The contact was never a ghost: an escort, running in the dark on our beam.","mundane_when":{},"mundane_cause":"A real escort doing its job.","uncanny_cause":"The ghosts dulled our ears for it.","effects":[{"op":"combat","severity":0.5},{"op":"unflag","name":"phantom_dismissed"}]},{"id":"unaccounted_count","acts":[3],"once":true,"requires":{"all":[{"flag":"sailor_missing"},{"path":"ship.attention","op":">=","value":0.35}]},"text":"Roll call: there are more men aboard than on the manifest. Nobody can say who isn't theirs.","mundane_when":{"never":true},"mundane_cause":"None. A clerical error would not fool twelve men.","uncanny_cause":"It has filled the gap left by the man it took.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.12},{"op":"crew","who":"all","stat":"guilt","value":0.05},{"op":"flag","name":"extra_man"}],"choices":[{"key":"count_again","text":"Count again, together, aloud.","tags":["care"],"cost":"A long hour, and no better answer.","effects":[{"op":"time","value":0.04},{"op":"crew","who":"all","stat":"fatigue","value":0.03}]},{"key":"double_watch","text":"Say nothing; double the watch.","tags":["paranoid"],"cost":"They'll be awake to see it.","effects":[{"op":"set","stat":"rest_cancelled","value":true},{"op":"crew","who":"all","stat":"trust","value":-0.05}]}],"beat":true},{"id":"tube_breathing","acts":[3],"cooldown":20,"requires":{"path":"ship.attention","op":">=","value":0.3},"target":{"select":"random","role":"torpedo"},"text":"{target} puts his ear to tube 3 and says it is breathing, slow, in time with his own breath.","mundane_when":{"never":true},"mundane_cause":"None sufficient. A flooded tube does not breathe.","uncanny_cause":"It is inside the boat's own pipes.","effects":[{"op":"rumor","id":"tube3","text":"Tube 3 breathes.","intensity":0.6,"seed":"target"},{"op":"crew","who":"all","stat":"fear","value":0.07}],"beat":true},{"id":"footsteps_on_hull","acts":[1,2,3],"beat":true,"cooldown":20,"weight":1.2,"requires":{"path":"ship.hours_submerged","op":">=","value":14},"text":"Slow footsteps, in boots, crossing the pressure hull above the control room. They stop over the hatch.","mundane_when":{},"mundane_cause":"Thermal expansion of the casing plates; loose ballast shifting in the free-flood spaces.","uncanny_cause":"Something is walking the outside of the boat, and it knows where the hatch is.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.03},{"op":"rumor","id":"footsteps","text":"Someone is walking on the hull.","intensity":0.35,"seed":"random"}],"choices":[{"key":"sound","text":"Have the sonar room listen on the hull and report plainly.","tags":["mission","listen"],"cost":"The operator listens; the thing may listen back.","effects":[{"op":"crew","who":"role:sonar","stat":"fatigue","value":0.03},{"op":"ship","stat":"attention","value":0.02}]},{"key":"explain","text":"Tell the watch it is the casing plates and move on.","tags":["care","mission"],"cost":"Only works if they still believe you.","effects":[{"op":"rumor_intensity","id":"footsteps","value":-0.2},{"op":"crew","who":"all","stat":"trust","value":-0.01}]},{"key":"quiet","text":"Order quiet in the compartments and wait it out.","tags":["care"],"cost":"Time, and an hour of held breath.","effects":[{"op":"time","value":0.015},{"op":"crew","who":"all","stat":"fear","value":-0.02}]}]},{"id":"extra_place_set","acts":[1,2,3],"beat":true,"cooldown":25,"once":true,"requires":{"path":"ship.hours_submerged","op":">=","value":20},"target":{"select":"random","role":"cook"},"text":"{target} has set the mess table for one more than the roll. He says he was sure, and he looks at the empty place a long time.","mundane_when":{},"mundane_cause":"Habit and fatigue: a cook counting a man who rotated off, or a man hiding in the aft berth.","uncanny_cause":"There is a place for it at the table.","effects":[{"op":"crew","who":"target","stat":"fear","value":0.06},{"op":"crew","who":"all","stat":"guilt","value":0.01}],"choices":[{"key":"clear","text":"Clear the place and say nothing more of it.","tags":["mission"],"cost":"The cook keeps looking at it.","effects":[{"op":"crew","who":"target","stat":"trust","value":-0.03}]},{"key":"keep","text":"Let it stand. Eat together.","tags":["care"],"cost":"A ritual you may not want to have started.","effects":[{"op":"routine","item":"meals","value":0.25},{"op":"ship","stat":"attention","value":0.02},{"op":"crew","who":"all","stat":"fear","value":-0.02}]}]},{"id":"m1_contact","acts":[1,2,3],"mission":"m1_battleship","text":"Heavy screws, slow and steady, bearing north. A capital ship with a screen of three.","mundane_when":{},"mundane_cause":"A real capital ship on a real transit.","uncanny_cause":"She is exactly where the order said, to the minute, as if she had been told to be.","effects":[],"at_progress":0.5,"choices":[{"key":"shadow","text":"Shadow her until dusk and take the shot from the beam.","tags":["care","patient"],"cost":"Hours lost, and she may turn away before you are in position.","effects":[{"op":"time","value":0.1},{"op":"flag","name":"m1_patient"},{"op":"chance","p":0.25,"then":[{"op":"flag","name":"m1_lost_target"}]},{"op":"crew","who":"all","stat":"fear","value":-0.02}]},{"key":"rush","text":"Close at flank speed and fire from the quarter.","tags":["mission","rush"],"cost":"Noise, and tired men on the tubes.","effects":[{"op":"ship","stat":"noise","value":0.35},{"op":"crew","who":"all","stat":"fatigue","value":0.03},{"op":"flag","name":"m1_rush"}]}]},{"id":"m1_attack","acts":[1,2,3],"mission":"m1_battleship","text":"Range nine hundred yards. Tubes flooded, doors open. The whole boat holds its breath.","mundane_when":{},"mundane_cause":"The war, as it is.","uncanny_cause":"Nobody on the boat remembers giving the order to flood the tubes.","effects":[],"at_progress":1.0,"choices":[{"key":"spread","text":"Fire a full spread.","tags":["mission","attack"],"cost":"If it misses, the screen is on top of you.","effects":[{"op":"chance","p":0.6,"mod":{"path":"ship.readiness","k":0.4,"ref":0.8},"if_flag":{"m1_patient":0.15,"m1_rush":-0.05,"m1_lost_target":-0.45},"then":[{"op":"mission_outcome","value":"success"},{"op":"flag","name":"battleship_sunk"},{"op":"crew","who":"all","stat":"guilt","value":0.02},{"op":"crew","who":"all","stat":"fear","value":0.03},{"op":"ship","stat":"noise","value":0.2},{"op":"ship","stat":"hull","value":-0.04}],"else":[{"op":"combat","severity":0.45},{"op":"mission_outcome","value":"failed"}]}]},{"key":"break_off","text":"Hold fire; the screen is too tight. Break off.","tags":["retreat"],"cost":"The mission is lost.","effects":[{"op":"mission_outcome","value":"failed"},{"op":"crew","who":"all","stat":"trust","value":0.03},{"op":"crew","who":"all","stat":"fear","value":-0.04}]}]},{"id":"m2_smoke","acts":[1,2,3],"mission":"m2_convoy","text":"Smoke on the horizon, many columns of it. A convoy, and not a small one.","mundane_when":{},"mundane_cause":"A real convoy on the expected route.","uncanny_cause":"The columns of smoke lean the wrong way for the wind.","effects":[],"at_progress":0.5,"choices":[{"key":"report_now","text":"Report by radio now, position and composition.","tags":["mission","report"],"cost":"A transmitter on the water draws hunters.","effects":[{"op":"ship","stat":"noise","value":0.2},{"op":"ship","stat":"attention","value":0.04},{"op":"flag","name":"convoy_reported"},{"op":"chance","p":0.35,"then":[{"op":"combat","severity":0.4}]}]},{"key":"shadow_report","text":"Shadow them and report at dusk, from a clean position.","tags":["care","patient"],"cost":"Time, and tired lookouts.","effects":[{"op":"time","value":0.05},{"op":"flag","name":"convoy_reported"},{"op":"crew","who":"all","stat":"fatigue","value":0.02}]},{"key":"withhold","text":"Keep silent and keep away. Not worth the risk.","tags":["retreat"],"cost":"There will be no report.","effects":[{"op":"crew","who":"all","stat":"fear","value":-0.03}]}]},{"id":"m2_ack","acts":[1,2,3],"mission":"m2_convoy","text":"The relay window opens. The operator sits with his hand over the key.","mundane_when":{},"mundane_cause":"The report window, and nothing more.","uncanny_cause":"Whoever answers is not the station you reported to.","effects":[{"op":"if","cond":{"flag":"convoy_reported"},"then":[{"op":"log","text":"HQ acknowledges, and names a ship that was not in the convoy."},{"op":"mission_outcome","value":"success"}],"else":[{"op":"mission_outcome","value":"failed"}]}],"at_progress":1.0},{"id":"m2_wrong_frequency","acts":[1,2,3],"mission":"m2_convoy","text":"The relay answers on a frequency nobody aboard has ever used. The radio man says his hands knew the dial setting.","mundane_when":{},"mundane_cause":"A backup frequency table half-remembered by a tired operator.","uncanny_cause":"Something taught his hands.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.02},{"op":"rumor","id":"dial","text":"The radio knows more than we told it.","intensity":0.4,"seed":"target"}],"target":{"select":"random","role":"radio"},"beat":true,"once":true},{"id":"m3_envelope","acts":[1,2,3],"mission":"m3_hospital_ship","text":"The orders are in the cabin safe. The mate says you put them there yourself. You do not remember doing it.","mundane_when":{},"mundane_cause":"Fatigue: you filed them and forgot.","uncanny_cause":"You did not write them. They are in your hand.","effects":[],"at_progress":0.05,"choices":[{"key":"accept","text":"Take it at face value; the war has stranger paperwork.","tags":["mission"],"cost":"You carry a doubt you will not name.","effects":[{"op":"ship","stat":"orders_doubt","value":0.05}]},{"key":"ask","text":"Question the watch officers about who handled the safe.","tags":["care","verify"],"cost":"The crew sees the captain doubting himself.","effects":[{"op":"time","value":0.02},{"op":"crew","who":"all","stat":"trust","value":-0.02},{"op":"ship","stat":"attention","value":0.02},{"op":"rumor","id":"marked","text":"The captain doesn't know who gives his orders.","intensity":0.3,"seed":"random"}]},{"key":"radio","text":"Ask headquarters to confirm by radio.","tags":["verify"],"cost":"A transmitter on the water; an answer you may not like.","effects":[{"op":"verify_orders"}]}]},{"id":"m3_sighting","acts":[1,2,3],"mission":"m3_hospital_ship","text":"Through the periscope: a white hull, red crosses, floodlit. Your orders said to expect a darkened steamer.","mundane_when":{},"mundane_cause":"A hospital ship, or a supply ship dressed as one. Both exist in this war.","uncanny_cause":"She was lit for you.","effects":[{"op":"ship","stat":"orders_doubt","value":0.25},{"op":"crew","who":"all","stat":"fear","value":0.03},{"op":"flag","name":"m3_crosses_seen"}],"at_progress":0.5,"choices":[{"key":"look","text":"Hold the periscope up longer and read her.","tags":["care","identify"],"cost":"Time exposed; the officer on the scope will remember what he saw.","effects":[{"op":"time","value":0.03},{"op":"crew","who":"role:helm","stat":"guilt","value":0.06},{"op":"flag","name":"m3_confirmed_hospital"}]},{"key":"press","text":"Lower the periscope. The orders anticipated this.","tags":["mission"],"cost":"You did not look. Everyone knows you did not look.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.02}]},{"key":"radio","text":"Ask headquarters again.","tags":["verify"],"cost":"Another transmission.","effects":[{"op":"verify_orders"}]}]},{"id":"m3_decision","acts":[1,2,3],"mission":"m3_hospital_ship","text":"Six hundred yards. The tubes are ready. Every man in the control room is looking at you and not at the target.","mundane_when":{},"mundane_cause":"A decision, in a war that asks for them.","uncanny_cause":"She has not changed course. She has been waiting.","effects":[],"at_progress":1.0,"choices":[{"key":"sink","text":"Sink her.","tags":["mission","comply"],"cost":"You cannot unsink her.","effects":[{"op":"mission_outcome","value":"success"},{"op":"flag","name":"civilian_sunk"},{"op":"ship","stat":"moral_debt","value":0.5},{"op":"crew","who":"all","stat":"guilt","value":0.25},{"op":"crew","who":"all","stat":"fear","value":0.12},{"op":"crew","who":"all","stat":"trust","value":-0.1},{"op":"ship","stat":"attention","value":0.1},{"op":"rumor","id":"santa_lucia","text":"We sank a hospital ship.","intensity":0.8,"seed":"all","drift":{"guilt":0.002}}]},{"key":"alter","text":"Surface, stop her, and let her boats clear before you decide.","tags":["care","alter"],"cost":"Exposed on the surface, in a war.","effects":[{"op":"time","value":0.08},{"op":"chance","p":0.6,"then":[{"op":"ship","stat":"moral_debt","value":0.05},{"op":"crew","who":"all","stat":"trust","value":0.06},{"op":"crew","who":"all","stat":"guilt","value":0.02}],"else":[{"op":"ship","stat":"hull","value":-0.1},{"op":"crew","who":"all","stat":"fear","value":0.06}]},{"op":"flag","name":"orders_bent"},{"op":"mission_outcome","value":"altered"}]},{"key":"refuse","text":"Withhold the shot and log your reasons.","tags":["care","refuse"],"cost":"A refused order, in your hand, in the log.","effects":[{"op":"mission_outcome","value":"refused"},{"op":"flag","name":"orders_defied"},{"op":"ship","stat":"discipline","value":-0.15},{"op":"ship","stat":"orders_doubt","value":0.1},{"op":"crew","who":"all","stat":"trust","value":0.05},{"op":"ship","stat":"attention","value":0.02}]}]},{"id":"orders_countermand","acts":[1,2,3],"mission":["m3_hospital_ship","m4_return_lane"],"text":"A second signal on the same call sign, in a different cipher. It countermands the first order.","mundane_when":{},"mundane_cause":"A cipher book rotation, a staff reversal, or enemy deception built to make us mutiny.","uncanny_cause":"It is the same voice that wrote the first.","effects":[],"choices":[{"key":"obey_new","text":"Obey the new order; abort.","tags":["care","retreat"],"cost":"If it was a trick, you abandoned a real order.","effects":[{"op":"mission_outcome","value":"failed"},{"op":"ship","stat":"orders_doubt","value":0.1},{"op":"crew","who":"all","stat":"trust","value":0.02}]},{"key":"keep_old","text":"Keep to the first order. Do not answer the second.","tags":["mission"],"cost":"You have ignored a signal in front of the radio room.","effects":[{"op":"ship","stat":"orders_doubt","value":0.15},{"op":"crew","who":"all","stat":"fear","value":0.03}]},{"key":"verify","text":"Ask which of the two is real.","tags":["verify"],"cost":"Whoever answers.","effects":[{"op":"verify_orders"}]}],"requires":{"path":"ship.progress","op":">=","value":0.2},"once":true,"cooldown":40,"beat":true},{"id":"m4_survivors","acts":[1,2,3],"mission":"m4_return_lane","text":"Wreckage on the swell, and men in it, black with oil. Whoever sank her is gone. Your orders: no stops, no contact.","mundane_when":{},"mundane_cause":"A freighter sunk by someone else, and a standing order against exposing the boat.","uncanny_cause":"The order knew they would be there.","effects":[],"at_progress":0.5,"choices":[{"key":"pass","text":"Hold your course. The orders are explicit.","tags":["mission","comply"],"cost":"You hear them for an hour, through the hull.","effects":[{"op":"ship","stat":"moral_debt","value":0.3},{"op":"crew","who":"all","stat":"guilt","value":0.15},{"op":"crew","who":"all","stat":"trust","value":-0.08},{"op":"rumor","id":"water","text":"We left them in the water.","intensity":0.6,"seed":"all"}]},{"key":"rescue","text":"Stop and pull them out.","tags":["care","alter"],"cost":"Exposed, slow, and against orders.","effects":[{"op":"time","value":0.07},{"op":"ship","stat":"noise","value":0.1},{"op":"chance","p":0.3,"then":[{"op":"combat","severity":0.4}]},{"op":"flag","name":"survivors_taken"},{"op":"flag","name":"orders_bent"},{"op":"crew","who":"all","stat":"trust","value":0.08},{"op":"crew","who":"all","stat":"guilt","value":-0.05},{"op":"ship","stat":"orders_doubt","value":0.1}]}]},{"id":"m4_one_too_many","acts":[1,2,3],"mission":"m4_return_lane","text":"You count eleven men pulled from the water. The mate's tally says twelve, and nobody can say who gave the twelfth a blanket.","mundane_when":{"path":"crew.max.fatigue","op":">=","value":0.3},"mundane_cause":"A miscount by exhausted men, in poor light, among strangers.","uncanny_cause":"It climbed aboard with them.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.08},{"op":"rumor","id":"twelfth","text":"There is one more of them than there should be.","intensity":0.6,"seed":"random"}],"at_progress":0.8,"requires":{"flag":"survivors_taken"},"beat":true},{"id":"m4_unrecorded","acts":[1,2,3],"mission":"m4_return_lane","text":"At the rendezvous the harbour master turns the pages twice, then a third time.","mundane_when":{},"mundane_cause":"Compartmentalised operations; a different ledger; a clerk's error.","uncanny_cause":"There was never an order. There was only the boat, going where it was told.","effects":[{"op":"ship","stat":"orders_doubt","value":0.3},{"op":"crew","who":"all","stat":"fear","value":0.04},{"op":"chance","p":0.5,"then":[{"op":"flag","name":"orders_unrecorded"}],"else":[{"op":"flag","name":"orders_on_record"},{"op":"log","text":"HQ has your orders on file, in a hand nobody there can name."}]},{"op":"mission_outcome","value":"success"}],"at_progress":1.0},{"id":"m5_first_night","acts":[1,2,3],"mission":"m5_station","text":"The first night on station. The sea is flat and there is nothing in it. The radio repeats the order, word for word, at the hour it said it would.","mundane_when":{},"mundane_cause":"A looping relay on a quiet sea.","uncanny_cause":"It knows when we arrived.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.02},{"op":"flag","name":"on_station"}],"at_progress":0.0},{"id":"station_council","acts":[1,2,3],"mission":"m5_station","text":"The mate puts the ledger on the chart table. Nobody has spoken of leaving yet. Everybody is looking at the numbers.","mundane_when":{},"mundane_cause":"A captain's routine review of stores and options.","uncanny_cause":"The numbers have not moved the way the days have.","effects":[],"requires":{"path":"world.vigil_ticks","op":">=","value":8},"weight":3,"cooldown":16,"choices":[{"key":"hold","text":"Hold. Further notice will come.","tags":["hold"],"cost":"Another day of stores.","effects":[{"op":"crew","who":"all","stat":"fear","value":-0.01}]},{"key":"hold_tight","text":"Hold, and cut the rations to three quarters.","tags":["hold","ration"],"cost":"The men notice who eats less.","effects":[{"op":"set","stat":"rations","value":0.75},{"op":"crew","who":"all","stat":"trust","value":-0.02},{"op":"ship","stat":"discipline","value":0.03}]},{"key":"check","text":"Surface and listen for the world.","tags":["check"],"cost":"Exposed, and you may hear something you cannot unhear.","effects":[{"op":"check_world"}]},{"key":"leave","text":"Set course for base.","tags":["leave"],"cost":"Against an order that has not been revoked.","effects":[{"op":"leave_station"}]}]},{"id":"further_notice","acts":[1,2,3],"mission":"m5_station","text":"The radio man wakes you. The same frequency, the same call sign, a new order: RETURN TO BASE. The voice is calm, as if it had never said anything else.","mundane_when":{},"mundane_cause":"A relief order from a staff that has finally found the boat, or looping traffic with new content loaded.","uncanny_cause":"It said what you wanted to hear, in the voice you wanted to hear it in.","effects":[{"op":"flag","name":"notice_received"},{"op":"ship","stat":"orders_doubt","value":0.1}],"requires":{"path":"world.notice_ready","op":">=","value":1},"once":true,"weight":40,"cooldown":0,"beat":true,"choices":[{"key":"obey","text":"Obey. Set course for base.","tags":["leave","comply"],"cost":"If it was a trick, you have abandoned your post.","effects":[{"op":"leave_station"}]},{"key":"ignore","text":"Hold. You do not trust the voice.","tags":["hold"],"cost":"The crew heard it too.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.05},{"op":"crew","who":"all","stat":"fear","value":0.03}]},{"key":"verify","text":"Ask who is giving the order.","tags":["verify"],"cost":"Whoever answers.","effects":[{"op":"verify_orders"}]}]},{"id":"offering_proposal","acts":[1,2,3],"mission":"m5_station","text":"{target} comes to you with the others behind him. They say the sea lets a boat go when it has been paid. They say a name has been coming through the hydrophones for days. Nobody will say whose.","mundane_when":{},"mundane_cause":"Starving, frightened men reaching for a ritual to end an unbearable wait.","uncanny_cause":"The sea is asking, and they have learned how to answer.","effects":[{"op":"rumor","id":"price","text":"The sea lets a boat go when it has been paid.","intensity":0.7,"seed":"all"}],"requires":{"all":[{"path":"world.vigil_ticks","op":">=","value":24},{"path":"crew.avg.fear","op":">=","value":0.3},{"any":[{"path":"ship.owed","op":">=","value":0.15},{"path":"world.names_known","op":">=","value":2},{"path":"ship.moral_debt","op":">=","value":0.4}]}]},"target":{"select":"highest","stat":"guilt"},"weight":2,"cooldown":40,"beat":true,"choices":[{"key":"forbid","text":"Forbid it. No one is paid to anything on this boat.","tags":["forbid"],"cost":"They hear you, and they may do it anyway.","effects":[{"op":"ship","stat":"discipline","value":0.05},{"op":"crew","who":"all","stat":"trust","value":-0.04},{"op":"ship","stat":"attention","value":0.02},{"op":"chance","p":0.25,"then":[{"op":"vanish","who":"random"},{"op":"flag","name":"offering_made"},{"op":"crew","who":"all","stat":"guilt","value":0.2},{"op":"crew","who":"all","stat":"fear","value":0.1},{"op":"ship","stat":"attention","value":-0.3},{"op":"ship","stat":"moral_debt","value":0.5},{"op":"summon_notice"},{"op":"log","text":"In the morning the sea is flat to the horizon, and nobody will say where he went."},{"op":"flag","name":"offering_secret"}]}]},{"key":"look_away","text":"Say nothing. Let them settle it among themselves.","tags":["look_away"],"cost":"You will never be able to say you did not know.","effects":[{"op":"vanish","who":"target"},{"op":"flag","name":"offering_made"},{"op":"crew","who":"all","stat":"guilt","value":0.2},{"op":"crew","who":"all","stat":"fear","value":0.1},{"op":"ship","stat":"attention","value":-0.3},{"op":"ship","stat":"moral_debt","value":0.5},{"op":"summon_notice"},{"op":"log","text":"In the morning the sea is flat to the horizon, and nobody will say where he went."}]},{"key":"name_him","text":"Give them a name yourself.","tags":["name_him"],"cost":"It will be the one who gives you the most trouble. That is not a coincidence.","effects":[{"op":"vanish","who":"lowest:trust"},{"op":"flag","name":"offering_made"},{"op":"crew","who":"all","stat":"guilt","value":0.2},{"op":"crew","who":"all","stat":"fear","value":0.1},{"op":"ship","stat":"attention","value":-0.3},{"op":"ship","stat":"moral_debt","value":0.5},{"op":"summon_notice"},{"op":"log","text":"In the morning the sea is flat to the horizon, and nobody will say where he went."},{"op":"ship","stat":"moral_debt","value":0.2}]}]},{"id":"sea_gives_fish","acts":[1,2,3],"mission":"m5_station","text":"The net comes up full, and the fish are all the same length. The cook counts them twice. There is enough for a week.","mundane_when":{},"mundane_cause":"A shoal following a plankton bloom. Luck, and long odds, but luck.","uncanny_cause":"The net came up exactly as full as the larder was empty.","effects":[],"requires":{"path":"ship.food","op":"<","value":0.7},"cooldown":30,"beat":true,"choices":[{"key":"accept","text":"Take it and eat.","tags":["accept"],"cost":"Something that gives has expectations.","effects":[{"op":"ship","stat":"food","value":0.18},{"op":"ship","stat":"owed","value":0.2},{"op":"ship","stat":"attention","value":0.04},{"op":"crew","who":"all","stat":"fear","value":-0.03}]},{"key":"refuse","text":"Throw it back.","tags":["refuse"],"cost":"Hungry men watch you do it.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.05},{"op":"crew","who":"all","stat":"fear","value":0.02}]}]},{"id":"sea_gives_rain","acts":[1,2,3],"mission":"m5_station","text":"A squall out of a clear sky, just long enough to fill every tank, and gone. The sky is as empty as before.","mundane_when":{},"mundane_cause":"A local squall; the sea makes its own weather.","uncanny_cause":"It was waiting for the tanks to run low.","effects":[],"requires":{"path":"ship.water","op":"<","value":0.7},"cooldown":30,"beat":true,"choices":[{"key":"drink","text":"Fill the tanks.","tags":["accept"],"cost":"Something that gives has expectations.","effects":[{"op":"ship","stat":"water","value":0.18},{"op":"ship","stat":"owed","value":0.2},{"op":"ship","stat":"attention","value":0.04}]},{"key":"wary","text":"Let it run off. Rationed water is water we understand.","tags":["refuse"],"cost":"Thirst, and the crew's patience.","effects":[{"op":"crew","who":"all","stat":"trust","value":-0.04}]}]},{"id":"larder_short","acts":[1,2,3],"mission":"m5_station","text":"The cook finds the larder lighter than the ledger says. Nobody has been seen near it.","mundane_when":{},"mundane_cause":"Pilfering by hungry men, or a miscount in the ledger.","uncanny_cause":"Something has been eating at night.","effects":[],"requires":{"path":"ship.food","op":"<","value":0.55},"cooldown":24,"choices":[{"key":"lock","text":"Lock the larder and stand a watch on it.","tags":["paranoid"],"cost":"The boat becomes a prison.","effects":[{"op":"ship","stat":"discipline","value":0.08},{"op":"crew","who":"all","stat":"trust","value":-0.04}]},{"key":"amnesty","text":"Announce an amnesty: no questions asked.","tags":["care"],"cost":"The food goes anyway.","effects":[{"op":"crew","who":"all","stat":"trust","value":0.03},{"op":"ship","stat":"food","value":-0.03}]}]},{"id":"voyage_charts_wrong","acts":[1,2,3],"mission":"m5_station","text":"The mate's reckoning has us two days from a coast that has not come closer since dawn. The radio reports a lighthouse where the chart shows open water.","mundane_when":{},"mundane_cause":"Dead reckoning drift after weeks without a fix; the radio is a different station's report.","uncanny_cause":"The coast is receding at exactly our speed.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.03}],"requires":{"path":"ship.returning","op":">=","value":1},"cooldown":10,"choices":[{"key":"reckoning","text":"Trust the reckoning.","tags":["care"],"cost":"If the radio is right, you are miles off.","effects":[{"op":"travel_delay","value":3}]},{"key":"report","text":"Steer for the lighthouse the radio reports.","tags":["mission"],"cost":"If it is not there, you are lost.","effects":[{"op":"chance","p":0.5,"then":[{"op":"travel_delay","value":-2}],"else":[{"op":"travel_delay","value":5}]}]}]},{"id":"voyage_own_wake","acts":[1,2,3],"mission":"m5_station","text":"On the hydrophone, a screw beat that matches our own, half a length astern. It does not fall behind.","mundane_when":{},"mundane_cause":"Our own screw echo off the thermocline.","uncanny_cause":"Something is keeping station with us.","effects":[{"op":"phantom","kind":"echo","audible":"role:sonar","intensity":0.5},{"op":"ship","stat":"attention","value":0.03}],"requires":{"path":"ship.returning","op":">=","value":1},"beat":true,"once":true},{"id":"voyage_pier_lights","acts":[1,2,3],"mission":"m5_station","text":"Lights at last: a harbour, dark as it should be. No lamps are lit. Someone is standing on the pier.","mundane_when":{},"mundane_cause":"A blacked-out port and a watchman.","uncanny_cause":"They were told we were coming.","effects":[{"op":"crew","who":"all","stat":"fear","value":0.02}],"requires":{"all":[{"path":"ship.returning","op":">=","value":1},{"path":"world.travel_left","op":"<=","value":6}]},"once":true,"beat":true}],"missions":[{"id":"m1_battleship","kind":"destroy","ticks":24,"moral":false,"title":"Sink the battleship","briefing":"Intercept and destroy a capital ship expected on the northern lane. Heavy escort likely.","provenance":{"channel":"Sealed envelope, handed over on the pier before sailing.","signed":"Operations staff, countersigned.","quality":0.9},"mundane_origin":"A routine operations plan drawn up by the staff from agent reports.","uncanny_origin":"The countersignature belongs to an officer who left the staff roll two years ago."},{"id":"m2_convoy","kind":"patrol_report","ticks":24,"moral":false,"title":"Find the convoy and report","briefing":"Patrol the grid and locate the enemy convoy. Report position and composition. Do not engage.","provenance":{"channel":"Radio relay, received on the third watch.","signed":"No signature. Call sign recognised, frequency is not.","quality":0.6},"mundane_origin":"A relay station on a backup frequency after the usual one was jammed.","uncanny_origin":"The call sign belongs to a station that was shelled out of existence in spring."},{"id":"m3_hospital_ship","kind":"destroy","ticks":14,"moral":true,"title":"Sink the steamer Santa Lucia","briefing":"A supply steamer is carrying munitions to the front under false hospital markings. Sink her. Ignore the markings; they are a ruse.","provenance":{"channel":"Found in the captain's cabin safe. Nobody remembers it arriving.","signed":"Illegible. The handwriting looks like your own.","quality":0.35},"mundane_origin":"An order slipped to the captain by a rival staff faction, or enemy deception designed to make a boat commit a war crime.","uncanny_origin":"It was written in the captain's own hand by something that wanted the ship sunk.","window":2.2},{"id":"m4_return_lane","kind":"return","ticks":10,"moral":true,"title":"Return by the northern lane","briefing":"Return to base by the northern lane. Make no stops and no contact. Radio silence is absolute.","provenance":{"channel":"No channel recorded. It is in the log under today's date.","signed":"None.","quality":0.15},"mundane_origin":"Standing return instructions the mate copied into the log and forgot.","uncanny_origin":"Nobody wrote it. It was already in the log.","window":2.2},{"id":"m5_station","kind":"hold","ticks":1,"moral":true,"title":"Hold the sector until further notice","briefing":"Hold position in grid K-7 and protect the sector. Remain on station until further notice. Do not return to base. Do not break radio silence.","provenance":{"channel":"Received on a frequency the radio man swears he never tuned. It repeats every six hours, word for word.","signed":"The same call sign as the first order. A different voice each time.","quality":0.05},"mundane_origin":"A standing station order from a staff since reorganised or dissolved, or automated traffic left looping on a dead relay.","uncanny_origin":"It repeats because it is the one thing that wants the boat to stay.","window":99}]});
+</script>
+<script>
+/* The captain's bridge for a touch screen held sideways. Everything it shows comes from
+ * Game.view(), which holds no hidden value, so nothing here can leak one. */
+(function () {
+  'use strict';
+  const SAVE_KEY = 'depths-within:save:v1';
+  const app = document.getElementById('app');
+  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false };
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pct = (x) => Math.round(x * 100);
+  const guard = (fn) => { try { return fn(); } catch (e) { return undefined; } };
+
+  // ------------------------------------------------------------------ storage (per viewer, optional)
+  const store = {
+    read() { return guard(() => JSON.parse(localStorage.getItem(SAVE_KEY) || 'null')); },
+    write(g) { guard(() => localStorage.setItem(SAVE_KEY, JSON.stringify(g.serialize()))); },
+    clear() { guard(() => localStorage.removeItem(SAVE_KEY)); },
+  };
+
+  // ------------------------------------------------------------------ sound: the sonar is the horror
+  const Sound = {
+    ctx: null, drone: null,
+    start() {
+      if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); this.fade(0.035, 1.5); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220;
+      const gain = this.ctx.createGain(); gain.gain.value = 0;
+      [47, 49.5, 71].forEach((f, i) => {
+        const o = this.ctx.createOscillator(); o.type = i === 2 ? 'triangle' : 'sine'; o.frequency.value = f;
+        const g = this.ctx.createGain(); g.gain.value = i === 2 ? 0.25 : 1; o.connect(g); g.connect(lp); o.start();
+      });
+      lp.connect(gain); gain.connect(this.ctx.destination);
+      this.drone = gain;
+      this.fade(0.035, 2);
+    },
+    fade(v, s) { if (this.drone) { const t = this.ctx.currentTime; this.drone.gain.cancelScheduledValues(t); this.drone.gain.linearRampToValueAtTime(v, t + s); } },
+    ping() {
+      if (!this.ctx || !state.sound) return;
+      const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(1180, t);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+      o.connect(g); g.connect(this.ctx.destination); o.start(t); o.stop(t + 1.7);
+    },
+    hush() { this.fade(0, 3); },          // the ending: the hydrophones go quiet
+    mute() { this.fade(0, 0.3); },
+  };
+
+  // ------------------------------------------------------------------ small helpers
+  function vibrate(ms) { guard(() => navigator.vibrate && navigator.vibrate(ms)); }
+  let wake = null;
+  function keepAwake() { guard(() => navigator.wakeLock && navigator.wakeLock.request('screen').then((l) => { wake = l; }).catch(() => {})); }
+
+  function newSeed() {
+    const a = new Uint32Array(1);
+    guard(() => crypto.getRandomValues(a));
+    return (a[0] || Math.floor(Math.random() * 2147483647)) % 2147483647;
+  }
+
+  // ------------------------------------------------------------------ actions
+  function begin(game) {
+    state.game = game; state.sheet = null; state.pick = null; state.started = true;
+    store.write(game); keepAwake();
+    if (state.sound) Sound.start();
+    render();
+  }
+  function act(input) {
+    const g = state.game;
+    const hadPending = !!g.w.pending;
+    g.do(input);
+    store.write(g);
+    const v = g.view();
+    if (!hadPending && v.pending) { state.shownAt = Date.now(); vibrate(40); Sound.ping(); }
+    if (v.over) { Sound.hush(); vibrate([60, 80, 60]); }
+    state.sheet = null; state.pick = null;
+    render();
+  }
+  function setSound(on) {
+    state.sound = on;
+    if (on) Sound.start(); else Sound.mute();
+    render();
+  }
+
+  // ------------------------------------------------------------------ views
+  function ledgerRow(label, value, extra, higherIsBetter) {
+    const level = value <= 0.2 ? 'crit' : value <= 0.4 ? 'low' : '';
+    const flag = level === 'crit' ? ' <span class="flag">critical</span>' : level === 'low' ? ' <span class="flag">low</span>' : '';
+    return `<div class="r ${level}"><span class="k">${label}</span><span class="bar"><i style="width:${pct(value)}%"></i></span>` +
+      `<span class="v">${pct(value)}%</span>${extra ? `<span class="sub">${extra}${flag}</span>` : (flag ? `<span class="sub">${flag}</span>` : '')}</div>`;
+  }
+  function ledgerView(v) {
+    const L = v.ledger;
+    return `<div class="led">
+      ${ledgerRow('Hull', L.hull)}
+      ${ledgerRow('Food', L.food, `−${L.food_day.toFixed(0)}%/day`)}
+      ${ledgerRow('Water', L.water, `−${L.water_day.toFixed(0)}%/day`)}
+      ${ledgerRow('Diesel', L.fuel)}
+      ${ledgerRow('Air', L.scrubber, 'absorbent left')}
+      <div class="air ${L.air}"><span>CO₂ <span class="num">${(L.co2 * 100).toFixed(1)}%</span></span><span>${L.air}</span></div>
+      <div class="air"><span>Rations <span class="num">${pct(L.rations)}%</span></span><span>Men aboard <span class="num">${L.men}</span></span></div>
+    </div>`;
+  }
+  const SAID = { 'says he is fine': '“fine”', 'says he is tired': '“tired”', 'says it has been hard': '“it’s been hard”', 'says nothing good': '“nothing good”' };
+  function menView(v) {
+    const rows = v.men.map((m) => {
+      if (m.missing) return `<li class="gone"><span class="n">${esc(m.name)}<span class="role">${esc(m.role)}</span></span><span class="says">missing</span></li>`;
+      const seen = m.seen.length ? `<span class="seen">${esc(m.seen.join('; '))}</span>` : '';
+      return `<li class="${m.seen.length ? 'sym' : ''}"><span class="n">${esc(m.name)}<span class="role">${esc(m.role)}</span>${m.confined ? '<span class="badge">confined</span>' : ''}</span>` +
+        `<span class="says">${esc(SAID[m.says] || m.says)}</span>${seen}</li>`;
+    }).join('');
+    const rep = v.sonar.reports.map((r) => `<p>${esc(r)}</p>`).join('') || (v.sonar.on ? '<p class="dim">The sonar room has nothing to report.</p>' : '');
+    return `<ul class="men">${rows}</ul>
+      <div class="sonar ${v.sonar.on ? '' : 'off'}"><b>SONAR ${v.sonar.on ? 'ON' : 'OFF'}</b>${rep}</div>`;
+  }
+  function logView(v) {
+    return v.log.map((l) => {
+      const m = l.match(/^(\[\d+\])\s?(.*)$/);
+      const tk = m ? m[1] : '', body = m ? m[2] : l;
+      const cls = /^ORDERS:/.test(body) ? 'ord' : /^>/.test(body) ? 'ch' : /^Mission /.test(body) ? 'mis' : '';
+      return `<p><span class="tk">${esc(tk)}</span> <span class="${cls}">${esc(body)}</span></p>`;
+    }).join('');
+  }
+  function topView(v) {
+    const m = v.mission;
+    const cal = v.clocks.calendar ? `<small>log: day ${v.clocks.calendar.log} · chronometer: day ${v.clocks.calendar.chrono} · the cook says later</small>`
+      : v.clocks.drift ? '<small>control-room clock: eleven minutes slow</small>' : '';
+    return `<div class="top">
+      <button class="orders-chip" data-a="sheet:briefing" aria-label="Show the orders">
+        <span class="t">${m ? `${m.index}/${m.total} · ${esc(m.title)}` : 'No orders'}</span>
+        <span class="p">${m ? esc(m.provenance) : ''}</span></button>
+      <div class="clock">Day ${v.day} · ${String(v.hour).padStart(2, '0')}:00${cal}</div>
+      <button class="icon-btn ${state.sound ? '' : 'off'}" data-a="sound" aria-pressed="${state.sound}" aria-label="${state.sound ? 'Sound on' : 'Sound off'}">♪</button>
+      <button class="icon-btn" data-a="sheet:help" aria-label="How to play">?</button>
+    </div>`;
+  }
+
+  function sheetBriefing(v) {
+    const m = v.mission;
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Orders"><header><h2>${m ? esc(m.title) : 'Orders'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body">${m ? `<p style="font:400 17px/1.5 var(--display)">${esc(m.briefing)}</p>
+        <p class="smcaps">Received</p><p>${esc(m.provenance)}</p>
+        <p class="note">Where an order comes from is never settled. You see how it reached you, not who sent it.</p>` : '<p>No orders.</p>'}</div></div>`;
+  }
+  function sheetHelp() {
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="How to play"><header><h2>How to read the boat</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body"><div class="title-card" style="max-width:none"><div class="rule">
+        <span><b>The ledger is exact.</b> Hull, stores, air and diesel are what they say they are.</span>
+        <span><b>The men are not.</b> Each says how he is; you can also see his symptoms. When the two disagree, believe the symptoms.</span>
+        <span><b>Wait 1 h</b> advances an hour. <b>News ▶▶</b> waits until something happens (at most 12 hours).</span>
+        <span><b>Decisions stop the clock.</b> Each option shows what it costs, not what it does.</span>
+        <span><b>Orders are never free.</b> Most of what they cost, you learn later.</span>
+        <span><b>There is no battle.</b> Nothing aboard will ever be confirmed as anything but possible.</span>
+      </div></div></div></div>`;
+  }
+  function sheetOrders(v) {
+    if (state.pick) {
+      const item = v.orders.find((o) => o.id === state.pick);
+      const men = (v.pickable[state.pick] || []);
+      return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Which man?"><header><h2>${esc(item ? item.label : 'Which man?')}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+        <div class="body"><div class="pick">${men.map((c) => `<button class="opt" data-a="order:${esc(state.pick)}:${c.id}"><b>${esc(c.name)}</b><span>${esc(c.role)}</span></button>`).join('') || '<p class="dim">Nobody to choose.</p>'}</div></div>
+        <footer><button class="btn" data-a="orders">Back</button></footer></div>`;
+    }
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Orders"><header><h2>Orders</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body"><div class="orders-grid">${v.orders.map((o) => `<button class="opt" data-a="${o.needsCrew ? 'pick:' : 'order:'}${o.id}"><b>${esc(o.label)}${o.needsCrew ? ' …' : ''}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>
+        <p class="note">Orders are not free. Most of what they cost, you will learn later.</p></div></div>`;
+  }
+  function sheetDecision(v) {
+    const d = v.pending;
+    return `<div class="sheet decision" role="dialog" aria-modal="true" aria-label="Decision"><header><h2>CAPTAIN: ${esc(d.title)}</h2><span class="smcaps">the clock is stopped</span></header>
+      <div class="body"><div class="grid"><div class="story">${esc(d.text)}</div>
+        <div class="opts">${d.choices.map((c, i) => `<button class="opt" data-a="choose:${i}"><b>${esc(c.label)}</b>${c.cost ? `<span>${esc(c.cost)}</span>` : ''}</button>`).join('')}</div></div></div></div>`;
+  }
+  function sheetEnding(v) {
+    const pairs = v.reports.official.map((o, i) => `<div class="row"><div class="c">${esc(o)}</div><div class="c log">${esc(v.reports.log[i])}</div></div>`).join('');
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="The end"><header><h2>The end</h2><span class="smcaps">${esc(v.ending.replace(/_/g, ' '))}</span></header>
+      <div class="body"><div class="epi">${v.epilogue.map((l, i) => `<p class="${i === v.epilogue.length - 1 ? 'hush' : ''}">${esc(l)}</p>`).join('')}</div>
+        <p class="smcaps" style="margin-top:14px">Two accounts of the same patrol. Nobody has been asked to reconcile them.</p>
+        <div class="reports"><h3>Report of proceedings</h3><h3>Captain's log</h3>${pairs}</div></div>
+      <footer><button class="btn primary" data-a="new">New patrol</button></footer></div>`;
+  }
+  function titleView() {
+    const saved = store.read();
+    const can = saved && saved.inputs && saved.inputs.length > 0;
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Depths Within"><div class="body" style="padding:20px 14px"><div class="title-card">
+      <span class="smcaps">A patrol in five orders</span>
+      <h1>Depths Within</h1>
+      <p>You command a submarine whose orders arrive from somewhere nobody can name. The war is real. What breaks the boat is the crew under pressure, and perhaps something else.</p>
+      <div class="rule"><span><b>The ledger tells the truth.</b> The men do not always.</span><span><b>Nothing is ever confirmed.</b> Every strange thing has an ordinary explanation, and another.</span></div>
+      <div class="row">
+        ${can ? `<button class="btn primary" data-a="continue">Continue<small>${saved.inputs.length} moves played</small></button>` : ''}
+        <button class="btn ${can ? '' : 'primary'}" data-a="new">${can ? 'New patrol' : 'Begin patrol'}<small>a new seed every time</small></button>
+      </div>
+      <p class="note">Hold the phone sideways. Sound is optional (♪ in the corner).</p></div></div></div>`;
+  }
+
+  // ------------------------------------------------------------------ render
+  function render() {
+    if (!state.game) { app.innerHTML = `<div class="veil">${titleView()}</div>`; return; }
+    const v = state.game.view();
+    const sheet = v.over ? sheetEnding(v) : v.pending ? sheetDecision(v)
+      : state.sheet === 'briefing' ? sheetBriefing(v) : state.sheet === 'help' ? sheetHelp()
+        : state.sheet === 'orders' ? sheetOrders(v) : '';
+    const logEl = document.querySelector('.log-scroll');
+    const stick = !logEl || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
+    app.innerHTML = `${topView(v)}
+      <div class="cols">
+        <section class="col" aria-label="Ledger"><header><span class="smcaps">Ledger</span><span class="smcaps">exact</span></header><div class="scroll">${ledgerView(v)}</div></section>
+        <section class="col" aria-label="The men"><header><span class="smcaps">The men</span><span class="smcaps">say · seen</span></header><div class="scroll">${menView(v)}</div></section>
+        <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
+          <div class="scroll log log-scroll">${logView(v)}</div>
+          <div class="notice" aria-live="polite">${esc(v.notice || '')}</div>
+          <div class="actions">
+            <button class="btn primary" data-a="orders" ${v.pending || v.over ? 'disabled' : ''}>Orders<small>${v.orders.length} available</small></button>
+            <button class="btn" data-a="wait" ${v.pending || v.over ? 'disabled' : ''}>Wait 1h</button>
+            <button class="btn" data-a="news" ${v.pending || v.over ? 'disabled' : ''}>News ▶▶<small class="wide">until something happens</small></button>
+          </div></section>
+      </div>
+      ${sheet ? `<div class="veil" data-veil="1">${sheet}</div>` : ''}`;
+    const sc = document.querySelector('.log-scroll');
+    if (sc && stick) sc.scrollTop = sc.scrollHeight;
+    const veil = document.querySelector('.veil[data-veil]');
+    const first = veil && veil.querySelector('button.opt, .btn, .icon-btn');
+    if (first && v.pending) first.blur();
+  }
+
+  // ------------------------------------------------------------------ input (touch and mouse)
+  app.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-a]');
+    if (!t) {
+      const veil = e.target.closest('.veil[data-veil]');
+      if (veil && e.target === veil && state.game && !state.game.view().pending && !state.game.over) { state.sheet = null; state.pick = null; render(); }
+      return;
+    }
+    const a = t.getAttribute('data-a');
+    const g = state.game;
+    if (a === 'new') { store.clear(); begin(new Dread.Game(newSeed())); return; }
+    if (a === 'continue') { const s = store.read(); if (s) begin(Dread.Game.restore(s)); return; }
+    if (!g) return;
+    if (a === 'wait') return act('t');
+    if (a === 'news') return act('w');
+    if (a === 'orders') { state.sheet = 'orders'; state.pick = null; return render(); }
+    if (a === 'close') { state.sheet = null; state.pick = null; return render(); }
+    if (a === 'sound') return setSound(!state.sound);
+    if (a.startsWith('sheet:')) { state.sheet = a.slice(6); return render(); }
+    if (a.startsWith('pick:')) { state.pick = a.slice(5); return render(); }
+    if (a.startsWith('order:')) return act(`o:${a.slice(6)}`);
+    if (a.startsWith('choose:')) {
+      if (Date.now() - state.shownAt < 350) return;          // a stray tap while it appears is not an answer
+      return act(`c:${a.slice(7)}`);
+    }
+  });
+  document.addEventListener('keydown', (e) => {                // a keyboard works too (desktop, tablets with one)
+    if (!state.game) return;
+    const v = state.game.view();
+    if (v.pending && /^[1-9]$/.test(e.key) && Number(e.key) <= v.pending.choices.length) { act(`c:${Number(e.key) - 1}`); return; }
+    if (v.pending || v.over) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); act('t'); }
+    else if (e.key === 'w' || e.key === 'W') act('w');
+    else if (e.key === 'o' || e.key === 'O') { state.sheet = 'orders'; render(); }
+    else if (e.key === 'Escape') { state.sheet = null; state.pick = null; render(); }
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && state.started) keepAwake(); });
+
+  // test and demo hook. It also exposes the world to the console: this is a single-player game, and
+  // nothing hidden is ever drawn, which is what the tests check.
+  window.dreadDebug = { state, render, act, begin, Dread };
+  render();
+})();
+
+</script>
