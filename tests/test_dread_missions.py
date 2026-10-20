@@ -75,6 +75,7 @@ def test_phase_events_fire_by_progress_and_only_for_their_mission():
     assert w.run.mission.id == "m1_battleship"
     w.ship.progress = 0.6
     w.tick()
+    w.tick()          # phase events arrive one per hour, in order of progress
     ids = {f.id for f in w.fired}
     assert "m1_contact" in ids
     assert not any(i.startswith(("m2_", "m3_", "m4_")) for i in ids)

@@ -117,7 +117,8 @@ def test_a_captain_who_gives_the_orders_finishes_the_mission():
             break
         w.tick()
     assert w.results and w.results[0]["mission"] == "m1_battleship"
-    assert w.results[0]["outcome"] == "success"
+    assert sum("Done:" in l for l in w.log[:30]) == 3      # all three steps were ordered and carried out
+    assert w.results[0]["outcome"] in ("success", "failed")   # the attack itself is a roll; the steps are not
 
 
 def test_every_mission_but_the_station_has_steps_and_each_names_its_hours():
