@@ -59,10 +59,12 @@ def test_tab_opens_the_bridge_and_it_shows_the_ledger_not_the_numbers(game):
 def test_orders_are_typed_as_a_number_and_enter(game):
     w = game.horror_manager.dread.world
     press(game, K.TAB)
-    assert w.ship.sonar_on
-    press(game, K.N1, K.RETURN)                  # order 1: silence the sonar
-    assert not w.ship.sonar_on
+    assert w.ship.sonar_on and w.working is None
+    press(game, K.N1, K.RETURN)                  # order 1 is always the mission's next step
+    assert w.working is not None and w.working.id == "search"
     assert game.dread_ui.session(game).notice
+    press(game, K.N2, K.RETURN)                  # order 2: silence the sonar
+    assert not w.ship.sonar_on
 
 
 def test_enter_and_space_wait_an_hour_through_the_games_own_clock(game):
@@ -205,7 +207,8 @@ def test_the_real_run_loop_routes_keys_to_the_bridge_and_the_modal(monkeypatch):
     g = Game()
     script = iter([
         [_key(K.TAB)],                    # open the bridge
-        [_key(K.N1), _key(K.RETURN)],     # order 1: silence the sonar
+        [_key(K.N1), _key(K.RETURN)],     # order 1: the mission's next step
+        [_key(K.N2), _key(K.RETURN)],     # order 2: silence the sonar
         [_key(K.SPACE)],                  # wait an hour (through the bridge)
         [_key(K.ESCAPE)],                 # back to the map
         [_key(K.W)],                      # wait for news on the map
@@ -227,7 +230,8 @@ def test_the_real_run_loop_routes_keys_to_the_bridge_and_the_modal(monkeypatch):
     monkeypatch.setenv("TW_SH", "60")
     g.run()
     w = g.horror_manager.dread.world
-    assert not w.ship.sonar_on                                  # the order went through the real loop
+    assert not w.ship.sonar_on                                  # the orders went through the real loop
+    assert w.run.working is not None or w.run.acts_done >= 1    # ...including the mission's step
     assert g.turn >= 2 and w.tick_no >= 2                       # waiting used the game's clock
     assert any("LEDGER (exact)" in f for f in frames)           # the bridge was on screen at some frame
     assert "Stage:" not in "\n".join(frames)

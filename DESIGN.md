@@ -639,3 +639,13 @@ Lovecraft, *El templo*; McCammon, *The Night Boat*; Buchheim, *Das Boot*
 Armfield, *Our Wives Under the Sea*; Hodgson, *The Ghost Pirates*.
 Juegos: Barotrauma, Iron Lung, SOMA, Sunless Sea, Return of the Obra Dinn
 (el diario inconsistente), Still Wakes the Deep, el estrés de Darkest Dungeon.
+
+
+## 7.5 Los actos de la misión (lo que el capitán hace)
+
+La superficie del juego es un simulador bélico: submarino, patrullaje, reconocimiento, aproximación, ataque. Nada avanza esperando: cada misión se compone de **actos** (`acts` en `data/missions.json`), pasos que el capitán ordena uno por vez y que consumen horas (buscar en el sonar, acercarse, preparar tubos, transmitir el informe, tomar rumbo...). El progreso es actos hechos / actos totales; los eventos de fase y las decisiones morales siguen disparándose por progreso.
+
+- Un acto puede exigir condiciones (sonar encendido, alguien en el cuarto de torpedos, estar sumergido) y dice por qué no puede darse.
+- Una tripulación agotada tarda más; dormir a la tripulación o emerger frena el trabajo; el ritual y verificar las órdenes gastan horas de la ventana.
+- Esperar solo cierra la ventana: la misión falla.
+- La guerra es la superficie. Lo importante son las cosas sutiles y las decisiones morales cada vez más pesadas que aparecen con el tiempo.

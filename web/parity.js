@@ -25,6 +25,7 @@ function fuzz(seed, maxSteps) {
       w.choose(w.pending.choices[nxt() % w.pending.choices.length].key);
       continue;
     }
+    if (nxt() % 3 === 0) w.do_act();
     if (nxt() % 5 === 0) {
       const items = Dread.availableOrders(w);
       const item = items[nxt() % items.length];

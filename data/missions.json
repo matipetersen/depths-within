@@ -14,7 +14,52 @@
         "quality": 0.9
       },
       "mundane_origin": "A routine operations plan drawn up by the staff from agent reports.",
-      "uncanny_origin": "The countersignature belongs to an officer who left the staff roll two years ago."
+      "uncanny_origin": "The countersignature belongs to an officer who left the staff roll two years ago.",
+      "acts": [
+        {
+          "id": "search",
+          "label": "Search the northern lane",
+          "hint": "hours at the headsets; the boat must be listening",
+          "hours": 8,
+          "requires": {
+            "path": "ship.sonar_on",
+            "op": ">=",
+            "value": 1
+          },
+          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "m1_located"
+            }
+          ]
+        },
+        {
+          "id": "close",
+          "label": "Close with her",
+          "hint": "hours of careful running, and every man knows why",
+          "hours": 5,
+          "effects": [
+            {
+              "op": "flag",
+              "name": "m1_close"
+            }
+          ]
+        },
+        {
+          "id": "ready",
+          "label": "Order the tubes flooded",
+          "hint": "the last thing before the order itself",
+          "hours": 1,
+          "requires": {
+            "crew_where": {
+              "role": "torpedo"
+            }
+          },
+          "why": "There is nobody left in the torpedo room to do it.",
+          "effects": []
+        }
+      ]
     },
     {
       "id": "m2_convoy",
@@ -29,7 +74,40 @@
         "quality": 0.6
       },
       "mundane_origin": "A relay station on a backup frequency after the usual one was jammed.",
-      "uncanny_origin": "The call sign belongs to a station that was shelled out of existence in spring."
+      "uncanny_origin": "The call sign belongs to a station that was shelled out of existence in spring.",
+      "acts": [
+        {
+          "id": "search",
+          "label": "Search the grid for smoke",
+          "hint": "hours at the headsets; the boat must be listening",
+          "hours": 10,
+          "requires": {
+            "path": "ship.sonar_on",
+            "op": ">=",
+            "value": 1
+          },
+          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "m2_searched"
+            }
+          ]
+        },
+        {
+          "id": "transmit",
+          "label": "Transmit at the relay window",
+          "hint": "say what you saw; or something else",
+          "hours": 2,
+          "requires": {
+            "crew_where": {
+              "role": "radio"
+            }
+          },
+          "why": "There is no radio man to send it.",
+          "effects": []
+        }
+      ]
     },
     {
       "id": "m3_hospital_ship",
@@ -45,7 +123,47 @@
       },
       "mundane_origin": "An order slipped to the captain by a rival staff faction, or enemy deception designed to make a boat commit a war crime.",
       "uncanny_origin": "It was written in the captain's own hand by something that wanted the ship sunk.",
-      "window": 2.2
+      "window": 2.2,
+      "acts": [
+        {
+          "id": "find",
+          "label": "Search for the steamer",
+          "hint": "hours at the headsets; the boat must be listening",
+          "hours": 6,
+          "requires": {
+            "path": "ship.sonar_on",
+            "op": ">=",
+            "value": 1
+          },
+          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "m3_found"
+            }
+          ]
+        },
+        {
+          "id": "approach",
+          "label": "Bring the boat to bear",
+          "hint": "the steamer is lit; she does not turn",
+          "hours": 3,
+          "effects": []
+        },
+        {
+          "id": "ready",
+          "label": "Order the tubes flooded",
+          "hint": "the last thing before the order itself",
+          "hours": 1,
+          "requires": {
+            "crew_where": {
+              "role": "torpedo"
+            }
+          },
+          "why": "There is nobody left in the torpedo room to do it.",
+          "effects": []
+        }
+      ]
     },
     {
       "id": "m4_return_lane",
@@ -61,7 +179,23 @@
       },
       "mundane_origin": "Standing return instructions the mate copied into the log and forgot.",
       "uncanny_origin": "Nobody wrote it. It was already in the log.",
-      "window": 2.2
+      "window": 2.2,
+      "acts": [
+        {
+          "id": "steer",
+          "label": "Steer the northern lane",
+          "hint": "hours at the wheel, under radio silence",
+          "hours": 6,
+          "effects": []
+        },
+        {
+          "id": "rendezvous",
+          "label": "Make the rendezvous",
+          "hint": "the boat will be expected, or it will not",
+          "hours": 4,
+          "effects": []
+        }
+      ]
     },
     {
       "id": "m5_station",
@@ -77,7 +211,8 @@
       },
       "mundane_origin": "A standing station order from a staff since reorganised or dissolved, or automated traffic left looping on a dead relay.",
       "uncanny_origin": "It repeats because it is the one thing that wants the boat to stay.",
-      "window": 99
+      "window": 99,
+      "acts": []
     }
   ]
 }

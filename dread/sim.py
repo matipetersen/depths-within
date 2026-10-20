@@ -76,6 +76,20 @@ def pick_choice(policy: str, pending, prng=None, world=None) -> str:
     return ranked[0].key
 
 
+def _carry_on(policy: str, w: DreadWorld, fatigue: float):
+    """Give the mission's next order, the way each kind of captain would."""
+    s = w.ship
+    a, ok, why = w.act_status()
+    if a is None:
+        return
+    if not ok and not s.sonar_on and a.requires and "sonar_on" in str(a.requires):
+        O.restore_sonar(w)                                   # even a wary captain has to listen to search
+        a, ok, why = w.act_status()
+    # the cautious captain lets a worn crew sleep before asking more of it
+    if ok and not (policy == "crew_first" and fatigue > 0.55):
+        w.do_act()
+
+
 def issue_orders(policy: str, w: DreadWorld, prng=None):
     s = w.ship
     live = w.active_crew()
@@ -90,6 +104,7 @@ def issue_orders(policy: str, w: DreadWorld, prng=None):
            (policy == "crew_first" and run.mission.quality < 0.4):
             w.log.append(f"[{w.tick_no:03d}] {O.verify_orders(w)}")
     fatigue = sum(c.fatigue for c in live) / len(live)
+    _carry_on(policy, w, fatigue)
     if w.on_station and fatigue > 0.6 and not s.stand_down and policy != "paranoid":
         O.stand_down(w)                       # nothing to rush on station: let a broken crew sleep
     if policy == "mission_first":
@@ -144,6 +159,9 @@ def issue_orders(policy: str, w: DreadWorld, prng=None):
 
 def random_orders(w: DreadWorld, prng: random.Random):
     """A captain with no plan: sometimes does something, sometimes not."""
+    a, ok, _ = w.act_status()
+    if ok and prng.random() < 0.5:
+        w.do_act()
     if prng.random() > 0.15:
         return
     s, live = w.ship, w.active_crew()

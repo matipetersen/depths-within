@@ -70,7 +70,7 @@ def test_ritual_restores_routine_and_costs_mission_time():
     before = w.ship.routine
     O.hold_ritual(w)
     assert w.ship.routine > before
-    assert w.time_cost > 0
+    assert w.run.lost > 0
 
 
 def test_cancel_rest_raises_readiness_now_and_fatigue_later():

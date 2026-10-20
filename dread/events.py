@@ -255,7 +255,7 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "set":
             setattr(ship, fx["stat"], fx["value"])
         elif op == "time":
-            world.time_cost += fx["value"]
+            world.lose_hours(fx["value"] * world.patrol_ticks)
         elif op == "rumor_intensity":
             r = ship.rumors.get(fx["id"])
             if r is not None:

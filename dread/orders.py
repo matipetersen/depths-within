@@ -95,7 +95,7 @@ def hold_ritual(world):
     s = world.ship
     for item in sorted(s.routines, key=s.routines.get)[:2]:
         s.routines[item] = clamp(s.routines[item] + 0.4)
-    world.time_cost += 1.5 / world.patrol_ticks
+    world.lose_hours(1.5)
     for c in _live(world):
         c.fear = clamp(c.fear - 0.03)
     return "The crew eats together. Someone finds a deck of cards."
@@ -159,7 +159,7 @@ def verify_orders(world):
     s = world.ship
     s.noise = clamp(s.noise + 0.15)
     s.attention = clamp(s.attention + 0.03)
-    world.time_cost += 0.01
+    world.lose_hours(0.7)
     roll = world.rng.random()
     if roll < run.mission.quality * 0.8:
         s.orders_doubt = clamp(s.orders_doubt - 0.25)

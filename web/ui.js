@@ -121,13 +121,32 @@
       return `<p><span class="tk">${esc(tk)}</span> <span class="${cls}">${esc(body)}</span></p>`;
     }).join('');
   }
+  /** The mission's next step as the first thing to do; nothing advances unless it is ordered. */
+  function stepView(v) {
+    const m = v.mission;
+    if (!m) return '';
+    const st = m.step, o = v.orders.find((x) => x.kind === 'act');
+    if (!st.of) return `<div class="step hold"><span class="k">Station</span><span class="t">Hold position. Nothing is asked of you but to stay.</span></div>`;
+    const off = v.pending || v.over;
+    if (!o) return `<div class="step done"><span class="k">${st.of} of ${st.of}</span><span class="t">Every step ordered. What comes now is not up to the sea.</span></div>`;
+    const cls = st.working ? 'step going' : o.why ? 'step blocked' : 'step ready';
+    const sub = st.working ? `Under way · ${esc(o.hint)}${o.why ? ' · ' + esc(o.why) : ''}` : o.why ? esc(o.why) : esc(o.hint);
+    return `<button class="${cls}" data-a="act" ${off ? 'disabled' : ''}><span class="k">Step ${st.n + 1} of ${st.of}</span>` +
+      `<span class="t">${esc(o.label.replace(/^Under way: /, ''))}</span><span class="s">${sub}</span></button>`;
+  }
+  function pips(m) {
+    if (!m || !m.step.of) return '';
+    let out = '';
+    for (let i = 0; i < m.step.of; i++) out += i < m.step.n ? '●' : i === m.step.n && m.step.working ? '◐' : '○';
+    return `<span class="pips" aria-label="Steps ordered: ${m.step.n} of ${m.step.of}">${out}</span>`;
+  }
   function topView(v) {
     const m = v.mission;
     const cal = v.clocks.calendar ? `<small>log: day ${v.clocks.calendar.log} · chronometer: day ${v.clocks.calendar.chrono} · the cook says later</small>`
       : v.clocks.drift ? '<small>control-room clock: eleven minutes slow</small>' : '';
     return `<div class="top">
       <button class="orders-chip" data-a="sheet:briefing" aria-label="Show the orders">
-        <span class="t">${m ? `${m.index}/${m.total} · ${esc(m.title)}` : 'No orders'}</span>
+        <span class="t">${m ? `${m.index}/${m.total} · ${esc(m.title)}` : 'No orders'} ${pips(m)}</span>
         <span class="p">${m ? esc(m.provenance) : ''}</span></button>
       <div class="clock">Day ${v.day} · ${String(v.hour).padStart(2, '0')}:00${cal}</div>
       <button class="icon-btn ${state.sound ? '' : 'off'}" data-a="sound" aria-pressed="${state.sound}" aria-label="${state.sound ? 'Sound on' : 'Sound off'}">♪</button>
@@ -147,6 +166,7 @@
       <div class="body"><div class="title-card" style="max-width:none"><div class="rule">
         <span><b>The ledger is exact.</b> Hull, stores, air and diesel are what they say they are.</span>
         <span><b>The men are not.</b> Each says how he is; you can also see his symptoms. When the two disagree, believe the symptoms.</span>
+        <span><b>Nothing advances while you wait.</b> The mission is carried out by ordering its steps, one at a time. Each takes hours, and the clock on the orders keeps running.</span>
         <span><b>Wait 1 h</b> advances an hour. <b>News ▶▶</b> waits until something happens (at most 12 hours).</span>
         <span><b>Decisions stop the clock.</b> Each option shows what it costs, not what it does.</span>
         <span><b>Orders are never free.</b> Most of what they cost, you learn later.</span>
@@ -162,7 +182,7 @@
         <footer><button class="btn" data-a="orders">Back</button></footer></div>`;
     }
     return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Orders"><header><h2>Orders</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
-      <div class="body"><div class="orders-grid">${v.orders.map((o) => `<button class="opt" data-a="${o.needsCrew ? 'pick:' : 'order:'}${o.id}"><b>${esc(o.label)}${o.needsCrew ? ' …' : ''}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>
+      <div class="body"><div class="orders-grid">${v.orders.filter((o) => o.kind !== 'act').map((o) => `<button class="opt" data-a="${o.needsCrew ? 'pick:' : 'order:'}${o.id}"><b>${esc(o.label)}${o.needsCrew ? ' …' : ''}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>
         <p class="note">Orders are not free. Most of what they cost, you will learn later.</p></div></div>`;
   }
   function sheetDecision(v) {
@@ -210,8 +230,9 @@
         <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
           <div class="scroll log log-scroll">${logView(v)}</div>
           <div class="notice" aria-live="polite">${esc(v.notice || '')}</div>
+          ${stepView(v)}
           <div class="actions">
-            <button class="btn primary" data-a="orders" ${v.pending || v.over ? 'disabled' : ''}>Orders<small>${v.orders.length} available</small></button>
+            <button class="btn primary" data-a="orders" ${v.pending || v.over ? 'disabled' : ''}>Orders<small>${v.orders.filter((o) => o.kind !== 'act').length} more</small></button>
             <button class="btn" data-a="wait" ${v.pending || v.over ? 'disabled' : ''}>Wait 1h</button>
             <button class="btn" data-a="news" ${v.pending || v.over ? 'disabled' : ''}>News ▶▶<small class="wide">until something happens</small></button>
           </div></section>
@@ -237,6 +258,7 @@
     if (a === 'new') { store.clear(); begin(new Dread.Game(newSeed())); return; }
     if (a === 'continue') { const s = store.read(); if (s) begin(Dread.Game.restore(s)); return; }
     if (!g) return;
+    if (a === 'act') return act('o:act');
     if (a === 'wait') return act('t');
     if (a === 'news') return act('w');
     if (a === 'orders') { state.sheet = 'orders'; state.pick = null; return render(); }

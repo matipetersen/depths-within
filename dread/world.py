@@ -2,6 +2,7 @@
 import random
 from typing import List, Optional
 
+from .conditions import evaluate
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
 from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
@@ -40,7 +41,7 @@ class DreadWorld:
         self.event_target: Optional[Crew] = None
         self.flag_expiry = {}
         self.mutiny_clock = 0
-        self.time_cost = 0.0      # progress lost to rituals etc., applied next tick
+        self.legacy_loss = 0.0    # progress lost to rituals when no mission is running
         self.peak_dread = 0.0
         # Missions (DESIGN.md section 7). missions=[] disables them (the live game
         # supplies its own); None loads the default sequence.
@@ -388,6 +389,95 @@ class DreadWorld:
         self.log.append(f"[{self.tick_no:03d}] ORDERS: {m.title}. {m.briefing}")
         self.log.append(f"[{self.tick_no:03d}]   Received: {provenance_line(m)}")
 
+    # -- the acts: what the captain orders to carry the mission out ------------
+    def lose_hours(self, hours: float):
+        """Hours of the window spent on something other than the mission."""
+        if self.run is not None and self.run.outcome is None:
+            self.run.lost += hours
+        else:
+            self.legacy_loss += hours / self.patrol_ticks
+
+    def next_act(self):
+        """The act that carries the mission forward, or None (on station, or all done)."""
+        run = self.run
+        if run is None or run.outcome is not None:
+            return None
+        acts = run.mission.acts
+        return acts[run.acts_done] if run.acts_done < len(acts) else None
+
+    def act_status(self):
+        """(act, ok, why): the next act, whether it can start now, and the reason if not."""
+        a = self.next_act()
+        if a is None:
+            return None, False, ""
+        if self.run.working is not None:
+            return a, False, "Already under way."
+        if self.ship.surfaced:
+            return a, False, "We are on the surface. Dive first."
+        if not evaluate(a.requires, self):
+            return a, False, a.why or "It cannot be done now."
+        return a, True, ""
+
+    @property
+    def working(self):
+        """The act being carried out right now, or None."""
+        run = self.run
+        if run is None or run.working is None:
+            return None
+        return run.mission.acts[run.working]
+
+    @property
+    def work_blocked(self) -> str:
+        """Why the work under way is stopped ('' if it is running)."""
+        a = self.working
+        if a is None:
+            return ""
+        if self.ship.surfaced:
+            return "We are on the surface."
+        if self.ship.stand_down:
+            return "The crew is asleep."
+        return "" if evaluate(a.requires, self) else (a.why or "It cannot go on.")
+
+    def do_act(self) -> str:
+        """Order the next step of the mission. The hours then pass tick by tick."""
+        a, ok, why = self.act_status()
+        if a is None:
+            return "There is nothing to order. The rest is waiting."
+        if not ok:
+            return why
+        run = self.run
+        run.working = run.acts_done
+        run.work_left = float(a.hours)
+        self._set_progress()
+        msg = f"You order it: {a.label}."
+        self.log.append(f"[{self.tick_no:03d}] > {msg}")
+        return msg
+
+    def _set_progress(self):
+        run = self.run
+        n = len(run.mission.acts)
+        part = 0.0
+        if run.working is not None:
+            part = 1.0 - run.work_left / run.mission.acts[run.working].hours
+        self.ship.progress = clamp((run.acts_done + part) / n)
+
+    def _work(self):
+        run = self.run
+        if run is None or run.outcome is not None or run.working is None:
+            return
+        if self.work_blocked:
+            return
+        a = run.mission.acts[run.working]
+        run.work_left -= min(1.0, self.ship.readiness)       # a tired crew takes longer
+        if run.work_left <= 0.0:
+            run.work_left = 0.0
+            run.acts_done += 1
+            run.working = None
+            self.log.append(f"[{self.tick_no:03d}] Done: {a.label}.")
+            apply_effects(a.effects, self)
+        if run.outcome is None and self.run is run:
+            self._set_progress()
+
     def resolve_mission(self, outcome: str):
         run = self.run
         if run is None or run.outcome is not None:
@@ -442,13 +532,16 @@ class DreadWorld:
 
     def _mission(self):
         s = self.ship
+        run = self.run
         speed = s.readiness * (0.5 if s.silent_running else 1.0) * (0.0 if s.surfaced else 1.0) * (0.3 if s.stand_down else 1.0)
-        if self.run is not None:
-            if self.run.outcome is None and self.run.mission.kind != "hold":
-                s.progress = clamp(s.progress + speed / (self.run.mission.ticks * PACE) - self.time_cost)
+        if run is not None:
+            if run.outcome is None and run.mission.acts:
+                self._work()
+            elif run.outcome is None and run.mission.kind != "hold":
+                s.progress = clamp(s.progress + speed / (run.mission.ticks * PACE))
         else:
-            s.progress = clamp(s.progress + speed / (self.patrol_ticks * PACE) - self.time_cost)
-        self.time_cost = 0.0
+            s.progress = clamp(s.progress + speed / (self.patrol_ticks * PACE) - self.legacy_loss)
+            self.legacy_loss = 0.0
         if s.surfaced and self.rng.random() < 0.08 and not (self.truth["war_over"] and self.vigil_ticks > 0):
             self.log.append(f"[{self.tick_no:03d}] Aircraft overhead. We are exposed.")
             s.hull = clamp(s.hull - 0.12)

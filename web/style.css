@@ -104,9 +104,28 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brass)
 .log .ch { color: var(--sea); }
 .log .mis { color: var(--paper); font-weight: 500; }
 .col.logcol .scroll { padding-bottom: 4px; }
-.notice { min-height: 38px; padding: 4px 10px; font-size: 13px; line-height: 1.25; color: var(--sea); border-top: 1px solid var(--line); display: flex; align-items: center; }
+.notice { min-height: 30px; padding: 4px 10px; font-size: 13px; line-height: 1.25; color: var(--sea); border-top: 1px solid var(--line); display: flex; align-items: center; }
 .btn { white-space: nowrap; }
 .btn small { white-space: normal; }
+.step {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 8px; align-items: baseline;
+  margin: 6px 6px 0; padding: 6px 10px; min-height: 48px; text-align: left; border: 1px solid var(--brass); border-radius: 4px;
+  background: var(--panel-hi); color: var(--paper); font: inherit;
+}
+.step .k { font: 500 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--brass); }
+.step .t { font: 600 15px/1.15 var(--body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.step .s { grid-column: 1 / -1; font-size: 11.5px; color: var(--dim); line-height: 1.2; }
+button.step.ready { background: var(--brass); color: var(--ink); }
+button.step.ready .k, button.step.ready .s { color: #3a2f12; }
+button.step.blocked { border-color: var(--line); }
+button.step.blocked .k { color: var(--dim); }
+button.step.blocked .s { color: var(--rust); }
+button.step.going { border-style: dashed; }
+button.step:active:not(:disabled) { transform: translateY(1px); filter: brightness(1.12); }
+button.step:disabled { opacity: .4; }
+.step.hold, .step.done { border-color: var(--line); }
+.step.hold .t, .step.done .t { white-space: normal; font-weight: 400; }
+.pips { color: var(--brass); letter-spacing: .12em; margin-left: 4px; font-size: 13px; }
 .actions { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 6px; padding: 6px; border-top: 1px solid var(--line); }
 .btn {
   min-height: 52px; padding: 6px 8px; background: var(--panel-hi); border: 1px solid var(--line); border-radius: 4px;

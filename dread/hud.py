@@ -46,9 +46,22 @@ def header(w) -> List[str]:
         m = w.run.mission
         out.append(f"ORDERS: {m.title}")
         out.append(textwrap.fill(f"Received: {m.channel} {m.signed}".strip(), WIDTH, subsequent_indent="  "))
+        out.append(step_line(w))
     out += clock_lines(w)
     out.append("=" * WIDTH)
     return out
+
+
+def step_line(w) -> str:
+    """Where the mission stands, in the captain's own terms: steps ordered, not a gauge."""
+    run, acts = w.run, w.run.mission.acts
+    if not acts:
+        return "Station: nothing is asked of you but to stay."
+    if run.acts_done >= len(acts):
+        return "Every step ordered. What remains is not up to the sea."
+    a = acts[run.acts_done]
+    state = f"under way, {max(1, int(-(-run.work_left // 1)))} h more" if run.working is not None else "waiting for your order"
+    return f"Step {run.acts_done + 1} of {len(acts)}: {a.label} ({state})"
 
 
 def ledger(w) -> List[str]:
@@ -128,7 +141,8 @@ def log_tail(w, n: int = 8) -> List[str]:
 def orders_menu(items) -> List[str]:
     out = ["ORDERS   (enter = wait an hour · w = wait for something · h = help)"]
     for i, it in enumerate(items, 1):
-        out.append(f"  {i:>2}. {it.label}" + (f"  — {it.hint}" if it.hint else ""))
+        tail = f"  — not now: {it.why}" if it.why else (f"  — {it.hint}" if it.hint else "")
+        out.append(f"  {i:>2}. {it.label}{tail}")
     out.append("  " + ORDERS_NOTE)
     return out
 

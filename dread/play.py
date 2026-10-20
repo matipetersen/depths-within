@@ -23,6 +23,7 @@ HELP = """\
   enter   wait one hour           w   wait until something happens (or 12 hours)
   1..N    give that order         o   show the orders again
   l       the whole log           q   quit
+  The first order is always the mission's next step: nothing advances by waiting.
   Decisions stop the clock: answer them with their number.
   Nothing is explained to you. Watch the men, trust the ledger."""
 
@@ -33,6 +34,7 @@ class Item:
     hint: str
     run: Callable
     needs_crew: bool = False
+    why: str = ""             # when set, the order cannot be given now, and this says why
 
 
 def _game_depth(game, meters: int, text: str) -> str:
@@ -44,6 +46,13 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
     """``game``: when the HUD runs inside the real game, depth is the game's, not the story's."""
     s = w.ship
     items: List[Item] = []
+    a, ok, why = w.act_status()
+    if w.working is not None:
+        left = max(1, int(-(-w.run.work_left // 1)))
+        items.append(Item(f"Under way: {w.working.label}", f"about {left} h more", lambda: "", why=w.work_blocked or "The hours must pass."))
+    elif a is not None:
+        hint = f"{a.hours:g} h; {a.hint}" if a.hint else f"{a.hours:g} h"
+        items.append(Item(a.label, hint, w.do_act, why="" if ok else why))
     if s.sonar_on:
         items.append(Item("Silence the sonar", "the headsets go quiet; so does the warning", lambda: O.silence_sonar(w)))
     else:
@@ -175,6 +184,8 @@ class Session:
         if not 1 <= n <= len(items):
             return self.view(f"There is no order {n}.")
         item = items[n - 1]
+        if item.why:
+            return self.view(item.why)
         if item.needs_crew:
             self.awaiting = item
             return self.view()

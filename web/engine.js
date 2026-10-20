@@ -149,6 +149,10 @@
         quality: (m.provenance && m.provenance.quality !== undefined) ? m.provenance.quality : 0.5,
         mundane_origin: m.mundane_origin, uncanny_origin: m.uncanny_origin,
         window: m.window !== undefined ? m.window : 1.25,
+        acts: (m.acts || []).map((a) => ({
+          id: a.id, label: a.label, hint: a.hint || '', hours: Number(a.hours),
+          requires: a.requires || null, why: a.why || '', effects: a.effects || [],
+        })),
       })),
     };
   }
@@ -515,7 +519,7 @@
       } else if (op === 'set') {
         ship[fx.stat] = fx.value;
       } else if (op === 'time') {
-        world.time_cost += fx.value;
+        world.lose_hours(fx.value * world.patrol_ticks);
       } else if (op === 'rumor_intensity') {
         const r = ship.rumors.get(fx.id);
         if (r) r.intensity = clamp(r.intensity + fx.value);
@@ -585,7 +589,7 @@
       const s = w.ship;
       const order = Object.keys(s.routines).map((k, i) => [k, i]).sort((a, b) => (s.routines[a[0]] - s.routines[b[0]]) || (a[1] - b[1]));
       for (const [item] of order.slice(0, 2)) s.routines[item] = clamp(s.routines[item] + 0.4);
-      w.time_cost += 1.5 / w.patrol_ticks;
+      w.lose_hours(1.5);
       for (const c of w.active_crew()) c.fear = clamp(c.fear - 0.03);
       return 'The crew eats together. Someone finds a deck of cards.';
     },
@@ -625,7 +629,7 @@
       run.phase_fired.add('verified');
       const s = w.ship;
       s.noise = clamp(s.noise + 0.15); s.attention = clamp(s.attention + 0.03);
-      w.time_cost += 0.01;
+      w.lose_hours(0.7);
       const roll = w.rng.random();
       if (roll < run.mission.quality * 0.8) {
         s.orders_doubt = clamp(s.orders_doubt - 0.25);
@@ -659,7 +663,7 @@
       this.event_target = null;
       this.flag_expiry = new Map();
       this.mutiny_clock = 0;
-      this.time_cost = 0.0;
+      this.legacy_loss = 0.0;
       this.peak_dread = 0.0;
       this.missions = opts.missions !== undefined ? opts.missions : DATA.missions;
       this.run = null;
@@ -936,7 +940,10 @@
     _start_mission(i) {
       this.mission_i = i;
       const m = this.missions[i];
-      this.run = { mission: m, start_tick: this.tick_no, outcome: null, phase_fired: new Set() };
+      this.run = {
+        mission: m, start_tick: this.tick_no, outcome: null, phase_fired: new Set(),
+        acts_done: 0, working: null, work_left: 0.0, lost: 0.0,
+      };
       const s = this.ship;
       s.progress = 0.0;
       s.orders_doubt = clamp(Math.max(s.orders_doubt * 0.5, (1 - m.quality) * 0.6 + (m.moral ? 0.15 : 0.0)));
@@ -964,7 +971,7 @@
         if (this.vigil_ticks > 480) { this.ship.flags.add('derelict'); this.resolve_mission('failed'); }
         return;
       }
-      if (this.tick_no > run.start_tick + m.ticks * m.window) {
+      if (this.tick_no > run.start_tick + m.ticks * m.window - run.lost) {
         this.log.push(`${tag(this.tick_no)} The window for '${m.title}' has closed.`);
         this.resolve_mission('failed');
       } else if (this.ship.progress >= 1.0) {
@@ -975,21 +982,87 @@
     }
 
     _mission() {
-      const s = this.ship;
+      const s = this.ship, run = this.run;
       const speed = s.readiness * (s.silent_running ? 0.5 : 1.0) * (s.surfaced ? 0.0 : 1.0) * (s.stand_down ? 0.3 : 1.0);
-      if (this.run !== null) {
-        if (this.run.outcome === null && this.run.mission.kind !== 'hold') {
-          s.progress = clamp(s.progress + speed / (this.run.mission.ticks * PACE) - this.time_cost);
+      if (run !== null) {
+        if (run.outcome === null && run.mission.acts.length) {
+          this._work();
+        } else if (run.outcome === null && run.mission.kind !== 'hold') {
+          s.progress = clamp(s.progress + speed / (run.mission.ticks * PACE));
         }
       } else {
-        s.progress = clamp(s.progress + speed / (this.patrol_ticks * PACE) - this.time_cost);
+        s.progress = clamp(s.progress + speed / (this.patrol_ticks * PACE) - this.legacy_loss);
+        this.legacy_loss = 0.0;
       }
-      this.time_cost = 0.0;
       if (s.surfaced && this.rng.random() < 0.08 && !(this.truth.war_over && this.vigil_ticks > 0)) {
         this.log.push(`${tag(this.tick_no)} Aircraft overhead. We are exposed.`);
         s.hull = clamp(s.hull - 0.12);
         for (const c of this.active_crew()) c.fear = clamp(c.fear + 0.05);
       }
+    }
+
+    // -- the acts: what the captain orders to carry the mission out
+    lose_hours(hours) {
+      if (this.run !== null && this.run.outcome === null) this.run.lost += hours;
+      else this.legacy_loss += hours / this.patrol_ticks;
+    }
+    next_act() {
+      const run = this.run;
+      if (run === null || run.outcome !== null) return null;
+      const acts = run.mission.acts;
+      return run.acts_done < acts.length ? acts[run.acts_done] : null;
+    }
+    act_status() {
+      const a = this.next_act();
+      if (a === null) return { act: null, ok: false, why: '' };
+      if (this.run.working !== null) return { act: a, ok: false, why: 'Already under way.' };
+      if (this.ship.surfaced) return { act: a, ok: false, why: 'We are on the surface. Dive first.' };
+      if (!evaluate(a.requires, this)) return { act: a, ok: false, why: a.why || 'It cannot be done now.' };
+      return { act: a, ok: true, why: '' };
+    }
+    get working() {
+      const run = this.run;
+      return run === null || run.working === null ? null : run.mission.acts[run.working];
+    }
+    get work_blocked() {
+      const a = this.working;
+      if (a === null) return '';
+      if (this.ship.surfaced) return 'We are on the surface.';
+      if (this.ship.stand_down) return 'The crew is asleep.';
+      return evaluate(a.requires, this) ? '' : (a.why || 'It cannot go on.');
+    }
+    do_act() {
+      const { act, ok, why } = this.act_status();
+      if (act === null) return 'There is nothing to order. The rest is waiting.';
+      if (!ok) return why;
+      const run = this.run;
+      run.working = run.acts_done;
+      run.work_left = Number(act.hours);
+      this._set_progress();
+      const msg = `You order it: ${act.label}.`;
+      this.log.push(`${tag(this.tick_no)} > ${msg}`);
+      return msg;
+    }
+    _set_progress() {
+      const run = this.run, n = run.mission.acts.length;
+      let part = 0.0;
+      if (run.working !== null) part = 1.0 - run.work_left / run.mission.acts[run.working].hours;
+      this.ship.progress = clamp((run.acts_done + part) / n);
+    }
+    _work() {
+      const run = this.run;
+      if (run === null || run.outcome !== null || run.working === null) return;
+      if (this.work_blocked) return;
+      const a = run.mission.acts[run.working];
+      run.work_left -= Math.min(1.0, this.ship.readiness);
+      if (run.work_left <= 0.0) {
+        run.work_left = 0.0;
+        run.acts_done += 1;
+        run.working = null;
+        this.log.push(`${tag(this.tick_no)} Done: ${a.label}.`);
+        applyEffects(a.effects, this);
+      }
+      if (run.outcome === null && this.run === run) this._set_progress();
     }
 
     _mutiny() {
@@ -1097,7 +1170,15 @@
   /** Same menu as dread/play.py: available_orders(w). */
   function availableOrders(w) {
     const s = w.ship, items = [];
-    const add = (id, label, hint, run, needsCrew, kind) => items.push({ id, label, hint, run, needsCrew: !!needsCrew, kind: kind || 'order' });
+    const add = (id, label, hint, run, needsCrew, kind, why) => items.push({ id, label, hint, run, needsCrew: !!needsCrew, kind: kind || 'order', why: why || '' });
+    const st = w.act_status();
+    if (w.working !== null) {
+      const left = Math.max(1, Math.ceil(w.run.work_left));
+      add('act', `Under way: ${w.working.label}`, `about ${left} h more`, () => '', false, 'act', w.work_blocked || 'The hours must pass.');
+    } else if (st.act !== null) {
+      const a = st.act;
+      add('act', a.label, a.hint ? `${a.hours} h; ${a.hint}` : `${a.hours} h`, () => w.do_act(), false, 'act', st.ok ? '' : st.why);
+    }
     if (s.sonar_on) add('silence_sonar', 'Silence the sonar', 'the headsets go quiet; so does the warning', () => orders.silence_sonar(w));
     else add('restore_sonar', 'Switch the sonar back on', 'you will hear what they heard', () => orders.restore_sonar(w));
     if (s.rest_cancelled) add('grant_rest', 'Resume normal watches', '', () => orders.grant_rest(w));
@@ -1179,6 +1260,7 @@
       } else if (kind === 'o') {
         const item = availableOrders(w).find((i) => i.id === a);
         if (!item) return;
+        if (item.why) { this.notice = item.why; return; }
         this.notice = String(item.run(b !== undefined ? Number(b) : undefined) || '');
       } else {
         return;
@@ -1190,6 +1272,16 @@
       const g = new Game(saved.seed, opts);
       for (const i of saved.inputs) g.do(i);
       return g;
+    }
+
+    /** Where the mission stands, as steps ordered; same wording as dread/hud.py step_line. */
+    _step() {
+      const w = this.w, run = w.run, acts = run.mission.acts;
+      if (!acts.length) return { text: 'Station: nothing is asked of you but to stay.', n: 0, of: 0, working: false };
+      if (run.acts_done >= acts.length) return { text: 'Every step ordered. What remains is not up to the sea.', n: acts.length, of: acts.length, working: false };
+      const a = acts[run.acts_done];
+      const state = run.working !== null ? `under way, ${Math.max(1, Math.ceil(run.work_left))} h more` : 'waiting for your order';
+      return { text: `Step ${run.acts_done + 1} of ${acts.length}: ${a.label} (${state})`, n: run.acts_done, of: acts.length, working: run.working !== null };
     }
 
     /** Everything the screen may show. Hidden values are not in here, so they cannot leak. */
@@ -1228,7 +1320,7 @@
           drift: s.flags.has('clock_drift'),
           calendar: w.on_station && w.vigil_ticks >= 24 ? { log: day, chrono: day + Math.floor(w.vigil_ticks / 24) } : null,
         },
-        mission: m ? { title: m.title, briefing: m.briefing, provenance: provenanceLine(m), index: w.mission_i + 1, total: w.missions.length } : null,
+        mission: m ? { title: m.title, briefing: m.briefing, provenance: provenanceLine(m), index: w.mission_i + 1, total: w.missions.length, step: this._step() } : null,
         ledger: {
           hull: s.hull, fuel: s.fuel, food: s.food, water: s.water, scrubber: s.scrubber, rations: s.rations,
           co2: s.co2, air: AIR(s.co2), men: live,
@@ -1238,7 +1330,7 @@
         surfaced: s.surfaced, on_station: w.on_station,
         log: w.log.filter((l) => l.trim()),
         pending,
-        orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew })),
+        orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
         pickable: {
           isolate: w.active_crew().map((c) => ({ id: c.id, name: c.name, role: c.role })),
           force_compartment: w.active_crew().map((c) => ({ id: c.id, name: c.name, role: c.role })),

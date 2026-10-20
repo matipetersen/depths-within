@@ -17,6 +17,18 @@ WINDOW_FACTOR = 1.25
 
 
 @dataclass
+class Act:
+    """One thing the captain orders to carry the mission out (nothing advances by waiting)."""
+    id: str
+    label: str
+    hint: str
+    hours: float
+    requires: Optional[dict]
+    why: str
+    effects: List[dict]
+
+
+@dataclass
 class Mission:
     id: str
     kind: str
@@ -30,6 +42,7 @@ class Mission:
     mundane_origin: str
     uncanny_origin: str
     window: float = WINDOW_FACTOR   # moral missions get slack: the clock must not steal the dilemma
+    acts: List[Act] = field(default_factory=list)
 
 
 @dataclass
@@ -39,10 +52,14 @@ class MissionRun:
     start_tick: int
     outcome: Optional[str] = None
     phase_fired: set = field(default_factory=set)
+    acts_done: int = 0
+    working: Optional[int] = None    # index of the act being carried out
+    work_left: float = 0.0           # hours of work still to do on it
+    lost: float = 0.0                # hours of the window spent on anything but the mission
 
     @property
     def deadline(self) -> float:
-        return self.start_tick + self.mission.ticks * self.mission.window
+        return self.start_tick + self.mission.ticks * self.mission.window - self.lost
 
 
 def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:
@@ -68,7 +85,10 @@ def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:
         missions.append(Mission(m["id"], m["kind"], int(m["ticks"]), bool(m.get("moral", False)),
                                 m["title"], m["briefing"], prov.get("channel", ""),
                                 prov.get("signed", ""), q, m["mundane_origin"], m["uncanny_origin"],
-                                float(m.get("window", WINDOW_FACTOR))))
+                                float(m.get("window", WINDOW_FACTOR)),
+                                [Act(a["id"], a["label"], a.get("hint", ""), float(a["hours"]),
+                                     a.get("requires"), a.get("why", ""), list(a.get("effects", [])))
+                                 for a in m.get("acts", [])]))
     return missions
 
 

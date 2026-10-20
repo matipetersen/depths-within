@@ -39,6 +39,8 @@ def fuzz(seed, max_steps=2500):
         if w.pending:
             w.choose(w.pending.choices[nxt() % len(w.pending.choices)].key)
             continue
+        if nxt() % 3 == 0:
+            w.do_act()                                   # most of the time a captain does carry the mission out
         if nxt() % 5 == 0:
             items = available_orders(w)
             item = items[nxt() % len(items)]
