@@ -80,6 +80,18 @@ def ledger(w) -> List[str]:
     ]
 
 
+def instruments(w) -> List[str]:
+    from .nav import hull_report, navigation
+    n = navigation(w)
+    where = f"Grid {n['grid']}  Heading {n['heading']:03d}  Speed {n['speed']:.1f} kn  Depth {n['depth']} m"
+    rng = (f"  Next: {n['next']}, {n['range_nm']} nm" + (f", {n['eta_h']} h of work left" if n["eta_h"] else "")) if n["next"] else "  On station."
+    hull = hull_report(w)
+    cells = "  ".join(f"{h['name'].replace(' torpedo room', ' tubes').replace(' quarters', ' berths')} {h['integrity'] * 100:.0f}%"
+                      + ("!" if h["state"] != "sound" else "") for h in hull)
+    return ["INSTRUMENTS", "  " + where + f"  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
+            "  Hull by compartment: " + cells]
+
+
 _SAYS = ((0.25, "says he is fine"), (0.45, "says he is tired"), (0.65, "says it has been hard"),
          (1.01, "says nothing good"))
 
@@ -172,7 +184,7 @@ def decision_from(d) -> List[str]:
 
 
 def screen(w, pending=None, items=None, notice: str = "") -> str:
-    parts: List[str] = header(w) + ledger(w) + [""] + crew(w) + [""] + sonar(w) + [""] + log_tail(w)
+    parts: List[str] = header(w) + ledger(w) + instruments(w) + [""] + crew(w) + [""] + sonar(w) + [""] + log_tail(w)
     if notice:
         parts += ["", f"> {notice}"]
     parts.append("")

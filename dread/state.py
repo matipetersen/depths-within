@@ -8,6 +8,8 @@ from typing import Dict, List, Set
 
 ROLES = ("sonar", "torpedo", "engine", "helm", "radio", "medic", "cook", "deck")
 
+COMPARTMENTS = ("bow torpedo room", "control room", "crew quarters", "engine room", "after torpedo room")
+
 ROUTINE_ITEMS = ("meals", "music", "cards", "coffee", "watches")
 
 
@@ -107,6 +109,7 @@ class Ship:
     rest_cancelled: bool = False
     stand_down: bool = False   # all hands but a skeleton watch rest; the presence is fed by sleepers
     hours_submerged: int = 0
+    damage: Dict[str, float] = field(default_factory=lambda: {c: 0.0 for c in COMPARTMENTS})  # hull lost, by compartment
     routines: Dict[str, float] = field(
         default_factory=lambda: {k: 0.9 for k in ROUTINE_ITEMS})
     flags: Set[str] = field(default_factory=set)

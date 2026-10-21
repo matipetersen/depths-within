@@ -23,6 +23,8 @@ ENDING_TEXT: Dict[str, List[str]] = {
                          "The harbour master says the boat is expected. He does not say by whom."],
     "forgotten_post": ["You come home to a peace that began a year ago. No one ever cancelled your orders;",
                        "there was no one left to cancel them. The station is a footnote in a closed file."],
+    "the_lamp": ["You come home with every order carried out. The quay is full of fishing boats with their lamps lit in broad daylight.",
+                 "Nobody looks at you. At night a lamp burns somewhere in the hull of your own boat, and the lookouts agree there is no lamp."],
     "stained_victory": ["You sailed home with every order carried out. The boat will never again be quiet at night."],
     "court_martial": ["There is an inquiry. The order you refused is on file, in a hand that the clerk cannot name."],
     "returned_under_a_cloud": ["You come home. The staff will have questions about the log, and some of the answers are in it."],
@@ -52,6 +54,8 @@ def classify_ending(w, initial_crew: int) -> str:
     if "peace_known" in s.flags and "left_station" in s.flags:
         return "forgotten_post"
     done = sum(1 for r in w.results if r["outcome"] in ("success", "altered"))
+    if "fishermen_sunk" in s.flags:
+        return "the_lamp"                    # twelve men who could not have hurt anyone
     if "civilian_sunk" in s.flags:
         return "stained_victory"             # the crew knows, whatever HQ's ledger says
     # Disobedience only counts if the orders are on record. Sometimes there is no

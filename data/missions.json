@@ -59,7 +59,31 @@
           "why": "There is nobody left in the torpedo room to do it.",
           "effects": []
         }
-      ]
+      ],
+      "chart": {
+        "from": [
+          100,
+          12,
+          "Base"
+        ],
+        "points": [
+          [
+            74,
+            30,
+            "Northern lane"
+          ],
+          [
+            52,
+            36,
+            "Contact bearing"
+          ],
+          [
+            44,
+            40,
+            "Firing point"
+          ]
+        ]
+      }
     },
     {
       "id": "m2_convoy",
@@ -107,7 +131,26 @@
           "why": "There is no radio man to send it.",
           "effects": []
         }
-      ]
+      ],
+      "chart": {
+        "from": [
+          44,
+          40,
+          "Firing point"
+        ],
+        "points": [
+          [
+            30,
+            26,
+            "Convoy grid"
+          ],
+          [
+            24,
+            34,
+            "Reporting position"
+          ]
+        ]
+      }
     },
     {
       "id": "m3_hospital_ship",
@@ -163,7 +206,31 @@
           "why": "There is nobody left in the torpedo room to do it.",
           "effects": []
         }
-      ]
+      ],
+      "chart": {
+        "from": [
+          24,
+          34,
+          "Reporting position"
+        ],
+        "points": [
+          [
+            36,
+            50,
+            "Steamer's lane"
+          ],
+          [
+            44,
+            58,
+            "Closing"
+          ],
+          [
+            50,
+            62,
+            "Santa Lucia"
+          ]
+        ]
+      }
     },
     {
       "id": "m4_return_lane",
@@ -195,7 +262,26 @@
           "hours": 4,
           "effects": []
         }
-      ]
+      ],
+      "chart": {
+        "from": [
+          50,
+          62,
+          "Santa Lucia"
+        ],
+        "points": [
+          [
+            74,
+            64,
+            "Northern lane"
+          ],
+          [
+            94,
+            64,
+            "Rendezvous"
+          ]
+        ]
+      }
     },
     {
       "id": "m5_station",
@@ -212,7 +298,21 @@
       "mundane_origin": "A standing station order from a staff since reorganised or dissolved, or automated traffic left looping on a dead relay.",
       "uncanny_origin": "It repeats because it is the one thing that wants the boat to stay.",
       "window": 99,
-      "acts": []
+      "acts": [],
+      "chart": {
+        "from": [
+          94,
+          64,
+          "Rendezvous"
+        ],
+        "points": [
+          [
+            104,
+            66,
+            "Grid K-7"
+          ]
+        ]
+      }
     }
   ]
 }

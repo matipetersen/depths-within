@@ -17,7 +17,7 @@ function fuzz(seed, maxSteps) {
   const w = new Dread.World(seed);
   let state = (seed * 2654435761) % 4294967296;
   const nxt = () => { state = (state * 1664525 + 1013904223) % 4294967296; return Math.floor(state / 256); };
-  const digest = [];
+  const digest = [], nav = [], dmg = [];
   let steps = 0;
   while (!w.finished && steps < maxSteps) {
     steps += 1;
@@ -42,9 +42,12 @@ function fuzz(seed, maxSteps) {
       const live = w.active_crew();
       digest.push([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2, w.ship.attention,
         w.ship.cohesion, w.dread(), live.length ? Dread.fsum(live.map((c) => c.fear)) / live.length : 0]);
+      const nv = Dread.navigation(w);
+      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm]);
+      dmg.push(Dread.hullReport(w).map((h) => h.integrity));
     }
   }
-  return { seed, log: w.log, results: w.results, ending: Dread.classifyEnding(w, 12), tick: w.tick_no, steps, digest };
+  return { seed, log: w.log, results: w.results, ending: Dread.classifyEnding(w, 12), tick: w.tick_no, steps, digest, nav, dmg };
 }
 
 const seeds = process.argv.slice(2).map(Number);

@@ -4,7 +4,7 @@
   'use strict';
   const SAVE_KEY = 'depths-within:save:v1';
   const app = document.getElementById('app');
-  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false };
+  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false, tabL: 'ledger', tabC: 'chart' };
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pct = (x) => Math.round(x * 100);
@@ -101,6 +101,52 @@
       <div class="air"><span>Rations <span class="num">${pct(L.rations)}%</span></span><span>Men aboard <span class="num">${L.men}</span></span></div>
     </div>`;
   }
+  // ------------------------------------------------------------------ the chart, the instruments, the hull
+  function chartSvg(v) {
+    const N = v.nav;
+    let g = '';
+    for (let i = 0; i <= 11; i++) g += `<line class="gl" x1="${i * 10}" y1="0" x2="${i * 10}" y2="80"/>`;
+    for (let j = 0; j <= 8; j++) g += `<line class="gl" x1="0" y1="${j * 10}" x2="110" y2="${j * 10}"/>`;
+    for (let i = 0; i < 11; i++) g += `<text class="gt" x="${i * 10 + 5}" y="3.4" text-anchor="middle">${'ABCDEFGHIJK'[i]}</text>`;
+    for (let j = 0; j < 8; j++) g += `<text class="gt" x="1.2" y="${j * 10 + 6.5}">${j + 1}</text>`;
+    let t = '';
+    v.tracks.forEach((tr) => {
+      if (!tr.points.length) return;
+      const d = tr.points.map((p) => `${p[0]},${p[1]}`).join(' ');
+      t += `<polyline class="trk ${tr.state}" points="${d}"/>`;
+      tr.points.forEach((p, i) => {
+        if (i === 0) return;
+        const reached = i <= tr.reached, next = tr.state === 'current' && i === tr.reached + 1;
+        t += `<circle class="wp ${reached ? 'hit' : next ? 'next' : ''}" cx="${p[0]}" cy="${p[1]}" r="${next ? 2.1 : 1.4}"/>`;
+        if (next || (tr.state === 'current' && reached && i === tr.reached)) t += `<text class="wl" x="${p[0]}" y="${p[1] + (p[1] > 66 ? -3.4 : 5)}" text-anchor="${p[0] > 85 ? 'end' : 'middle'}">${esc(p[2])}</text>`;
+      });
+    });
+    const boat = `<g class="boat ${v.surfaced ? 'up' : ''}" transform="translate(${N.x} ${N.y}) rotate(${N.heading})"><circle class="halo" r="4.2"/><path d="M0 -4.6 L2.4 3.4 L0 2.2 L-2.4 3.4 Z"/></g>`;
+    return `<svg class="chart" viewBox="0 0 110 80" role="img" aria-label="Chart: ${esc(N.grid)}, heading ${N.heading}">
+      <rect class="sea" width="110" height="80"/>${g}
+      <path class="land" d="M90 0 L110 0 L110 21 L101 19 L95 9 Z"/><text class="wl" x="108" y="26" text-anchor="end">Base</text>${t}${boat}</svg>`;
+  }
+  function gauge(k, val, unit, extra) {
+    return `<div class="gg"><span class="gk">${k}</span><span class="gv">${val}<small>${unit || ''}</small></span>${extra || ''}</div>`;
+  }
+  function chartView(v) {
+    const N = v.nav;
+    const nxt = N.next ? `${esc(N.next)} · ${N.range_nm} nm${N.eta_h ? ` · ${N.eta_h} h` : ''}` : 'On station';
+    return `${chartSvg(v)}<div class="gauges">
+      ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn')}
+      ${gauge('Depth', N.depth, ' m')}${gauge('Grid', N.grid, '')}
+      ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
+      <div class="gg wide"><span class="gk">Next</span><span class="gv sm">${nxt}</span></div></div>`;
+  }
+  function hullView(v) {
+    const segs = v.hull.map((h, i) => {
+      const x = 4 + i * 20.4;
+      return `<rect class="cp ${h.state}" x="${x}" y="15" width="19.6" height="14" rx="${i === 0 || i === 4 ? 6 : 1.5}" style="opacity:${(0.35 + 0.65 * h.integrity).toFixed(2)}"/>`;
+    }).join('');
+    const rows = v.hull.map((h) => `<li class="${h.state}"><span class="n">${esc(h.name)}</span><span class="bar"><i style="width:${pct(h.integrity)}%"></i></span><span class="v">${pct(h.integrity)}%</span>` +
+      `<span class="st">${h.state === 'flooding' ? 'taking water' : h.state}</span></li>`).join('');
+    return `<svg class="hullsvg" viewBox="0 0 110 40" aria-hidden="true"><path class="tower" d="M27 15 L29 8 L37 8 L39 15 Z"/>${segs}</svg><ul class="comp">${rows}</ul>`;
+  }
   const SAID = { 'says he is fine': '“fine”', 'says he is tired': '“tired”', 'says it has been hard': '“it’s been hard”', 'says nothing good': '“nothing good”' };
   function menView(v) {
     const rows = v.men.map((m) => {
@@ -113,6 +159,7 @@
     return `<ul class="men">${rows}</ul>
       <div class="sonar ${v.sonar.on ? '' : 'off'}"><b>SONAR ${v.sonar.on ? 'ON' : 'OFF'}</b>${rep}</div>`;
   }
+  const tabBtn = (key, id, label, cur) => `<button class="tab ${cur === id ? 'on' : ''}" data-a="${key}:${id}" aria-pressed="${cur === id}">${label}</button>`;
   function logView(v) {
     return v.log.map((l) => {
       const m = l.match(/^(\[\d+\])\s?(.*)$/);
@@ -225,8 +272,8 @@
     const stick = !logEl || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
     app.innerHTML = `${topView(v)}
       <div class="cols">
-        <section class="col" aria-label="Ledger"><header><span class="smcaps">Ledger</span><span class="smcaps">exact</span></header><div class="scroll">${ledgerView(v)}</div></section>
-        <section class="col" aria-label="The men"><header><span class="smcaps">The men</span><span class="smcaps">say · seen</span></header><div class="scroll">${menView(v)}</div></section>
+        <section class="col" aria-label="${state.tabL === 'hull' ? 'Hull' : 'Ledger'}"><header class="tabs">${tabBtn('tabL', 'ledger', 'Ledger', state.tabL)}${tabBtn('tabL', 'hull', 'Hull', state.tabL)}</header><div class="scroll">${state.tabL === 'hull' ? hullView(v) : ledgerView(v)}</div></section>
+        <section class="col" aria-label="${state.tabC === 'men' ? 'The men' : 'Chart'}"><header class="tabs">${tabBtn('tabC', 'chart', 'Chart', state.tabC)}${tabBtn('tabC', 'men', 'The men', state.tabC)}</header><div class="scroll">${state.tabC === 'men' ? menView(v) : chartView(v)}</div></section>
         <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
           <div class="scroll log log-scroll">${logView(v)}</div>
           <div class="notice" aria-live="polite">${esc(v.notice || '')}</div>
@@ -258,6 +305,8 @@
     if (a === 'new') { store.clear(); begin(new Dread.Game(newSeed())); return; }
     if (a === 'continue') { const s = store.read(); if (s) begin(Dread.Game.restore(s)); return; }
     if (!g) return;
+    if (a.startsWith('tabL:')) { state.tabL = a.slice(5); return render(); }
+    if (a.startsWith('tabC:')) { state.tabC = a.slice(5); return render(); }
     if (a === 'act') return act('o:act');
     if (a === 'wait') return act('t');
     if (a === 'news') return act('w');

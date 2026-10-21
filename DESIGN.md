@@ -649,3 +649,16 @@ La superficie del juego es un simulador bélico: submarino, patrullaje, reconoci
 - Una tripulación agotada tarda más; dormir a la tripulación o emerger frena el trabajo; el ritual y verificar las órdenes gastan horas de la ventana.
 - Esperar solo cierra la ventana: la misión falla.
 - La guerra es la superficie. Lo importante son las cosas sutiles y las decisiones morales cada vez más pesadas que aparecen con el tiempo.
+
+## 12.7 Navegación, instrumentos y casco
+
+Para que se lea como un simulador de submarino, el puente muestra lo que un capitán miraría:
+
+- **Carta** (`dread/nav.py`, espejo en `web/engine.js`): cuadrícula A–K × 1–8; cada misión trae su ruta (`chart` en `data/missions.json`) y el submarino se ubica entre el último punto alcanzado y el siguiente según el trabajo hecho. Las órdenes que todavía no llegaron no están en la carta. La estación es la cuadrícula K-7; el regreso al puerto se dibuja como travesía.
+- **Instrumentos:** rumbo, velocidad, profundidad, cuadrícula, distancia y horas al próximo punto, y firma acústica (el ruido que hace el casco). Todo exacto y derivado; nada lo lee de vuelta.
+- **Casco por compartimento:** proa (tubos), sala de control, alojamientos, máquinas, popa (tubos). Lo que pierde el casco se anota en un compartimento (función del tick y del casco, sin dados del mundo) y la reparación sana primero el peor. Menos de 70 % = dañado; menos de 35 % = "taking water".
+- El HUD de texto muestra el mismo bloque (`INSTRUMENTS`); el táctil lo ofrece en pestañas: Ledger/Hull y Chart/The men.
+
+## 8.1 Final propio: la lámpara (`the_lamp`)
+
+Hundir al pesquero testigo (misión 2) marca `fishermen_sunk`. Si el mar no cobra antes su veredicto (la ofrenda, el regreso sin cuentas claras o el puesto olvidado), el final es "la lámpara": todo cumplido, y una luz en el casco que nadie más ve.

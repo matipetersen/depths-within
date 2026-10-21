@@ -127,6 +127,7 @@ def test_orders_and_picking_a_man(browser, page_file):
     assert page.locator(".pick .opt").count() == 12
     page.locator(".pick .opt").nth(2).tap()
     assert "is confined" in page.inner_text(".notice")
+    page.locator("[data-a='tabC:men']").tap()
     assert "CONFINED" in page.inner_text(".men").upper()
     page.locator("[data-a=orders]").tap()
     page.locator(".orders-grid .opt", has_text="Silence the sonar").tap()
@@ -152,6 +153,7 @@ def test_nothing_hidden_is_ever_drawn(browser, page_file):
     for token in HIDDEN:
         assert token not in text, token
     assert not HIDDEN_FIELD.search(text)
+    page.evaluate("() => { dreadDebug.state.tabC = 'men'; dreadDebug.render(); }")
     assert not re.search(r"\d", page.inner_text(".men"))        # not one number about the men
     assert "Hull" in "\n".join(seen) and "CAPTAIN" in "\n".join(seen)
 
@@ -227,3 +229,40 @@ console.log(JSON.stringify([g.w.log.join('|')===r.w.log.join('|'), g.ending===r.
     out = subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout
     same_log, same_end, over, moves = __import__("json").loads(out)
     assert same_log and same_end and over and moves > 20
+
+
+def test_the_chart_and_the_instruments_show_where_the_boat_is_and_move_with_the_work(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    assert page.locator("svg.chart .boat").count() == 1
+    assert page.locator("svg.chart polyline.trk").count() == 1        # only the orders received are on the chart
+    for label in ("Heading", "Speed", "Depth", "Grid", "Signature", "Next"):
+        assert label.lower() in page.inner_text(".gauges").lower()
+    before = page.get_attribute("svg.chart .boat", "transform")
+    page.locator("button.step").tap()
+    for _ in range(4):
+        if page.locator(".sheet.decision").count():
+            break
+        page.locator("[data-a=wait]").tap()
+    assert page.get_attribute("svg.chart .boat", "transform") != before
+    assert page.inner_text(".gauges").count("°") == 1
+
+
+def test_the_hull_tab_shows_each_compartment_and_where_the_damage_is(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.locator("[data-a='tabL:hull']").tap()
+    assert page.locator(".comp li").count() == 5 and page.locator("svg.hullsvg .cp.sound").count() == 5
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.hull -= 0.4; w.settle_damage(); dreadDebug.render(); }")
+    assert page.locator("svg.hullsvg .cp.flooding, svg.hullsvg .cp.damaged").count() == 1
+    assert "taking water" in page.inner_text(".comp")
+    page.locator("[data-a='tabL:ledger']").tap()
+    assert "Diesel" in page.inner_text(".led")
+
+
+def test_the_tabs_are_big_enough_to_tap(browser, page_file):
+    page = open_page(browser, page_file, (667, 375))
+    begin(page)
+    for tab in page.locator("button.tab").all():
+        box = tab.bounding_box()
+        assert box["height"] >= 40 and box["width"] >= 40

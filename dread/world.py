@@ -6,7 +6,7 @@ from .conditions import evaluate
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
 from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
-from .state import Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
+from .state import COMPARTMENTS, Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 
 DEFAULT_NAMES = ("Brandt", "Keller", "Vogel", "Hahn", "Lenz", "Ostrow",
                  "Weiss", "Maier", "Fuchs", "Reiter", "Arndt", "Kopp")
@@ -43,6 +43,7 @@ class DreadWorld:
         self.mutiny_clock = 0
         self.legacy_loss = 0.0    # progress lost to rituals when no mission is running
         self.peak_dread = 0.0
+        self._hull_seen = 1.0
         # Missions (DESIGN.md section 7). missions=[] disables them (the live game
         # supplies its own); None loads the default sequence.
         self.missions = load_missions() if missions is None else list(missions)
@@ -133,6 +134,7 @@ class DreadWorld:
             raise KeyError(key)
         target = self.crew_by_id(self.pending.target_id) if self.pending.target_id is not None else None
         apply_effects(ch.effects, self, target)
+        self.settle_damage()
         for rec in reversed(self.fired):
             if rec.id == self.pending.event_id:
                 rec.choice = key
@@ -146,6 +148,7 @@ class DreadWorld:
         if self.pending is not None:
             raise RuntimeError("a decision is pending; call choose() first")
         start = len(self.log)
+        self.settle_damage()
         self.tick_no += 1
         s = self.ship
         for name, until in list(self.flag_expiry.items()):
@@ -167,8 +170,26 @@ class DreadWorld:
         ev = self.engine.select(self)
         if ev is not None:
             self.engine.fire(ev, self)
+        self.settle_damage()
         self.peak_dread = max(self.peak_dread, self.dread())
         return self.log[start:]
+
+    def settle_damage(self):
+        """Book what the hull lost (or got back) against a compartment. Display only: nothing reads it.
+
+        The compartment is a function of the tick and the hull, so it needs no dice of the world's
+        and gives the same answer however often it is called."""
+        s = self.ship
+        d = self._hull_seen - s.hull
+        if abs(d) < 1e-9:
+            return
+        if d > 0:
+            name = random.Random(self.tick_no * 6151 + int(round(s.hull * 1000))).choice(COMPARTMENTS)
+            s.damage[name] += d
+        else:                                              # damage control works on the worst compartment first
+            name = max(COMPARTMENTS, key=lambda c: s.damage[c])
+            s.damage[name] = max(0.0, s.damage[name] + d)
+        self._hull_seen = s.hull
 
     def _physics(self):
         s, live = self.ship, self.active_crew()

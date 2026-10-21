@@ -149,6 +149,7 @@
         quality: (m.provenance && m.provenance.quality !== undefined) ? m.provenance.quality : 0.5,
         mundane_origin: m.mundane_origin, uncanny_origin: m.uncanny_origin,
         window: m.window !== undefined ? m.window : 1.25,
+        chart: m.chart || null,
         acts: (m.acts || []).map((a) => ({
           id: a.id, label: a.label, hint: a.hint || '', hours: Number(a.hours),
           requires: a.requires || null, why: a.why || '', effects: a.effects || [],
@@ -160,6 +161,7 @@
 
   // ---------------------------------------------------------------- state (dread/state.py)
   const ROLES = ['sonar', 'torpedo', 'engine', 'helm', 'radio', 'medic', 'cook', 'deck'];
+  const COMPARTMENTS = ['bow torpedo room', 'control room', 'crew quarters', 'engine room', 'after torpedo room'];
   const ROUTINE_ITEMS = ['meals', 'music', 'cards', 'coffee', 'watches'];
 
   class Crew {
@@ -206,6 +208,8 @@
         sonar_on: true, silent_running: false, surfaced: false, rest_cancelled: false,
         stand_down: false, hours_submerged: 0,
       });
+      this.damage = {};
+      COMPARTMENTS.forEach((c) => { this.damage[c] = 0.0; });
       this.routines = {};
       ROUTINE_ITEMS.forEach((k) => { this.routines[k] = 0.9; });
       this.flags = new Set();
@@ -665,6 +669,7 @@
       this.mutiny_clock = 0;
       this.legacy_loss = 0.0;
       this.peak_dread = 0.0;
+      this._hull_seen = 1.0;
       this.missions = opts.missions !== undefined ? opts.missions : DATA.missions;
       this.run = null;
       this.mission_i = -1;
@@ -721,6 +726,7 @@
       if (!ch) throw new Error(`no such choice ${key}`);
       const target = this.pending.target_id !== null ? this.crew_by_id(this.pending.target_id) : null;
       applyEffects(ch.effects, this, target);
+      this.settle_damage();
       for (let i = this.fired.length - 1; i >= 0; i--) {
         if (this.fired[i].id === this.pending.event_id) { this.fired[i].choice = key; break; }
       }
@@ -731,6 +737,7 @@
 
     tick() {
       if (this.pending !== null) throw new Error('a decision is pending; call choose() first');
+      this.settle_damage();
       this.tick_no += 1;
       const s = this.ship;
       for (const [name, until] of Array.from(this.flag_expiry.entries())) {
@@ -748,7 +755,22 @@
       this._mutiny();
       const ev = this.engine.select(this);
       if (ev !== null) this.engine.fire(ev, this);
+      this.settle_damage();
       this.peak_dread = Math.max(this.peak_dread, this.dread());
+    }
+
+    /** Book what the hull lost (or got back) against a compartment. Display only; no dice of the world's. */
+    settle_damage() {
+      const s = this.ship, d = this._hull_seen - s.hull;
+      if (Math.abs(d) < 1e-9) return;
+      if (d > 0) {
+        const name = new PyRandom(this.tick_no * 6151 + Math.round(s.hull * 1000)).choice(COMPARTMENTS);
+        s.damage[name] += d;
+      } else {
+        const name = maxBy(COMPARTMENTS, (c) => s.damage[c]);
+        s.damage[name] = Math.max(0.0, s.damage[name] + d);
+      }
+      this._hull_seen = s.hull;
     }
 
     _physics() {
@@ -1115,6 +1137,8 @@
       'The harbour master says the boat is expected. He does not say by whom.'],
     forgotten_post: ['You come home to a peace that began a year ago. No one ever cancelled your orders;',
       'there was no one left to cancel them. The station is a footnote in a closed file.'],
+    the_lamp: ['You come home with every order carried out. The quay is full of fishing boats with their lamps lit in broad daylight.',
+      'Nobody looks at you. At night a lamp burns somewhere in the hull of your own boat, and the lookouts agree there is no lamp.'],
     stained_victory: ['You sailed home with every order carried out. The boat will never again be quiet at night.'],
     court_martial: ['There is an inquiry. The order you refused is on file, in a hand that the clerk cannot name.'],
     returned_under_a_cloud: ['You come home. The staff will have questions about the log, and some of the answers are in it.'],
@@ -1134,6 +1158,7 @@
     if (f.has('home_unaccounted')) return 'home_unaccounted';
     if (f.has('peace_known') && f.has('left_station')) return 'forgotten_post';
     const done = w.results.filter((r) => r.outcome === 'success' || r.outcome === 'altered').length;
+    if (f.has('fishermen_sunk')) return 'the_lamp';
     if (f.has('civilian_sunk')) return 'stained_victory';
     const onRecord = !f.has('orders_unrecorded');
     if (f.has('orders_defied') && onRecord) return 'court_martial';
@@ -1162,6 +1187,67 @@
       }
     }
     return { official, log };
+  }
+
+  // ---------------------------------------------------------------- navigation and instruments (dread/nav.py)
+  const COLUMNS = 'ABCDEFGHIJK', BASE = [100.0, 12.0, 'Base'], RETURN_TICKS = 18;
+  const gridRef = (x, y) => `${COLUMNS[Math.max(0, Math.min(10, Math.floor(x / 10)))]}-${Math.max(1, Math.min(8, Math.floor(y / 10) + 1))}`;
+  const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const bearing = (a, b) => ((Math.round(Math.atan2(b[0] - a[0], a[1] - b[1]) * 180 / Math.PI) % 360) + 360) % 360;
+  const ceilDiv = (x) => Math.max(1, Math.ceil(x));
+
+  function navigation(w) {
+    const s = w.ship, run = w.run;
+    const ch = run !== null ? run.mission.chart : null;
+    const pts = ch ? [ch.from].concat(ch.points) : [];
+    let pos, heading = 0, nxt = '', rng = 0.0;
+    if (!pts.length) {
+      pos = [BASE[0], BASE[1]];
+    } else if (run.mission.kind === 'hold') {
+      const st = pts[pts.length - 1];
+      pos = [st[0], st[1]];
+      if (s.returning) {
+        const t = 1.0 - w.travel_left / RETURN_TICKS;
+        pos = lerp2(st, BASE, Math.max(0.0, Math.min(1.0, t)));
+        heading = bearing(st, BASE); nxt = 'Base';
+        rng = Math.hypot(BASE[0] - pos[0], BASE[1] - pos[1]) * 0.9;
+      }
+    } else {
+      const n = pts.length - 1;
+      let i = Math.min(run.acts_done, n - 1), t = 0.0;
+      if (run.working !== null) t = 1.0 - run.work_left / run.mission.acts[run.working].hours;
+      if (run.acts_done >= n) { i = n - 1; t = 1.0; }
+      pos = lerp2(pts[i], pts[i + 1], t);
+      heading = bearing(pts[i], pts[i + 1]);
+      nxt = pts[i + 1][2];
+      rng = Math.hypot(pts[i + 1][0] - pos[0], pts[i + 1][1] - pos[1]) * 0.9;
+    }
+    const moving = s.returning || (w.working !== null && !w.work_blocked);
+    let speed;
+    if (s.surfaced) speed = moving ? 11.0 : 4.0;
+    else if (s.returning) speed = 9.0;
+    else if (moving) speed = 8.0 * Math.min(1.0, s.readiness);
+    else speed = 2.5;
+    if (s.silent_running && !s.surfaced) speed = Math.min(speed, 3.0);
+    return {
+      x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10, grid: gridRef(pos[0], pos[1]), heading,
+      speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.silent_running ? 90 : 60, range_nm: Math.round(rng), next: nxt,
+      eta_h: run !== null && run.working !== null ? ceilDiv(run.work_left) : null, noise: s.noise,
+    };
+  }
+  function hullReport(w) {
+    return COMPARTMENTS.map((c) => {
+      const integrity = Math.max(0.0, Math.min(1.0, 1.0 - 2.0 * w.ship.damage[c]));
+      return { name: c, integrity, state: integrity < 0.35 ? 'flooding' : integrity < 0.7 ? 'damaged' : 'sound' };
+    });
+  }
+  /** Every mission's waypoints, for drawing the chart: those behind, the one under way, those to come. */
+  function chartTracks(w) {
+    return w.missions.map((m, i) => ({
+      id: m.id, state: i < w.mission_i ? 'done' : i === w.mission_i ? 'current' : 'ahead',
+      points: m.chart && i <= w.mission_i ? [m.chart.from].concat(m.chart.points) : [],   // orders not yet received are not on the chart
+      reached: i < w.mission_i ? 99 : i === w.mission_i && w.run ? w.run.acts_done : 0,
+    }));
   }
 
   // ---------------------------------------------------------------- the captain's orders menu
@@ -1328,6 +1414,7 @@
         },
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
+        nav: navigation(w), hull: hullReport(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
         log: w.log.filter((l) => l.trim()),
         pending,
         orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
@@ -1347,7 +1434,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

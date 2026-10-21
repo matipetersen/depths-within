@@ -6,7 +6,7 @@ from dread.sim import PRIORITY, run_patrol, summarize
 
 SEEDS = list(range(100))
 SEVERE = {"hatch_caller", "unaccounted_count", "tube_breathing"}
-REACHABLE_ENDINGS = {"stained_victory", "returned_under_a_cloud", "returned", "lost_with_all_hands",
+REACHABLE_ENDINGS = {"stained_victory", "the_lamp", "returned_under_a_cloud", "returned", "lost_with_all_hands",
                      "derelict", "the_price", "home_unaccounted", "forgotten_post"}
 
 

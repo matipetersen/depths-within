@@ -14,6 +14,7 @@ import pytest
 
 from dread import orders as O
 from dread.endings import classify_ending
+from dread.nav import hull_report, navigation
 from dread.play import available_orders
 from dread.world import DreadWorld
 from dread.state import clamp  # noqa: F401
@@ -33,7 +34,7 @@ def fuzz(seed, max_steps=2500):
         state = (state * 1664525 + 1013904223) % 2 ** 32
         return state >> 8
 
-    digest, steps = [], 0
+    digest, nav, dmg, steps = [], [], [], 0
     while not w.finished and steps < max_steps:
         steps += 1
         if w.pending:
@@ -59,8 +60,11 @@ def fuzz(seed, max_steps=2500):
             digest.append([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2,
                            w.ship.attention, w.ship.cohesion, w.dread(),
                            sum(c.fear for c in live) / len(live) if live else 0])
+            n = navigation(w)
+            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"]])
+            dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
-            "tick": w.tick_no, "steps": steps, "digest": digest}
+            "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg}
 
 
 @pytest.fixture(scope="module")
@@ -128,3 +132,14 @@ def test_compensated_float_sum_matches_python():
     got = json.loads(subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout)
     xs = [0.1, 0.2, 0.3, 0.1, 0.7, 1e-17, 0.123456789, 0.987654321, 0.5, 0.25, 3.3, 0.0001, 0.9999, 0.05, 0.07]
     assert got == [sum(xs), sum(xs[:5]), sum([0.1]), sum([])]
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_instruments_and_the_hull_agree(seed, js_runs):
+    py, js = fuzz(seed), js_runs[seed]
+    assert len(py["nav"]) == len(js["nav"]) and len(py["dmg"]) == len(js["dmg"])
+    for a, b in zip(py["nav"], js["nav"]):
+        assert all(abs(x - y) <= 0.11 for x, y in zip(a[:2] + a[3:5], b[:2] + b[3:5])), (a, b)
+        assert abs(a[2] - b[2]) % 360 in (0, 1, 359) and abs(a[5] - b[5]) <= 1, (a, b)
+    for a, b in zip(py["dmg"], js["dmg"]):
+        assert all(abs(x - y) < 1e-9 for x, y in zip(a, b)), (a, b)

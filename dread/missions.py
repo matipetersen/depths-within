@@ -43,6 +43,7 @@ class Mission:
     uncanny_origin: str
     window: float = WINDOW_FACTOR   # moral missions get slack: the clock must not steal the dilemma
     acts: List[Act] = field(default_factory=list)
+    chart: dict = field(default_factory=dict)    # {'from': [x, y, label], 'points': [[x, y, label], ...]}
 
 
 @dataclass
@@ -88,7 +89,8 @@ def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:
                                 float(m.get("window", WINDOW_FACTOR)),
                                 [Act(a["id"], a["label"], a.get("hint", ""), float(a["hours"]),
                                      a.get("requires"), a.get("why", ""), list(a.get("effects", [])))
-                                 for a in m.get("acts", [])]))
+                                 for a in m.get("acts", [])],
+                                dict(m.get("chart", {}))))
     return missions
 
 
