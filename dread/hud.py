@@ -120,25 +120,17 @@ def crew(w) -> List[str]:
 
 def sonar(w) -> List[str]:
     """The captain hears only what the sonar room chooses to tell him."""
+    from .nav import contacts, sonar_reports
     s = w.ship
     state = "ON" if s.sonar_on else "OFF (the headsets are silent)"
-    look = random.Random(w.tick_no * 104729 + 5)
-    reports = []
-    for p in w.deck.phantoms:
-        for cid in sorted(p.audible_to):
-            c = w.crew_by_id(cid)
-            if c is None or not c.active:
-                continue
-            candor = max(0.0, min(1.0, c.candor * c.trust * (0.6 + 0.4 * s.cohesion)))
-            if look.random() < candor:
-                reports.append(f'  {c.name} reports: "{p.text}"')
-            elif len(p.audible_to) >= 2:
-                reports.append(f"  The sonar room has gone quiet around the headphones.")
-            break
+    reports = ["  " + line for _, line in sonar_reports(w)]
     out = [f"SONAR: {state}"]
     out += reports[:3] if s.sonar_on else []
-    if s.sonar_on and not reports:
+    cs = contacts(w)
+    if s.sonar_on and not reports and not cs:
         out.append("  The sonar room has nothing to report.")
+    for c in cs:
+        out.append(f"  {c['tag']}  bearing {c['bearing']:03d}  {c['range_nm']:.1f} nm  {c['label']}")
     return out
 
 

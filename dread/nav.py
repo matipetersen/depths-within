@@ -5,6 +5,7 @@ waypoints its acts lead to; the boat sits between the last one reached and the n
 to the work done. Numbers are exact and deterministic: they hold no dice and no hidden value.
 """
 import math
+import random
 from typing import Dict, List, Optional
 
 from .state import COMPARTMENTS
@@ -89,3 +90,57 @@ def hull_report(w) -> List[Dict]:
         state = "flooding" if integrity < 0.35 else "damaged" if integrity < 0.7 else "sound"
         out.append({"name": c, "integrity": integrity, "state": state})
     return out
+
+
+# -- the scope (DESIGN.md 12.8) -------------------------------------------------------------------
+SCOPE_NM = 30
+LABEL_POOL = ("single screw, steady", "heavy screws, slow", "many screws, slow", "faint screws, irregular",
+              "fast screws, closing", "no screw count", "heavy screws, steady")
+
+
+def sonar_reports(w) -> List[tuple]:
+    """(phantom, line): what the sonar room tells the captain. The captain hears only this."""
+    s = w.ship
+    look = random.Random(w.tick_no * 104729 + 5)
+    out = []
+    for p in w.deck.phantoms:
+        for cid in sorted(p.audible_to):
+            c = w.crew_by_id(cid)
+            if c is None or not c.active:
+                continue
+            candor = max(0.0, min(1.0, c.candor * c.trust * (0.6 + 0.4 * s.cohesion)))
+            if look.random() < candor:
+                out.append((p, f'{c.name} reports: "{p.text}"'))
+            elif len(p.audible_to) >= 2:
+                out.append((None, "The sonar room has gone quiet around the headphones."))
+            break
+    return out
+
+
+def contacts(w) -> List[Dict]:
+    """What is on the scope: real and false contacts, drawn alike. Nothing here says which is which.
+
+    A false one shows only while the sonar room reports it; a real one is steady but may drop out
+    for an hour, so the difference cannot be read off the screen."""
+    s, run = w.ship, w.run
+    if not (s.sonar_on or s.surfaced):
+        return []
+    raw = []
+    me = (navigation(w)["x"], navigation(w)["y"])
+    tgt = run.mission.chart.get("target") if run is not None and run.outcome is None else None
+    drop = random.Random(w.tick_no * 3571 + 11).random() < 0.12
+    if tgt and run.acts_done >= 1 and not drop:
+        dist = math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9
+        if dist <= SCOPE_NM:
+            raw.append((_bearing(me, tgt), dist, tgt[2]))
+    if "in_combat" in s.flags:
+        k = w.tick_no // 5
+        raw.append(((k * 83 + 17) % 360, float(3 + (k * 7) % 6), "fast screws, closing"))
+    if s.sonar_on:
+        for p, _ in sonar_reports(w):
+            if p is not None and p.kind == "echo":
+                raw.append(((p.id * 97 + 41 + p.age * 2) % 360, float(4 + (p.id * 53 + p.age) % 22),
+                            LABEL_POOL[(p.id * 7) % len(LABEL_POOL)]))
+    raw.sort(key=lambda r: r[0])
+    return [{"tag": f"C{i + 1}", "bearing": int(r[0]), "range_nm": round(r[1], 1), "label": r[2]}
+            for i, r in enumerate(raw)]

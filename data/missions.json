@@ -82,6 +82,11 @@
             40,
             "Firing point"
           ]
+        ],
+        "target": [
+          36,
+          34,
+          "heavy screws, steady"
         ]
       }
     },
@@ -149,6 +154,11 @@
             34,
             "Reporting position"
           ]
+        ],
+        "target": [
+          18,
+          24,
+          "many screws, slow"
         ]
       }
     },
@@ -229,6 +239,11 @@
             62,
             "Santa Lucia"
           ]
+        ],
+        "target": [
+          56,
+          66,
+          "single screw, steady"
         ]
       }
     },

@@ -118,3 +118,66 @@ def test_sinking_the_fishing_boat_has_its_own_ending():
     assert classify_ending(w, len(w.crew)) == "the_lamp"
     w.ship.flags.add("offering_made")                       # the sea's verdict still outranks it
     assert classify_ending(w, len(w.crew)) == "the_price"
+
+
+# ---- the scope ---------------------------------------------------------------------------------------
+
+def _near_the_target(seed=3):
+    from dread.world import DreadWorld
+    w = DreadWorld(seed=seed)
+    w.run.acts_done = 1
+    w.run.working = 1
+    w.run.work_left = 1.0           # nearly there: the target is inside 30 nm
+    w._set_progress()
+    return w
+
+
+def test_a_real_contact_shows_once_the_search_has_found_it_and_is_in_range():
+    from dread.nav import contacts
+    w = DreadWorld(seed=3)
+    assert contacts(w) == []                                   # nothing found yet
+    w = _near_the_target()
+    seen = []
+    for _ in range(8):
+        if w.pending is not None:
+            w.choose(w.pending.choices[0].key)
+        seen.append(contacts(w))
+        w.tick()
+    seen = [c for c in seen if c]
+    assert seen and all(c[0]["label"] == "heavy screws, steady" for c in seen if len(c) == 1 and c[0]["range_nm"] < 20)
+
+
+def test_a_false_contact_looks_exactly_like_a_real_one():
+    from dread.nav import LABEL_POOL, contacts
+    w = DreadWorld(seed=3)
+    op = next(c for c in w.crew if c.role == "sonar")
+    op.candor, op.trust = 1.0, 1.0
+    w.deck.spawn("echo", {op.id}, 0.5, rng=w.rng, crew=w.crew)
+    cs = contacts(w)
+    assert len(cs) == 1
+    assert set(cs[0]) == {"tag", "bearing", "range_nm", "label"}   # no kind, no id, no flag: nothing to tell them apart
+    assert cs[0]["label"] in LABEL_POOL                          # drawn from the same words the real ones use
+    assert all(m.chart["target"][2] in LABEL_POOL for m in w.missions if "target" in m.chart)   # no real label a false one cannot wear
+
+
+def test_contacts_are_ordered_by_bearing_not_by_what_they_are():
+    from dread.nav import contacts
+    w = DreadWorld(seed=3)
+    w.ship.flags.add("in_combat")
+    for cid in range(1, 4):
+        c = w.crew[cid]
+        c.candor, c.trust = 1.0, 1.0
+        w.deck.spawn("echo", {c.id}, 0.5, rng=w.rng, crew=w.crew)
+    bearings = [c["bearing"] for c in contacts(w)]
+    assert bearings == sorted(bearings) and len(bearings) >= 2
+
+
+def test_with_the_sonar_off_the_scope_is_dark_but_the_radar_works_on_the_surface():
+    from dread.nav import contacts
+    w = DreadWorld(seed=3)
+    w.ship.flags.add("in_combat")
+    assert contacts(w)
+    O.silence_sonar(w)
+    assert contacts(w) == []
+    O.surface(w)
+    assert contacts(w)                                          # radar: the real ones only, and no false echoes

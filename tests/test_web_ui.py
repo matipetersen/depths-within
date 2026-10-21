@@ -266,3 +266,18 @@ def test_the_tabs_are_big_enough_to_tap(browser, page_file):
     for tab in page.locator("button.tab").all():
         box = tab.bounding_box()
         assert box["height"] >= 40 and box["width"] >= 40
+
+
+def test_the_scope_draws_contacts_alike_and_goes_dark_when_the_sonar_is_off(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.locator("[data-a='tabC:scope']").tap()
+    assert "SONAR" in page.inner_text(".scopehead") and page.locator("svg.scope").count() == 1
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.flags.add('in_combat'); dreadDebug.render(); }")
+    assert page.locator("svg.scope .blip").count() == 1 and "fast screws" in page.inner_text(".cts")
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.sonar_on = false; dreadDebug.render(); }")
+    assert page.locator("svg.scope .blip").count() == 0 and "Sonar is off" in page.inner_text(".scopemsg")
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.surfaced = true; dreadDebug.render(); }")
+    assert "RADAR" in page.inner_text(".scopehead")
+    shown = page.inner_text("#app").lower()
+    assert "phantom" not in shown and "false" not in shown and "real contact" not in shown

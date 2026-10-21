@@ -1241,6 +1241,47 @@
       return { name: c, integrity, state: integrity < 0.35 ? 'flooding' : integrity < 0.7 ? 'damaged' : 'sound' };
     });
   }
+  // the scope (dread/nav.py: contacts)
+  const SCOPE_NM = 30;
+  const LABEL_POOL = ['single screw, steady', 'heavy screws, slow', 'many screws, slow', 'faint screws, irregular', 'fast screws, closing', 'no screw count', 'heavy screws, steady'];
+  function sonarReports(w) {
+    const s = w.ship, look = new PyRandom(w.tick_no * 104729 + 5), out = [];
+    for (const p of w.deck.phantoms) {
+      for (const cid of Array.from(p.audible_to).sort((a, b) => a - b)) {
+        const c = w.crew_by_id(cid);
+        if (!c || !c.active) continue;
+        const candor = Math.max(0.0, Math.min(1.0, c.candor * c.trust * (0.6 + 0.4 * s.cohesion)));
+        if (look.random() < candor) out.push({ p, line: `${c.name} reports: “${p.text}”` });
+        else if (p.audible_to.size >= 2) out.push({ p: null, line: 'The sonar room has gone quiet around the headphones.' });
+        break;
+      }
+    }
+    return out;
+  }
+  /** Real and false contacts, drawn alike: nothing here says which is which. */
+  function contacts(w) {
+    const s = w.ship, run = w.run;
+    if (!(s.sonar_on || s.surfaced)) return [];
+    const raw = [], nv = navigation(w), me = [nv.x, nv.y];
+    const tgt = run !== null && run.outcome === null && run.mission.chart ? run.mission.chart.target : null;
+    const drop = new PyRandom(w.tick_no * 3571 + 11).random() < 0.12;
+    if (tgt && run.acts_done >= 1 && !drop) {
+      const dist = Math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9;
+      if (dist <= SCOPE_NM) raw.push([bearing(me, tgt), dist, tgt[2]]);
+    }
+    if (s.flags.has('in_combat')) {
+      const k = Math.floor(w.tick_no / 5);
+      raw.push([(k * 83 + 17) % 360, 3 + (k * 7) % 6, 'fast screws, closing']);
+    }
+    if (s.sonar_on) {
+      for (const r of sonarReports(w)) {
+        const p = r.p;
+        if (p !== null && p.kind === 'echo') raw.push([(p.id * 97 + 41 + p.age * 2) % 360, 4 + (p.id * 53 + p.age) % 22, LABEL_POOL[(p.id * 7) % LABEL_POOL.length]]);
+      }
+    }
+    raw.sort((a, b) => a[0] - b[0]);
+    return raw.map((r, i) => ({ tag: `C${i + 1}`, bearing: Math.trunc(r[0]), range_nm: Math.round(r[1] * 10) / 10, label: r[2] }));
+  }
   /** Every mission's waypoints, for drawing the chart: those behind, the one under way, those to come. */
   function chartTracks(w) {
     return w.missions.map((m, i) => ({
@@ -1414,7 +1455,7 @@
         },
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
-        nav: navigation(w), hull: hullReport(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
+        nav: navigation(w), hull: hullReport(w), contacts: contacts(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
         log: w.log.filter((l) => l.trim()),
         pending,
         orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
@@ -1434,7 +1475,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, navigation, hullReport, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, contacts, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

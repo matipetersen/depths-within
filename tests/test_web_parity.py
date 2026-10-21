@@ -14,7 +14,7 @@ import pytest
 
 from dread import orders as O
 from dread.endings import classify_ending
-from dread.nav import hull_report, navigation
+from dread.nav import contacts, hull_report, navigation
 from dread.play import available_orders
 from dread.world import DreadWorld
 from dread.state import clamp  # noqa: F401
@@ -34,7 +34,7 @@ def fuzz(seed, max_steps=2500):
         state = (state * 1664525 + 1013904223) % 2 ** 32
         return state >> 8
 
-    digest, nav, dmg, steps = [], [], [], 0
+    digest, nav, dmg, cts, steps = [], [], [], [], 0
     while not w.finished and steps < max_steps:
         steps += 1
         if w.pending:
@@ -55,6 +55,8 @@ def fuzz(seed, max_steps=2500):
             else:
                 item.run()
         w.tick()
+        if steps % 3 == 0:
+            cts.append([[c["bearing"], c["range_nm"]] for c in contacts(w)])
         if steps % 25 == 0:
             live = w.active_crew()
             digest.append([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2,
@@ -64,7 +66,7 @@ def fuzz(seed, max_steps=2500):
             nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"]])
             dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
-            "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg}
+            "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts}
 
 
 @pytest.fixture(scope="module")
@@ -143,3 +145,11 @@ def test_the_instruments_and_the_hull_agree(seed, js_runs):
         assert abs(a[2] - b[2]) % 360 in (0, 1, 359) and abs(a[5] - b[5]) <= 1, (a, b)
     for a, b in zip(py["dmg"], js["dmg"]):
         assert all(abs(x - y) < 1e-9 for x, y in zip(a, b)), (a, b)
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_scope_agrees(seed, js_runs):
+    py, js = fuzz(seed), js_runs[seed]
+    assert py["cts"] == js["cts"] or all(
+        len(a) == len(b) and all(x[0] == y[0] and abs(x[1] - y[1]) <= 0.11 for x, y in zip(a, b))
+        for a, b in zip(py["cts"], js["cts"]))

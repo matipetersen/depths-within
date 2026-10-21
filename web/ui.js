@@ -138,6 +138,27 @@
       ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
       <div class="gg wide"><span class="gk">Next</span><span class="gv sm">${nxt}</span></div></div>`;
   }
+  /** The scope: sonar under water, radar on the surface. Every contact is drawn the same way. */
+  function scopeView(v) {
+    const R = 46, up = v.surfaced;
+    const live = v.sonar.on || up;
+    let g = [1, 2, 3].map((i) => `<circle class="ring" cx="50" cy="50" r="${(R * i / 3).toFixed(1)}"/>`).join('');
+    g += '<line class="ring" x1="50" y1="4" x2="50" y2="96"/><line class="ring" x1="4" y1="50" x2="96" y2="50"/>';
+    g += '<text class="gt" x="50" y="8" text-anchor="middle">N</text><text class="gt" x="94" y="52" text-anchor="end">E</text><text class="gt" x="50" y="97" text-anchor="middle">S</text><text class="gt" x="6" y="52">W</text>';
+    const blips = live ? v.contacts.map((c) => {
+      const r = Math.min(R, c.range_nm / 30 * R), a = c.bearing * Math.PI / 180;
+      const x = 50 + r * Math.sin(a), y = 50 - r * Math.cos(a);
+      return `<g class="blip"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.8"/><text x="${(x + 2.6).toFixed(1)}" y="${(y + 1).toFixed(1)}">${c.tag}</text></g>`;
+    }).join('') : '';
+    const rows = live ? v.contacts.map((c) => `<li><b>${c.tag}</b><span>${String(c.bearing).padStart(3, '0')}° · ${c.range_nm.toFixed(1)} nm</span><span class="dim">${esc(c.label)}</span></li>`).join('') : '';
+    const msg = !live ? 'Sonar is off. You hear nothing, and nothing is told to you.' : v.contacts.length ? '' : (up ? 'Radar clear.' : 'Nothing on the scope.');
+    return `<div class="scopehead"><b>${up ? 'RADAR' : 'SONAR'}</b><span>${live ? 'range 30 nm · north up' : 'off'}</span></div>
+      <svg class="scope ${live ? '' : 'dark'}" viewBox="0 0 100 100" role="img" aria-label="${up ? 'Radar' : 'Sonar'} scope, ${v.contacts.length} contacts">
+        <circle class="face" cx="50" cy="50" r="${R}"/>${g}${live ? '<line class="sweep" x1="50" y1="50" x2="50" y2="4"/>' : ''}${blips}
+        <path class="me" d="M50 46.5 L52 52.5 L50 51.5 L48 52.5 Z" transform="rotate(${v.nav.heading} 50 50)"/></svg>
+      ${msg ? `<p class="dim scopemsg">${msg}</p>` : `<ul class="cts">${rows}</ul>`}
+      <p class="note">A contact is something the room heard. The scope does not say what it was.</p>`;
+  }
   function hullView(v) {
     const segs = v.hull.map((h, i) => {
       const x = 4 + i * 20.4;
@@ -177,7 +198,7 @@
     const off = v.pending || v.over;
     if (!o) return `<div class="step done"><span class="k">${st.of} of ${st.of}</span><span class="t">Every step ordered. What comes now is not up to the sea.</span></div>`;
     const cls = st.working ? 'step going' : o.why ? 'step blocked' : 'step ready';
-    const sub = st.working ? `Under way · ${esc(o.hint)}${o.why ? ' · ' + esc(o.why) : ''}` : o.why ? esc(o.why) : esc(o.hint);
+    const sub = st.working ? `Under way · ${esc(o.hint)}${o.why && o.why !== 'The hours must pass.' ? ' · ' + esc(o.why) : ''}` : o.why ? esc(o.why) : esc(o.hint);
     return `<button class="${cls}" data-a="act" ${off ? 'disabled' : ''}><span class="k">Step ${st.n + 1} of ${st.of}</span>` +
       `<span class="t">${esc(o.label.replace(/^Under way: /, ''))}</span><span class="s">${sub}</span></button>`;
   }
@@ -273,7 +294,7 @@
     app.innerHTML = `${topView(v)}
       <div class="cols">
         <section class="col" aria-label="${state.tabL === 'hull' ? 'Hull' : 'Ledger'}"><header class="tabs">${tabBtn('tabL', 'ledger', 'Ledger', state.tabL)}${tabBtn('tabL', 'hull', 'Hull', state.tabL)}</header><div class="scroll">${state.tabL === 'hull' ? hullView(v) : ledgerView(v)}</div></section>
-        <section class="col" aria-label="${state.tabC === 'men' ? 'The men' : 'Chart'}"><header class="tabs">${tabBtn('tabC', 'chart', 'Chart', state.tabC)}${tabBtn('tabC', 'men', 'The men', state.tabC)}</header><div class="scroll">${state.tabC === 'men' ? menView(v) : chartView(v)}</div></section>
+        <section class="col" aria-label="${state.tabC === 'men' ? 'The men' : state.tabC === 'scope' ? 'Scope' : 'Chart'}"><header class="tabs">${tabBtn('tabC', 'chart', 'Chart', state.tabC)}${tabBtn('tabC', 'scope', 'Scope', state.tabC)}${tabBtn('tabC', 'men', 'The men', state.tabC)}</header><div class="scroll">${state.tabC === 'men' ? menView(v) : state.tabC === 'scope' ? scopeView(v) : chartView(v)}</div></section>
         <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
           <div class="scroll log log-scroll">${logView(v)}</div>
           <div class="notice" aria-live="polite">${esc(v.notice || '')}</div>

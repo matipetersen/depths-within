@@ -662,3 +662,12 @@ Para que se lea como un simulador de submarino, el puente muestra lo que un capi
 ## 8.1 Final propio: la lámpara (`the_lamp`)
 
 Hundir al pesquero testigo (misión 2) marca `fishermen_sunk`. Si el mar no cobra antes su veredicto (la ofrenda, el regreso sin cuentas claras o el puesto olvidado), el final es "la lámpara": todo cumplido, y una luz en el casco que nadie más ve.
+
+## 12.8 El radar / sonar con contactos
+
+La pantalla de contactos (`contacts` en `dread/nav.py`, espejo en `web/engine.js`) sirve a la vez al realismo de simulador y a la regla de oro: **los contactos reales y los falsos se dibujan igual**. Bajo el agua es sonar; en superficie, radar (solo contactos reales; los ecos falsos se oyen, no se ven).
+
+- Reales: el objetivo de la misión una vez hecho el primer paso (si está a menos de 30 nm), y los contactos rápidos mientras dura un combate. Pueden desaparecer una hora.
+- Falsos: los ecos fantasma, solo mientras la sala de sonar los reporta (filtro de candor y confianza, el mismo de siempre).
+- La salida solo tiene marca, rumbo, distancia y etiqueta; las etiquetas salen de un mismo repertorio, de modo que ningún texto delata el origen. Los contactos se ordenan por rumbo.
+- Con el sonar apagado la pantalla queda negra: no oís, y nada te dice nada.
