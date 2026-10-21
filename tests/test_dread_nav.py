@@ -340,3 +340,66 @@ def test_the_hud_shows_the_tubes_the_torpedoes_and_the_periscope():
     text = "\n".join(hud.instruments(w))
     assert "Torpedoes aboard 12" in text and "1:" in text and "Periscope:" in text
     assert "Torpedoes 12" in "\n".join(hud.ledger(w))
+
+
+# ---- the attack reads the room and the eye ------------------------------------------------------------
+
+def test_the_solution_error_is_the_rooms_unless_the_eye_has_the_target():
+    from dread.nav import solution_error
+    w = _at_the_firing_point()
+    assert solution_error(w) == 0.0                              # a rested, calm room
+    for c in w.crew:
+        if c.role == "torpedo":
+            c.fear, c.fatigue = 0.9, 0.9
+    room = solution_error(w)
+    assert room > 0.4
+    O.raise_periscope(w)
+    w.tick_no = 7
+    clear = solution_error(w)
+    assert clear < room and abs(clear - room * 0.4) < 1e-9       # a clear eye mends the room's error
+    w.ship.moral_debt, w.ship.attention = 0.9, 0.8               # ...a troubled one makes it worse
+    for c in w.crew:
+        c.fear, c.fatigue = 0.8, 0.8
+    bad = [solution_error(_set_tick(w, t)) for t in range(0, 300, 3)]
+    assert max(bad) == 0.5
+
+
+def _set_tick(w, t):
+    w.tick_no = t
+    return w
+
+
+def test_a_clear_eye_wins_the_attack_more_often_than_a_room_that_is_afraid():
+    from dread.events import apply_effects
+    def shots(raise_scope):
+        hits = 0
+        for seed in range(150):
+            w = _at_the_firing_point(seed)
+            for c in w.crew:
+                if c.role == "torpedo":
+                    c.fear, c.fatigue = 0.85, 0.85
+            if raise_scope:
+                O.raise_periscope(w)
+            _to_the_attack(w)
+            if w.pending is None or w.pending.event_id != "m1_attack":
+                continue
+            w.choose("spread")
+            hits += w.results[-1]["outcome"] == "success" if w.results else 0
+        return hits
+    assert shots(True) > shots(False) + 10
+
+
+def test_a_frightened_room_loses_tubes_and_a_calm_one_never_does():
+    from dread.events import apply_effects
+    lost = calm = 0
+    for seed in range(60):
+        w = DreadWorld(seed=seed)
+        apply_effects([{"op": "tubes", "state": "open"}, {"op": "fire", "n": 3}], w)
+        calm += w.ship.torpedoes != 9
+        w = DreadWorld(seed=seed)
+        for c in w.crew:
+            if c.role == "torpedo":
+                c.fear, c.fatigue = 0.95, 0.95
+        apply_effects([{"op": "tubes", "state": "open"}, {"op": "fire", "n": 3}], w)
+        lost += w.ship.torpedoes > 9
+    assert calm == 0 and lost >= 20

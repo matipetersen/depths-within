@@ -166,6 +166,26 @@ def _torpedo_room(w):
     return [c for c in w.active_crew() if c.role == "torpedo"]
 
 
+def _room_error(crew) -> float:
+    """How often a torpedo room in this state gets it wrong: nothing for a rested, calm one."""
+    if not crew:
+        return 0.6
+    strain = sum((c.fear + c.fatigue) / 2 for c in crew) / len(crew)
+    return max(0.0, min(0.6, 1.2 * strain - 0.2))
+
+
+def solution_error(w) -> float:
+    """How far off the shot will be: the room's real error, unless the captain has the target in the eyepiece.
+    A clear eye mends the room's error; an eye that is seeing things makes it worse. Hidden: never shown."""
+    s = w.ship
+    p_room = _room_error(_torpedo_room(w))
+    if s.surfaced or s.scope_up:
+        ps = periscope(w, 0)
+        if ps["ship"] is not None:
+            return 0.5 if ps["distortions"] else p_room * 0.4
+    return p_room
+
+
 def weapons(w) -> Dict:
     """The torpedo room's readings. The stock is the ledger's (exact); the tubes and the firing solutions are
     what the men report, and a frightened, tired room reports them wrong. Nothing says when."""
@@ -174,9 +194,7 @@ def weapons(w) -> Dict:
     stock = s.torpedoes
     if not crew:
         return {"stock": stock, "manned": False, "tubes": ["no report"] * 6, "solutions": []}
-    n = len(crew)
-    strain = sum((c.fear + c.fatigue) / 2 for c in crew) / n
-    p = max(0.0, min(0.6, 1.2 * strain - 0.2))
+    p = _room_error(crew)
     look = random.Random(w.tick_no * 2711 + 3)
     tubes = []
     for st in s.tubes:

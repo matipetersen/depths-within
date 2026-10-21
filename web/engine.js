@@ -516,10 +516,18 @@
       } else if (op === 'tubes') {
         for (let i = 0; i < 4; i++) if (world.ship.tubes[i] !== 'empty') world.ship.tubes[i] = fx.state;
       } else if (op === 'fire') {
+        const room = roomError(world.active_crew().filter((c) => c.role === 'torpedo'));
         let n = 0;
         for (let i = 0; i < 4; i++) {
           const sh = world.ship;
-          if (n < fx.n && (sh.tubes[i] === 'open' || sh.tubes[i] === 'flooded') && sh.torpedoes > 0) { sh.tubes[i] = 'empty'; sh.torpedoes -= 1; n += 1; }
+          if (n < fx.n && (sh.tubes[i] === 'open' || sh.tubes[i] === 'flooded') && sh.torpedoes > 0) {
+            if (room > 0 && world.rng.random() < 0.5 * room) {
+              world.log.push(`${tag(world.tick_no)} Tube ${i + 1} does not answer.`);
+              sh.flags.add('tube_fail'); world.flag_expiry.set('tube_fail', world.tick_no + 2);
+              continue;
+            }
+            sh.tubes[i] = 'empty'; sh.torpedoes -= 1; n += 1;
+          }
         }
       } else if (op === 'leave_station') {
         world.log.push(`${tag(world.tick_no)} ${world.leave_station()}`);
@@ -544,7 +552,7 @@
         applyEffects(evaluate(fx.cond, world) ? fx.then : (fx.else || []), world, target);
       } else if (op === 'chance') {
         let p = fx.p;
-        if ('mod' in fx) p += fx.mod.k * (resolvePath(fx.mod.path, world) - (fx.mod.ref !== undefined ? fx.mod.ref : 0.0));
+        for (const m of ('mod' in fx ? [fx.mod] : []).concat(fx.mods || [])) p += m.k * (resolvePath(m.path, world) - (m.ref !== undefined ? m.ref : 0.0));
         for (const [flag, bonus] of Object.entries(fx.if_flag || {})) if (ship.flags.has(flag)) p += bonus;
         applyEffects(world.rng.random() < clamp(p, 0.02, 0.98) ? fx.then : (fx.else || []), world, target);
       } else if (op === 'mute_phantoms') {
@@ -711,6 +719,7 @@
       const byDread = d < 0.22 ? 1 : d < 0.38 ? 2 : 3;
       return Math.min(byDread, 1 + Math.floor(this.tick_no / 24));
     }
+    get solution_error() { return solutionError(this); }
     get finished() {
       const f = this.ship.flags;
       const done = this.missions.length ? this.mission_i >= this.missions.length : this.ship.progress >= 1.0;
@@ -1304,11 +1313,23 @@
   const TUBE_STATES = ['empty', 'loaded', 'flooded', 'open'];
   const DISTORTIONS = ['figures_on_rail', 'cross_on_hull', 'second_hull', 'lamp', 'wake_wrong'];
   const wrap180 = (d) => ((((d % 360) + 360) % 360 + 180) % 360) - 180;
+  function roomError(crew) {
+    if (!crew.length) return 0.6;
+    const strain = fsum(crew.map((c) => (c.fear + c.fatigue) / 2)) / crew.length;
+    return Math.max(0.0, Math.min(0.6, 1.2 * strain - 0.2));
+  }
+  function solutionError(w) {
+    const s = w.ship, pRoom = roomError(w.active_crew().filter((c) => c.role === 'torpedo'));
+    if (s.surfaced || s.scope_up) {
+      const ps = periscope(w, 0);
+      if (ps.ship !== null) return ps.distortions.length ? 0.5 : pRoom * 0.4;
+    }
+    return pRoom;
+  }
   function weapons(w) {
     const s = w.ship, crew = w.active_crew().filter((c) => c.role === 'torpedo'), stock = s.torpedoes;
     if (!crew.length) return { stock, manned: false, tubes: Array(6).fill('no report'), solutions: [] };
-    const strain = fsum(crew.map((c) => (c.fear + c.fatigue) / 2)) / crew.length;
-    const p = Math.max(0.0, Math.min(0.6, 1.2 * strain - 0.2));
+    const p = roomError(crew);
     const look = new PyRandom(w.tick_no * 2711 + 3);
     const tubes = s.tubes.map((st) => (look.random() < p ? look.choice(TUBE_STATES.filter((x) => x !== st)) : st));
     const nv = navigation(w), sols = [];

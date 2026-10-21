@@ -2260,7 +2260,8 @@
               "if_flag": {
                 "m1_patient": 0.15,
                 "m1_rush": -0.05,
-                "m1_lost_target": -0.45
+                "m1_lost_target": -0.45,
+                "tube_fail": -0.15
               },
               "then": [
                 {
@@ -2302,6 +2303,13 @@
                 {
                   "op": "mission_outcome",
                   "value": "failed"
+                }
+              ],
+              "mods": [
+                {
+                  "path": "world.solution_error",
+                  "k": -0.6,
+                  "ref": 0.0
                 }
               ]
             }

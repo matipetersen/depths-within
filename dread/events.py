@@ -174,6 +174,11 @@ class EventEngine:
         return world.rng.choice(pool)
 
 
+def _room_p(world) -> float:
+    from .nav import _room_error
+    return _room_error([c for c in world.active_crew() if c.role == "torpedo"])
+
+
 # -- effect interpreter ----------------------------------------------------
 def _who(spec, world, target):
     if spec == "target":
@@ -249,9 +254,15 @@ def apply_effects(effects: List[dict], world, target=None):
                 if ship.tubes[i] != "empty":
                     ship.tubes[i] = fx["state"]
         elif op == "fire":
+            room = _room_p(world)
             n = 0
             for i in range(4):
                 if n < fx["n"] and ship.tubes[i] in ("open", "flooded") and ship.torpedoes > 0:
+                    if room > 0 and world.rng.random() < 0.5 * room:      # the tube does not answer
+                        world.log.append(f"[{world.tick_no:03d}] Tube {i + 1} does not answer.")
+                        ship.flags.add("tube_fail")
+                        world.flag_expiry["tube_fail"] = world.tick_no + 2
+                        continue
                     ship.tubes[i] = "empty"
                     ship.torpedoes -= 1
                     n += 1
@@ -280,8 +291,7 @@ def apply_effects(effects: List[dict], world, target=None):
             apply_effects(fx["then"] if evaluate(fx["cond"], world) else fx.get("else", []), world, target)
         elif op == "chance":
             p = fx["p"]
-            if "mod" in fx:
-                m = fx["mod"]
+            for m in ([fx["mod"]] if "mod" in fx else []) + fx.get("mods", []):
                 p += m["k"] * (resolve_path(m["path"], world) - m.get("ref", 0.0))
             for flag, bonus in fx.get("if_flag", {}).items():
                 if flag in ship.flags:

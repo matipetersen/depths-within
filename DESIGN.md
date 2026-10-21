@@ -678,3 +678,54 @@ La pantalla de contactos (`contacts` en `dread/nav.py`, espejo en `web/engine.js
 - **Lecturas de la sala (`weapons` en `dread/nav.py`).** Estado de cada tubo y una solución de tiro (rumbo, distancia en yardas, tiempo de carrera a 30 nudos, ángulo de giro) **por cada contacto del scope, falso o real**: la solución no delata cuál es cuál. Es lo que *informa* la sala: con miedo y cansancio altos entre los hombres de torpedos, el reporte se equivoca (estado de tubo cambiado, rumbo y distancia desviados) y nadie avisa. El inventario del ledger sigue siendo exacto.
 - **Periscopio (`periscope`).** Orden "Raise the periscope" (profundidad 14 m en el instrumento; sube la atención de la presencia cada hora que está levantado: ventana en ambos sentidos). Se ve el objetivo real a menos de 12 nm, con su silueta (acorazado y escoltas, convoy, vapor con o sin cruz). El campo es de 50°; el capitán gira el periscopio ◀ ▶ (estado solo de la interfaz). Emergido es el puente, con los mismos binoculares.
 - **El ojo afectado.** Según cansancio y miedo de la tripulación, deuda moral y atención, el ojo añade cosas al mar: figuras en la borda, una cruz en un casco que no la llevaba, un segundo casco detrás, una lámpara en el horizonte, una estela que corre al revés; y, a veces, un casco tenue en el rumbo de un contacto falso del scope (nunca en el de uno real). Todo calculado sin dados del mundo, igual en Python y en JavaScript, y sin ninguna marca que diga que es una visión.
+
+## 12.10 El ataque lee la sala y el ojo (hecho)
+
+La probabilidad de acertar el disparo de la misión 1 ya no depende solo de la disposición de la tripulación: resta `0.6 × solution_error` (`world.solution_error`, oculto, nunca se muestra). El error es el de la sala de torpedos (0 si está descansada y tranquila; hasta 0,6 si está aterrada y agotada, o si no queda ningún torpedista). Con el periscopio levantado y el objetivo a la vista, un ojo claro lo reduce al 40 %, y un ojo que ve cosas lo sube a 0,5: el capitán se fía de una visión. Además, con la sala en mal estado cada tubo puede no responder (`Tube N does not answer`, −0,15 al acierto) y el torpedo no se gasta. La forma de averiguar que la sala miente es la que ya existe en pantalla: comparar su solución con lo que dice el periscopio.
+
+# 14. Auditoría: qué le falta al simulador de submarino y cómo lo tuerce el miedo
+
+Método: se leyó el código y los datos tal como están (no lo que dice el diseño) y se comparó con lo que un simulador de submarino de la guerra del Atlántico/Pacífico espera ofrecer. Para cada mecánica que falta o está hueca se fija **qué hace en un simulador**, **cómo la tuerce el miedo, el cansancio, la culpa o la presencia**, y cuál es su par **mundano / inquietante** (regla de oro: nada se confirma, nada se muestra como número oculto).
+
+## 14.1 Hallazgos sobre lo que hay (honestos)
+
+1. **El combate es una tirada, no una mecánica.** Solo 8 de 55 eventos usan `combat`; no hay persecución, evasión ni decisión táctica mientras dura. Es el hueco que más pesa para "parecer un simulador bélico".
+2. **Navegar es decorativo.** El rumbo, la velocidad y la profundidad se *derivan* de la misión; el capitán no ordena ninguno. Las únicas órdenes de movimiento son emerger/sumergirse y marcha silenciosa.
+3. **Los compartimentos del casco son solo vista.** El daño se anota pero no inutiliza nada: una máquina anegada no baja la velocidad, una proa anegada no cierra tubos.
+4. **Casi todos los oficios sobran.** En los eventos aparecen `sonar` (14 veces), `medic` (3), `radio` (2), `engine`, `torpedo` y `cook` (1 cada uno); `helm` y `deck` no cambian nada. Una tripulación de ocho oficios se comporta como una de tres.
+5. **Un solo recurso de marcha.** Existe "diesel" y nada de batería, snorkel ni carga; sumergirse no tiene reloj propio.
+6. **Los contactos reales son pocos:** el objetivo de la misión y un contacto durante el combate. No hay escoltas, mercantes de paso, ni tráfico que haga creíble el mar (y que esconda a los falsos).
+7. **La política de pruebas no usa lo nuevo.** Los simuladores de política nunca levantan el periscopio ni miran la sala de torpedos: el balance medido es el de un capitán que dispara a ciegas.
+
+## 14.2 Lo que falta, ordenado por valor
+
+| # | Mecánica | En un simulador | Cómo la tuerce el dread | Par mundano / inquietante |
+|---|---|---|---|---|
+| 1 | **Ordenes de rumbo, velocidad y profundidad** (timón, planos, lastre) | El corazón de la navegación: ruido ↔ velocidad ↔ combustible; cota de prueba y de aplastamiento | El miedo estira o acorta lo que el capitán *cree* que ordenó: un timonel agotado repite el rumbo anterior; la tripulación asustada reclama "velocidad de huida"; a mayor profundidad el casco cruje más según la atención. Se puede ordenar mal por culpa de un reporte falso | Una lectura de profundidad más honda de la ordenada / el fondo que no responde al sondeo |
+| 2 | **Batería, snorkel y carga** | Sumergido se vive de baterías; emerger para cargar es el reloj de toda patrulla | Batería baja = luces tenues = más miedo; cargar en superficie expone y desgasta la confianza; la presencia "escucha" mejor con el casco quieto y a oscuras | Fallo de una celda / las luces bajan justo cuando se nombra a alguien |
+| 3 | **Combate de verdad** (escoltas, cargas de profundidad, evasión, silencio) | Detección, clasificación, solución de tiro, ataque, evasión: una secuencia de decisiones, no una tirada | El miedo decide lo táctico: tras la tercera carga hay hombres que abren una válvula o disparan sin orden; la marcha silenciosa falla porque alguien no puede callar; los escoltas "fallan siempre" por el mismo lugar | Mala suerte del enemigo / algo ahí abajo que absorbe las cargas |
+| 4 | **Avería y control de averías** | Inundaciones, incendios, equipos que fallan (sonar, timón, radio, bombas), repuestos, equipos de reparación | El daño por compartimento *inutiliza* sistemas; reparar es mandar a un hombre al compartimento (ya existe `force_compartment`): cuánto recuerdan los demás; el pánico retrasa al equipo; aparecen rumores de sabotaje | Fatiga y desgaste / averías que siguen un patrón, siempre en la guardia de un mismo hombre |
+| 5 | **Incertidumbre de navegación** (estima, puntos de posición, elipse de error) | Sin fix, la posición se degrada; se corrige por periscopio, astros o radio | El error crece con el cansancio y el miedo; la carta dibuja una elipse que se ensancha, y al corregir la costa no está donde debía (ya es tema del cierre: el calendario que no coincide) | Error de estima / la costa que se corrió |
+| 6 | **Radio y cifra** (ventanas, silencio, descifrado, respuesta) | Recibir órdenes y reportar es parte de la patrulla; el silencio de radio es una regla | Aquí viven las **órdenes sin origen**: el radiotelegrafista oye voces en la estática, el descifrado da nombres de la tripulación, responder rompe el silencio y cuesta | Interferencia / quien transmite conoce a la dotación |
+| 7 | **Tráfico y mar vivo** (mercantes, pesqueros, neutrales, boyas, mal tiempo, noche y niebla) | Reconocimiento y patrulla se justifican con un mar que no es solo el objetivo | Más contactos reales = más sitio donde esconder a los falsos; la visibilidad (noche, niebla) modula lo que el ojo agrega; hundir a quien no era enemigo ya está medido (la lámpara) | Un mar concurrido / el mismo pesquero en cada puerto |
+| 8 | **Oficiales y consejo** (segundo, jefe de máquinas, médico) | Un capitán no decide solo: pide parecer | El consejo se filtra por confianza y candor: el segundo "dice lo que quieres oír" cuando la confianza cae; la lealtad al capitán se rompe con órdenes dudosas; un motín *empieza* con un consejo que nadie pidió | Un buen oficial cansado / un consejo que repite tus propias palabras |
+| 9 | **Lesiones, enfermedad, comida** | Moral y supervivencia a largo plazo; sanidad, higiene, comida en mal estado | Un enfermo oculta síntomas por miedo a ser encerrado; la comida estropeada alimenta rumores; el médico es un oficio decisivo (ya reduce el ruido en los reportes) | Intoxicación / el hombre que enferma de lo que otro ya había soñado |
+| 10 | **Diario del capitán** (qué se anota y qué no) | Registro, rendición de cuentas | Es el mecanismo natural de "reportado vs. real": cada entrada puede ser veraz o suavizada (ya hay `log_falsified`); el diario final se contrasta con el informe oficial | Prisa del que anota / una entrada que no recuerdas haber escrito |
+
+## 14.3 Cómo se acoplan al dread (reglas comunes)
+
+- **Todo lo que "informa" lo hace una persona y puede fallar** (ya probado con sonar, solución de tiro y periscopio). Cada mecánica nueva debe tener un *informante* con candor y confianza; el ledger sigue siendo lo único exacto.
+- **El miedo no cambia las reglas: cambia lo que se percibe y lo que se obedece.** Tres vías: (1) la lectura (el instrumento o el hombre miente), (2) la ejecución (la orden se cumple mal o no se cumple), (3) la elección (la tripulación presiona hacia lo que teme).
+- **La presencia no combate nunca.** Ninguna mecánica nueva puede ofrecer una pelea contra ella; solo puede *estar* en la lectura (eco sin casco, rumbo sin timón, voz en la cifra) y cobrar.
+- **Cada cambio tiene precio oculto y par mundano/inquietante.** Se añade `mundane_when` a los eventos nuevos para medir la ambigüedad como hasta ahora.
+- **Nada oculto en pantalla.** Los tests que barren el texto buscando valores ocultos se extienden a cada vista nueva.
+
+## 14.4 Hoja de ruta propuesta
+
+1. **Combate como secuencia** (3) con las decisiones del miedo; es el mayor salto de "parece un simulador".
+2. **Rumbo, velocidad y profundidad** (1) + **batería** (2): dan al capitán el timón y el reloj; se miden en el mismo simulador de políticas.
+3. **Daño que inutiliza sistemas** (4): convierte el casco por compartimento en una decisión.
+4. **Radio y cifra** (6): lleva al juego las órdenes de origen incierto como acto, no solo como texto.
+5. Navegación con incertidumbre (5), tráfico (7), consejo de oficiales (8), sanidad (9), diario (10).
+
+Riesgos a vigilar: (a) un simulador de combate muy completo aplasta lo sutil, de modo que cada mecánica debe pasar el "criterio de la cena": ¿qué dice la tripulación de esto?; (b) cada mecánica nueva exige una política de prueba que la use, o el balance se mide a ciegas (hallazgo 7); (c) la paridad Python ↔ JavaScript se amplía con cada una: todo cálculo de pantalla sigue siendo determinista y sin dados del mundo.

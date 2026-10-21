@@ -89,6 +89,11 @@ class DreadWorld:
         return self.run is not None and self.run.mission.kind == "hold"
 
     @property
+    def solution_error(self) -> float:
+        from .nav import solution_error
+        return solution_error(self)
+
+    @property
     def notice_ready(self) -> float:
         """1.0 once 'further notice' is due (it never is, if the war is over and nobody paid)."""
         if not self.on_station or "notice_received" in self.ship.flags:
