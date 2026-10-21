@@ -65,7 +65,7 @@ def fuzz(seed, max_steps=2500):
                            w.ship.attention, w.ship.cohesion, w.dread(),
                            sum(c.fear for c in live) / len(live) if live else 0])
             n = navigation(w)
-            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"]])
+            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"], w.ship.battery, w.ship.spares])
             dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
             "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts, "eye": eye}
@@ -145,6 +145,7 @@ def test_the_instruments_and_the_hull_agree(seed, js_runs):
     for a, b in zip(py["nav"], js["nav"]):
         assert all(abs(x - y) <= 0.11 for x, y in zip(a[:2] + a[3:5], b[:2] + b[3:5])), (a, b)
         assert abs(a[2] - b[2]) % 360 in (0, 1, 359) and abs(a[5] - b[5]) <= 1, (a, b)
+        assert abs(a[6] - b[6]) < 1e-9 and abs(a[7] - b[7]) < 1e-9, (a, b)
     for a, b in zip(py["dmg"], js["dmg"]):
         assert all(abs(x - y) < 1e-9 for x, y in zip(a, b)), (a, b)
 

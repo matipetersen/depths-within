@@ -4664,6 +4664,243 @@
           ]
         }
       ]
+    },
+    {
+      "id": "fault_sonar",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 30,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.85
+          },
+          {
+            "path": "crew.avg.fatigue",
+            "op": ">=",
+            "value": 0.45
+          }
+        ]
+      },
+      "text": "The sonar goes dead. The headsets give only hiss, and the hiss is not quite steady.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.95
+      },
+      "mundane_cause": "A salt-damp connector in a hull that has been knocked about.",
+      "uncanny_cause": "It stopped listening the moment something came close enough to listen back.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fault_sonar",
+          "ttl": 6
+        },
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.05
+        }
+      ]
+    },
+    {
+      "id": "fault_pumps",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 36,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.8
+          },
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          }
+        ]
+      },
+      "text": "The bilge pumps run and run. The water they pump out is colder than the sea outside.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.9
+      },
+      "mundane_cause": "A weeping seam, and a thermometer nobody trusts.",
+      "uncanny_cause": "The water is coming from somewhere that is not the sea.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "hull",
+          "value": -0.03
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        }
+      ]
+    },
+    {
+      "id": "failures_follow_a_man",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "target": {
+        "select": "random"
+      },
+      "requires": {
+        "flag": "fault_sonar"
+      },
+      "text": "The sonar failed on {target}'s watch. So did the pumps last week, and the radio before that. Nobody says it aloud. Everybody has counted.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Tired men break things; one of them is simply always on watch when it happens.",
+      "uncanny_cause": "The failures follow him as a shadow follows a man at dusk.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "inspect",
+          "text": "Have every watch checked, his and the others.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It costs hours, and it tells them you also counted.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "confine",
+          "text": "Confine him until the fault is understood.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "If it was not him, you have just made him the reason.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.12
+            },
+            {
+              "op": "rumor",
+              "id": "jinx",
+              "text": "It was him all along.",
+              "intensity": 0.6,
+              "seed": "all"
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Say nothing and keep the watch bill as it is.",
+          "tags": [
+            "comply"
+          ],
+          "cost": "Silence is a decision the men will read.",
+          "effects": [
+            {
+              "op": "rumor",
+              "id": "jinx",
+              "text": "The failures follow one man.",
+              "intensity": 0.5,
+              "seed": "all"
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": -0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hull_creaks",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 24,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.2
+          }
+        ]
+      },
+      "text": "At this depth the hull speaks. It groans in long vowels, and for a moment the groan has the cadence of a name.",
+      "mundane_when": {
+        "path": "world.depth_m",
+        "op": ">=",
+        "value": 120
+      },
+      "mundane_cause": "Steel under load makes every sound a steel can make, and men supply the words.",
+      "uncanny_cause": "The pressure is not the only thing leaning on her.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.05
+        },
+        {
+          "op": "ship",
+          "stat": "attention",
+          "value": 0.02
+        }
+      ]
     }
   ]
 }

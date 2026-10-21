@@ -81,6 +81,22 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
         items.append(Item(("Lower the periscope" if s.scope_up else "Raise the periscope"),
                           "you see; and you are seen" if not s.scope_up else "",
                           (lambda: O.lower_periscope(w)) if s.scope_up else (lambda: O.raise_periscope(w))))
+    for lv in ("slow", "standard", "flank"):
+        if lv != s.speed_order:
+            items.append(Item(f"Ahead {lv}", {"slow": "quiet and sparing; the work crawls", "standard": "",
+                                              "flank": "fast; loud, and the batteries go"}[lv], (lambda lv=lv: O.set_speed(w, lv))))
+    if not s.surfaced:
+        for lv, m in (("shallow", 60), ("deep", 120), ("test", 180)):
+            if lv != s.depth_order:
+                items.append(Item(f"Go to {m} metres", {"shallow": "", "deep": "hidden; the hull speaks",
+                                                         "test": "as deep as she is built for"}[lv], (lambda lv=lv: O.set_depth(w, lv))))
+        if s.scope_up:
+            items.append(Item("Stop the diesels" if s.snorkel else "Run the diesels at snorkel depth",
+                              "charges the batteries; loud, and the sea can hear it" if not s.snorkel else "",
+                              (lambda: O.snorkel(w, not s.snorkel))))
+    if s.hull < 0.999 or s.dc_active:
+        items.append(Item("Stand the damage control party down" if s.dc_active else "Damage control: all hands to the worst compartment",
+                          f"spares {s.spares * 100:.0f}%", (lambda: O.damage_control(w, not s.dc_active))))
     if w.run is not None and "verified" not in w.run.phase_fired:
         items.append(Item("Ask headquarters to confirm the orders", "an answer is not the same as a source",
                           lambda: O.verify_orders(w)))

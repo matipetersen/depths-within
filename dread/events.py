@@ -256,7 +256,8 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "fire":
             room = _room_p(world)
             n = 0
-            for i in range(4):
+            from .systems import usable_bow_tubes
+            for i in range(usable_bow_tubes(world)):                 # a hurt bow room gives fewer tubes, a drowned one none
                 if n < fx["n"] and ship.tubes[i] in ("open", "flooded") and ship.torpedoes > 0:
                     if room > 0 and world.rng.random() < 0.5 * room:      # the tube does not answer
                         world.log.append(f"[{world.tick_no:03d}] Tube {i + 1} does not answer.")

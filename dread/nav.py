@@ -8,6 +8,7 @@ import math
 import random
 from typing import Dict, List, Optional
 
+from . import systems
 from .state import COMPARTMENTS
 
 BASE = (100.0, 12.0, "Base")
@@ -68,12 +69,14 @@ def navigation(w) -> Dict:
     elif s.returning:
         speed = 9.0
     elif moving:
-        speed = 8.0 * min(1.0, s.readiness)
+        speed = systems.SPEEDS[s.speed_order][1] * min(1.0, s.readiness) * {"ok": 1.0, "damaged": 0.6, "dead": 0.3}[systems.system_state(w, "engine room")]
     else:
         speed = 2.5
+    if s.battery <= 0 and not s.surfaced:
+        speed = 0.0
     if s.silent_running and not s.surfaced:
         speed = min(speed, 3.0)
-    depth = 0 if s.surfaced else 14 if s.scope_up else 90 if s.silent_running else 60
+    depth = 0 if s.surfaced else 14 if s.scope_up else systems.DEPTHS[s.depth_order]
     return {
         "x": round(pos[0], 1), "y": round(pos[1], 1), "grid": grid_ref(*pos), "heading": heading,
         "speed": round(speed, 1), "depth": depth, "range_nm": round(rng_nm), "next": nxt,
@@ -101,6 +104,8 @@ LABEL_POOL = ("single screw, steady", "heavy screws, slow", "many screws, slow",
 def sonar_reports(w) -> List[tuple]:
     """(phantom, line): what the sonar room tells the captain. The captain hears only this."""
     s = w.ship
+    if "fault_sonar" in s.flags:
+        return []
     look = random.Random(w.tick_no * 104729 + 5)
     out = []
     for p in w.deck.phantoms:
@@ -121,7 +126,7 @@ def _rows(w) -> List[tuple]:
     """(bearing, range_nm, label, real): the scope's raw picture. `real` never leaves this module's callers
     that draw the scope; the periscope alone uses it, because a hull is either there or not."""
     s, run = w.ship, w.run
-    if not (s.sonar_on or s.surfaced):
+    if not (s.sonar_on or s.surfaced) or "fault_sonar" in s.flags:
         return []
     raw = []
     nv = navigation(w)

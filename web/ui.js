@@ -97,6 +97,8 @@
       ${ledgerRow('Food', L.food, `−${L.food_day.toFixed(0)}%/day`)}
       ${ledgerRow('Water', L.water, `−${L.water_day.toFixed(0)}%/day`)}
       ${ledgerRow('Diesel', L.fuel)}
+      ${ledgerRow('Battery', L.battery, v.helm.snorkel ? 'on the snorkel' : v.surfaced ? 'charging' : '')}
+      ${ledgerRow('Spares', L.spares, v.helm.dc ? 'damage control at work' : '')}
       ${ledgerRow('Air', L.scrubber, 'absorbent left')}
       <div class="air ${L.air}"><span>CO₂ <span class="num">${(L.co2 * 100).toFixed(1)}%</span></span><span>${L.air}</span></div>
       <div class="air"><span>Rations <span class="num">${pct(L.rations)}%</span></span><span>Men aboard <span class="num">${L.men}</span></span></div>
@@ -135,7 +137,7 @@
     const N = v.nav;
     const nxt = N.next ? `${esc(N.next)} · ${N.range_nm} nm${N.eta_h ? ` · ${N.eta_h} h` : ''}` : 'On station';
     return `${chartSvg(v)}<div class="gauges">
-      ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn')}
+      ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn', `<span class="gk">ordered ${v.helm.speed}${v.helm.lag ? ' …' : ''}</span>`)}
       ${gauge('Depth', N.depth, ' m')}${gauge('Grid', N.grid, '')}
       ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
       <div class="gg wide"><span class="gk">Next</span><span class="gv sm">${nxt}</span></div></div>`;

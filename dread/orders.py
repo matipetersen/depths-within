@@ -183,7 +183,27 @@ def verify_orders(world):
     return "The reply contradicts the order: same call sign, different cipher."
 
 
+from . import systems as _sys  # noqa: E402
+
+
+def set_speed(world, level):
+    return _sys.set_speed(world, level)
+
+
+def set_depth(world, level):
+    return _sys.set_depth(world, level)
+
+
+def snorkel(world, on=True):
+    return _sys.snorkel(world, on)
+
+
+def damage_control(world, on=True):
+    return _sys.damage_control(world, on)
+
+
 ORDERS = {
+    "set_speed": set_speed, "set_depth": set_depth, "snorkel": snorkel, "damage_control": damage_control,
     "verify_orders": verify_orders, "stand_down": stand_down,
     "silence_sonar": silence_sonar, "restore_sonar": restore_sonar, "isolate": isolate,
     "release": release, "force_compartment": force_compartment, "cancel_rest": cancel_rest,

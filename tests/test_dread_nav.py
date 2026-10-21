@@ -46,9 +46,8 @@ def test_the_boat_reaches_each_waypoint_when_its_step_is_done():
 def test_speed_and_depth_follow_what_the_boat_is_doing():
     w = DreadWorld(seed=3)
     assert navigation(w)["speed"] < 3.0 and navigation(w)["depth"] == 60
-    O.silent_running(w, True)
-    assert navigation(w)["depth"] == 90
-    O.silent_running(w, False)
+    O.set_depth(w, "deep")
+    assert navigation(w)["depth"] == 120
     O.surface(w)
     assert navigation(w)["depth"] == 0
 

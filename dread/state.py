@@ -112,6 +112,14 @@ class Ship:
     torpedoes: int = 12       # aboard, tubes included (exact)
     tubes: List[str] = field(default_factory=lambda: ["loaded"] * 6)   # 1-4 bow, 5-6 stern: empty|loaded|flooded|open
     scope_up: bool = False
+    speed_order: str = "standard"      # slow | standard | flank
+    depth_order: str = "shallow"       # shallow 60 m | deep 120 m | test 180 m
+    battery: float = 1.0
+    snorkel: bool = False
+    spares: float = 1.0                # what damage control mends with
+    dc_active: bool = False
+    helm_pending: object = None        # (kind, level) the helm has not carried out yet
+    helm_lag: int = 0
     damage: Dict[str, float] = field(default_factory=lambda: {c: 0.0 for c in COMPARTMENTS})  # hull lost, by compartment
     routines: Dict[str, float] = field(
         default_factory=lambda: {k: 0.9 for k in ROUTINE_ITEMS})

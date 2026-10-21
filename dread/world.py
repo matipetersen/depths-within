@@ -6,6 +6,7 @@ from .conditions import evaluate
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
 from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
+from . import systems
 from .state import COMPARTMENTS, Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 
 DEFAULT_NAMES = ("Brandt", "Keller", "Vogel", "Hahn", "Lenz", "Ostrow",
@@ -89,6 +90,10 @@ class DreadWorld:
         return self.run is not None and self.run.mission.kind == "hold"
 
     @property
+    def depth_m(self) -> int:
+        return systems.depth_m(self)
+
+    @property
     def solution_error(self) -> float:
         from .nav import solution_error
         return solution_error(self)
@@ -164,6 +169,7 @@ class DreadWorld:
             s.hours_submerged += 1
         self._physics()
         self._resources()
+        systems.tick(self)
         self._voyage()
         self._rumors()
         self.deck.tick(self)
@@ -205,7 +211,8 @@ class DreadWorld:
         else:
             s.co2 = clamp(s.co2 + 0.00075 * n / 10, 0.0, 0.1)
         # noise
-        base = 0.04 if s.silent_running else 0.1
+        base = max(0.01, (0.04 if s.silent_running else 0.1) + {"slow": -0.03, "standard": 0.0, "flank": 0.15}[s.speed_order]
+                   + (0.2 if s.snorkel else 0.0))
         s.noise = clamp(base + (s.noise - base) * 0.6)
         # routines wear out on their own
         for k in s.routines:
@@ -222,7 +229,8 @@ class DreadWorld:
             elif s.rest_cancelled:
                 c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE)
             else:
-                quality = (0.5 if s.co2 > 0.015 else 1.0) * (0.5 if c.fear > 0.6 else 1.0)
+                quality = ((0.5 if s.co2 > 0.015 else 1.0) * (0.5 if c.fear > 0.6 else 1.0)
+                           * {"ok": 1.0, "damaged": 0.7, "dead": 0.4}[systems.system_state(self, "crew quarters")])
                 c.fatigue = clamp(c.fatigue - 0.012 * quality)
             if s.co2 > 0.015:
                 c.fatigue = clamp(c.fatigue + 0.003)
@@ -465,6 +473,8 @@ class DreadWorld:
             return "We are on the surface."
         if self.ship.stand_down:
             return "The crew is asleep."
+        if self.ship.battery <= 0 and not self.ship.surfaced:
+            return "The batteries are flat."
         return "" if evaluate(a.requires, self) else (a.why or "It cannot go on.")
 
     def do_act(self) -> str:
@@ -497,7 +507,7 @@ class DreadWorld:
         if self.work_blocked:
             return
         a = run.mission.acts[run.working]
-        run.work_left -= min(1.0, self.ship.readiness)       # a tired crew takes longer
+        run.work_left -= min(1.0, self.ship.readiness) * systems.pace(self)     # a tired crew, a slow ordered speed or a hurt engine take longer
         if run.work_left <= 0.0:
             run.work_left = 0.0
             run.acts_done += 1
@@ -562,7 +572,7 @@ class DreadWorld:
     def _mission(self):
         s = self.ship
         run = self.run
-        speed = s.readiness * (0.5 if s.silent_running else 1.0) * (0.0 if s.surfaced else 1.0) * (0.3 if s.stand_down else 1.0)
+        speed = s.readiness * systems.pace(self) * (0.0 if s.surfaced else 1.0) * (0.3 if s.stand_down else 1.0)
         if run is not None:
             if run.outcome is None and run.mission.acts:
                 self._work()

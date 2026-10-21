@@ -207,6 +207,8 @@
         returning: false, owed: 0.0, orders_doubt: 0.0, moral_debt: 0.0, scrubber: 1.0,
         sonar_on: true, silent_running: false, surfaced: false, rest_cancelled: false,
         stand_down: false, hours_submerged: 0, torpedoes: 12, scope_up: false,
+        speed_order: 'standard', depth_order: 'shallow', battery: 1.0, snorkel: false, spares: 1.0, dc_active: false,
+        helm_pending: null, helm_lag: 0,
       });
       this.tubes = ['loaded', 'loaded', 'loaded', 'loaded', 'loaded', 'loaded'];
       this.damage = {};
@@ -518,7 +520,7 @@
       } else if (op === 'fire') {
         const room = roomError(world.active_crew().filter((c) => c.role === 'torpedo'));
         let n = 0;
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < usableBowTubes(world); i++) {
           const sh = world.ship;
           if (n < fx.n && (sh.tubes[i] === 'open' || sh.tubes[i] === 'flooded') && sh.torpedoes > 0) {
             if (room > 0 && world.rng.random() < 0.5 * room) {
@@ -646,6 +648,10 @@
       w.ship.silent_running = on;
       return on ? 'Silent running.' : 'Resuming normal running.';
     },
+    set_speed(w, level) { return setSpeed(w, level); },
+    set_depth(w, level) { return setDepth(w, level); },
+    snorkel(w, on) { return setSnorkel(w, on); },
+    damage_control(w, on) { return setDamageControl(w, on); },
     verify_orders(w) {
       const run = w.run;
       if (run === null || run.phase_fired.has('verified')) return 'Nothing more to verify.';
@@ -668,6 +674,116 @@
   // ---------------------------------------------------------------- the world
   const DEFAULT_NAMES = ['Brandt', 'Keller', 'Vogel', 'Hahn', 'Lenz', 'Ostrow', 'Weiss', 'Maier', 'Fuchs', 'Reiter', 'Arndt', 'Kopp'];
   const HARD_LIMIT_FACTOR = 1.1, ATTENTION_FLOOR = 0.25, REST_CANCEL_FATIGUE = 0.012, PACE = 0.95;
+
+  // ---------------------------------------------------------------- the boat's machinery (dread/systems.py)
+  const SPEEDS = { slow: [0.5, 4.0], standard: [1.0, 8.0], flank: [1.6, 13.0] };
+  const DEPTHS = { shallow: 60, deep: 120, test: 180 };
+  const DRAIN = { slow: 0.004, standard: 0.009, flank: 0.03 }, HOTEL = 0.0015, IDLE_DRAIN = 0.003;
+  const ENGINE_FACTOR = { ok: 1.0, damaged: 0.6, dead: 0.3 };
+  const integrity = (w, comp) => Math.max(0.0, Math.min(1.0, 1.0 - 2.0 * w.ship.damage[comp]));
+  const systemState = (w, comp) => { const i = integrity(w, comp); return i < 0.35 ? 'dead' : i < 0.7 ? 'damaged' : 'ok'; };
+  function roleError(w, role) {
+    const crew = w.active_crew().filter((c) => c.role === role);
+    if (!crew.length) return 0.6;
+    const strain = fsum(crew.map((c) => (c.fear + c.fatigue) / 2)) / crew.length;
+    return Math.max(0.0, Math.min(0.6, 1.2 * strain - 0.2));
+  }
+  const depthM = (w) => (w.ship.surfaced ? 0 : DEPTHS[w.ship.depth_order]);
+  const movingNow = (w) => w.ship.returning || (w.working !== null && !w.work_blocked);
+  function pace(w) {
+    const s = w.ship;
+    if (s.battery <= 0 && !s.surfaced) return 0.0;
+    return SPEEDS[s.speed_order][0] * (s.silent_running ? 0.5 : 1.0) * ENGINE_FACTOR[systemState(w, 'engine room')];
+  }
+  const usableBowTubes = (w) => ({ ok: 4, damaged: 2, dead: 0 }[systemState(w, 'bow torpedo room')]);
+  function applyHelm(w, kind, level) { if (kind === 'speed') w.ship.speed_order = level; else w.ship.depth_order = level; }
+  function helmOrder(w, kind, level, text) {
+    const s = w.ship;
+    let err = roleError(w, 'helm');
+    if (systemState(w, 'control room') !== 'ok') err = Math.max(err, 0.3);
+    if (err > 0 && w.rng.random() < err * 0.8) {
+      s.helm_pending = [kind, level]; s.helm_lag = 2;
+      return 'The helmsman repeats the old order. It will take a moment.';
+    }
+    applyHelm(w, kind, level);
+    return text;
+  }
+  function setSpeed(w, level) {
+    const s = w.ship;
+    if (level === s.speed_order && s.helm_pending === null) return `We are already making ${level} speed.`;
+    const state = systemState(w, 'engine room');
+    if (level === 'flank' && state !== 'ok') return 'The engine room cannot give it.';
+    if (state === 'dead' && level !== 'slow') return 'The engine room can give no more than slow.';
+    return helmOrder(w, 'speed', level, `Ahead ${level}.`);
+  }
+  function setDepth(w, level) {
+    const s = w.ship;
+    if (s.surfaced) return 'We are on the surface.';
+    if (level === s.depth_order && s.helm_pending === null) return `We are already at ${DEPTHS[level]} metres.`;
+    if (systemState(w, 'control room') === 'dead') return 'The planes are jammed. We stay where we are.';
+    if (level !== 'shallow') s.scope_up = false;
+    return helmOrder(w, 'depth', level, `Going to ${DEPTHS[level]} metres.`);
+  }
+  function setSnorkel(w, on) {
+    const s = w.ship;
+    if (on && !(s.scope_up && !s.surfaced)) return 'Snorkel depth means the periscope is up.';
+    s.snorkel = on;
+    return on ? 'The diesels run on the snorkel. The boat shudders and the air moves.' : 'The diesels stop.';
+  }
+  function setDamageControl(w, on) {
+    const s = w.ship;
+    if (on && s.spares <= 0) return 'There is nothing left to repair with.';
+    if (on && s.hull >= 0.999) return 'Nothing is broken that anyone can find.';
+    s.dc_active = on;
+    return on ? 'All hands that can be spared go to the worst compartment.' : 'The damage control party stands down.';
+  }
+  function systemsTick(w) {
+    const s = w.ship, live = w.active_crew(), t = w.tick_no;
+    if (s.helm_pending !== null) {
+      s.helm_lag -= 1;
+      if (s.helm_lag <= 0) {
+        const [kind, level] = s.helm_pending;
+        s.helm_pending = null;
+        applyHelm(w, kind, level);
+        w.log.push(`${tag(t)} The helm answers: ${kind === 'speed' ? 'ahead ' + level : DEPTHS[level] + ' metres'}.`);
+      }
+    }
+    if (s.snorkel && !(s.scope_up && !s.surfaced)) { s.snorkel = false; w.log.push(`${tag(t)} The diesels stop; there is no snorkel to breathe through.`); }
+    if (s.surfaced) s.battery = clamp(s.battery + 0.035);
+    else if (s.snorkel) {
+      s.battery = clamp(s.battery + 0.02); s.fuel = clamp(s.fuel - 0.005); s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1); s.attention = clamp(s.attention + 0.004);
+    } else {
+      const rate = movingNow(w) ? DRAIN[s.speed_order] : IDLE_DRAIN;
+      s.battery = clamp(s.battery - (rate * (s.silent_running ? 0.6 : 1.0) + HOTEL));
+    }
+    if (s.battery <= 0.0 && !s.surfaced) {
+      if (!s.flags.has('battery_dead')) { s.flags.add('battery_dead'); w.log.push(`${tag(t)} The batteries are flat. The lights go. We cannot move until we surface or run the diesels.`); }
+    } else if (s.flags.has('battery_dead') && s.battery > 0.1) {
+      s.flags.delete('battery_dead'); w.log.push(`${tag(t)} The lights come back. The motors turn.`);
+    }
+    if (s.battery < 0.25 && !s.surfaced) {
+      for (const c of live) c.fear = clamp(c.fear + 0.003);
+      s.attention = clamp(s.attention + 0.003);
+    }
+    if (!s.surfaced) {
+      if (s.depth_order === 'deep') {
+        for (const c of live) c.fear = clamp(c.fear + 0.0015);
+        if (s.hull < 0.6 && w.rng.random() < 0.02) { s.hull = clamp(s.hull - 0.02); w.log.push(`${tag(t)} A seam weeps at 120 metres.`); }
+      } else if (s.depth_order === 'test') {
+        for (const c of live) c.fear = clamp(c.fear + 0.004);
+        if (s.hull < 0.8 && w.rng.random() < 0.05) { s.hull = clamp(s.hull - 0.04); w.log.push(`${tag(t)} A seam gives at test depth. The pumps race.`); }
+      }
+    }
+    if (s.dc_active) {
+      if (s.hull >= 0.999 || s.spares <= 0.0) {
+        s.dc_active = false;
+        w.log.push(`${tag(t)} Damage control stands down: ` + (s.hull >= 0.999 ? 'nothing left to mend.' : 'the spares are gone.'));
+      } else {
+        s.hull = clamp(s.hull + 0.005); s.spares = clamp(s.spares - 0.012);
+        for (const c of live) c.fatigue = clamp(c.fatigue + 0.003);
+      }
+    }
+  }
 
   class World {
     constructor(seed, opts) {
@@ -720,6 +836,7 @@
       return Math.min(byDread, 1 + Math.floor(this.tick_no / 24));
     }
     get solution_error() { return solutionError(this); }
+    get depth_m() { return depthM(this); }
     get finished() {
       const f = this.ship.flags;
       const done = this.missions.length ? this.mission_i >= this.missions.length : this.ship.progress >= 1.0;
@@ -766,6 +883,7 @@
       if (!s.surfaced) s.hours_submerged += 1;
       this._physics();
       this._resources();
+      systemsTick(this);
       this._voyage();
       this._rumors();
       this.deck.tick(this);
@@ -798,7 +916,7 @@
       const n = Math.max(1, live.length);
       if (s.surfaced) s.co2 = Math.max(0.005, s.co2 - 0.01);
       else s.co2 = clamp(s.co2 + 0.00075 * n / 10, 0.0, 0.1);
-      const base = s.silent_running ? 0.04 : 0.1;
+      const base = Math.max(0.01, (s.silent_running ? 0.04 : 0.1) + { slow: -0.03, standard: 0.0, flank: 0.15 }[s.speed_order] + (s.snorkel ? 0.2 : 0.0));
       s.noise = clamp(base + (s.noise - base) * 0.6);
       for (const k of Object.keys(s.routines)) s.routines[k] = clamp(s.routines[k] - 0.008);
       if (s.rest_cancelled) s.routines.watches = clamp(s.routines.watches - 0.01);
@@ -809,7 +927,7 @@
         else if (onWatch) c.fatigue = clamp(c.fatigue + 0.015);
         else if (s.rest_cancelled) c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE);
         else {
-          const quality = (s.co2 > 0.015 ? 0.5 : 1.0) * (c.fear > 0.6 ? 0.5 : 1.0);
+          const quality = (s.co2 > 0.015 ? 0.5 : 1.0) * (c.fear > 0.6 ? 0.5 : 1.0) * ({ ok: 1.0, damaged: 0.7, dead: 0.4 }[systemState(this, 'crew quarters')]);
           c.fatigue = clamp(c.fatigue - 0.012 * quality);
         }
         if (s.co2 > 0.015) c.fatigue = clamp(c.fatigue + 0.003);
@@ -1027,7 +1145,7 @@
 
     _mission() {
       const s = this.ship, run = this.run;
-      const speed = s.readiness * (s.silent_running ? 0.5 : 1.0) * (s.surfaced ? 0.0 : 1.0) * (s.stand_down ? 0.3 : 1.0);
+      const speed = s.readiness * pace(this) * (s.surfaced ? 0.0 : 1.0) * (s.stand_down ? 0.3 : 1.0);
       if (run !== null) {
         if (run.outcome === null && run.mission.acts.length) {
           this._work();
@@ -1073,6 +1191,7 @@
       if (a === null) return '';
       if (this.ship.surfaced) return 'We are on the surface.';
       if (this.ship.stand_down) return 'The crew is asleep.';
+      if (this.ship.battery <= 0 && !this.ship.surfaced) return 'The batteries are flat.';
       return evaluate(a.requires, this) ? '' : (a.why || 'It cannot go on.');
     }
     do_act() {
@@ -1098,7 +1217,7 @@
       if (run === null || run.outcome !== null || run.working === null) return;
       if (this.work_blocked) return;
       const a = run.mission.acts[run.working];
-      run.work_left -= Math.min(1.0, this.ship.readiness);
+      run.work_left -= Math.min(1.0, this.ship.readiness) * pace(this);
       if (run.work_left <= 0.0) {
         run.work_left = 0.0;
         run.acts_done += 1;
@@ -1248,12 +1367,13 @@
     let speed;
     if (s.surfaced) speed = moving ? 11.0 : 4.0;
     else if (s.returning) speed = 9.0;
-    else if (moving) speed = 8.0 * Math.min(1.0, s.readiness);
+    else if (moving) speed = SPEEDS[s.speed_order][1] * Math.min(1.0, s.readiness) * ENGINE_FACTOR[systemState(w, 'engine room')];
     else speed = 2.5;
+    if (s.battery <= 0 && !s.surfaced) speed = 0.0;
     if (s.silent_running && !s.surfaced) speed = Math.min(speed, 3.0);
     return {
       x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10, grid: gridRef(pos[0], pos[1]), heading,
-      speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.scope_up ? 14 : s.silent_running ? 90 : 60, range_nm: Math.round(rng), next: nxt,
+      speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.scope_up ? 14 : DEPTHS[s.depth_order], range_nm: Math.round(rng), next: nxt,
       eta_h: run !== null && run.working !== null ? ceilDiv(run.work_left) : null, noise: s.noise,
     };
   }
@@ -1268,6 +1388,7 @@
   const LABEL_POOL = ['single screw, steady', 'heavy screws, slow', 'many screws, slow', 'faint screws, irregular', 'fast screws, closing', 'no screw count', 'heavy screws, steady'];
   function sonarReports(w) {
     const s = w.ship, look = new PyRandom(w.tick_no * 104729 + 5), out = [];
+    if (s.flags.has('fault_sonar')) return [];
     for (const p of w.deck.phantoms) {
       for (const cid of Array.from(p.audible_to).sort((a, b) => a - b)) {
         const c = w.crew_by_id(cid);
@@ -1282,7 +1403,7 @@
   }
   function contactRows(w) {
     const s = w.ship, run = w.run;
-    if (!(s.sonar_on || s.surfaced)) return [];
+    if (!(s.sonar_on || s.surfaced) || s.flags.has('fault_sonar')) return [];
     const raw = [], nv = navigation(w), me = [nv.x, nv.y];
     const tgt = run !== null && run.outcome === null && run.mission.chart ? run.mission.chart.target : null;
     const drop = new PyRandom(w.tick_no * 3571 + 11).random() < 0.12;
@@ -1412,6 +1533,16 @@
       'quiet in a fight; slow in a race', () => orders.silent_running(w, !s.silent_running));
     add('active_ping', 'One active ping', 'information; and a sound the water carries', () => orders.active_ping(w));
     if (!s.surfaced) add(s.scope_up ? 'lower_periscope' : 'raise_periscope', s.scope_up ? 'Lower the periscope' : 'Raise the periscope', s.scope_up ? '' : 'you see; and you are seen', () => (s.scope_up ? orders.lower_periscope(w) : orders.raise_periscope(w)));
+    for (const lv of ['slow', 'standard', 'flank']) {
+      if (lv !== s.speed_order) add(`speed_${lv}`, `Ahead ${lv}`, { slow: 'quiet and sparing; the work crawls', standard: '', flank: 'fast; loud, and the batteries go' }[lv], () => orders.set_speed(w, lv));
+    }
+    if (!s.surfaced) {
+      for (const [lv, m] of [['shallow', 60], ['deep', 120], ['test', 180]]) {
+        if (lv !== s.depth_order) add(`depth_${lv}`, `Go to ${m} metres`, { shallow: '', deep: 'hidden; the hull speaks', test: 'as deep as she is built for' }[lv], () => orders.set_depth(w, lv));
+      }
+      if (s.scope_up) add(s.snorkel ? 'snorkel_off' : 'snorkel_on', s.snorkel ? 'Stop the diesels' : 'Run the diesels at snorkel depth', s.snorkel ? '' : 'charges the batteries; loud, and the sea can hear it', () => orders.snorkel(w, !s.snorkel));
+    }
+    if (s.hull < 0.999 || s.dc_active) add('damage_control', s.dc_active ? 'Stand the damage control party down' : 'Damage control: all hands to the worst compartment', `spares ${(s.spares * 100).toFixed(0)}%`, () => orders.damage_control(w, !s.dc_active));
     if (w.run !== null && !w.run.phase_fired.has('verified')) {
       add('verify_orders', 'Ask headquarters to confirm the orders', 'an answer is not the same as a source', () => orders.verify_orders(w));
     }
@@ -1543,11 +1674,12 @@
         mission: m ? { title: m.title, briefing: m.briefing, provenance: provenanceLine(m), index: w.mission_i + 1, total: w.missions.length, step: this._step() } : null,
         ledger: {
           hull: s.hull, fuel: s.fuel, food: s.food, water: s.water, scrubber: s.scrubber, rations: s.rations,
-          co2: s.co2, air: AIR(s.co2), men: live, torpedoes: s.torpedoes,
+          co2: s.co2, air: AIR(s.co2), men: live, torpedoes: s.torpedoes, battery: s.battery, spares: s.spares,
           food_day: 0.0036 * share * s.rations * 24 * 100, water_day: 0.0042 * share * s.rations * 24 * 100,
         },
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
+        helm: { speed: s.speed_order, depth: s.depth_order, snorkel: s.snorkel, dc: s.dc_active, lag: s.helm_pending !== null },
         nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
         log: w.log.filter((l) => l.trim()),
         pending,

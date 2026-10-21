@@ -90,6 +90,25 @@ def _carry_on(policy: str, w: DreadWorld, fatigue: float):
         w.do_act()
 
 
+def _machinery(policy: str, w: DreadWorld, fatigue: float):
+    """What a sensible captain does about the batteries, the speed and what is broken."""
+    s = w.ship
+    if not s.surfaced and s.battery < 0.3:
+        O.surface(w)                                                  # the batteries are the clock
+    elif s.surfaced and s.battery > 0.85 and "checking" not in s.flags and s.co2 < 0.02:
+        O.dive(w)
+    if s.hull < 0.7 and s.spares > 0.2 and not s.dc_active:
+        O.damage_control(w, True)
+    want = {"mission_first": "flank" if s.battery > 0.5 and fatigue < 0.7 else "standard",
+            "crew_first": "slow" if fatigue > 0.5 else "standard", "paranoid": "slow" if fatigue > 0.4 else "standard"}.get(policy)
+    if want and s.speed_order != want and s.helm_pending is None:
+        O.set_speed(w, want)
+    if policy == "paranoid" and not s.surfaced and s.helm_pending is None:     # the wary one hides in the deep
+        deep = "deep" if w.dread() > 0.4 and s.battery > 0.4 and s.hull > 0.5 else "shallow"
+        if s.depth_order != deep:
+            O.set_depth(w, deep)
+
+
 def issue_orders(policy: str, w: DreadWorld, prng=None):
     s = w.ship
     live = w.active_crew()
@@ -104,6 +123,7 @@ def issue_orders(policy: str, w: DreadWorld, prng=None):
            (policy == "crew_first" and run.mission.quality < 0.4):
             w.log.append(f"[{w.tick_no:03d}] {O.verify_orders(w)}")
     fatigue = sum(c.fatigue for c in live) / len(live)
+    _machinery(policy, w, fatigue)
     _carry_on(policy, w, fatigue)
     if w.on_station and fatigue > 0.6 and not s.stand_down and policy != "paranoid":
         O.stand_down(w)                       # nothing to rush on station: let a broken crew sleep

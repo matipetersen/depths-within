@@ -76,6 +76,7 @@ def ledger(w) -> List[str]:
         f"  Hull      [{bar(s.hull)}] {s.hull * 100:3.0f}%      Diesel    [{bar(s.fuel)}] {s.fuel * 100:3.0f}%",
         f"  Food      [{bar(s.food)}] {s.food * 100:3.0f}%  (-{food_day:.0f}%/day)    Rations   {s.rations * 100:.0f}%",
         f"  Water     [{bar(s.water)}] {s.water * 100:3.0f}%  (-{water_day:.0f}%/day)    Absorbent [{bar(s.scrubber)}] {s.scrubber * 100:3.0f}%",
+        f"  Battery   [{bar(s.battery)}] {s.battery * 100:3.0f}%      Spares    [{bar(s.spares)}] {s.spares * 100:3.0f}%",
         f"  Air       CO2 {s.co2 * 100:.1f}% ({air})    Men aboard: {live}    Torpedoes {s.torpedoes}",
     ]
 
@@ -83,7 +84,9 @@ def ledger(w) -> List[str]:
 def instruments(w) -> List[str]:
     from .nav import hull_report, navigation
     n = navigation(w)
-    where = f"Grid {n['grid']}  Heading {n['heading']:03d}  Speed {n['speed']:.1f} kn  Depth {n['depth']} m"
+    s = w.ship
+    where = (f"Grid {n['grid']}  Heading {n['heading']:03d}  Speed {n['speed']:.1f} kn (ordered {s.speed_order})  "
+             f"Depth {n['depth']} m" + ("  SNORKEL" if s.snorkel else ""))
     rng = (f"  Next: {n['next']}, {n['range_nm']} nm" + (f", {n['eta_h']} h of work left" if n["eta_h"] else "")) if n["next"] else "  On station."
     from .nav import periscope, weapons
     hull = hull_report(w)
@@ -137,6 +140,8 @@ def sonar(w) -> List[str]:
     s = w.ship
     state = "ON" if s.sonar_on else "OFF (the headsets are silent)"
     reports = ["  " + line for _, line in sonar_reports(w)]
+    if "fault_sonar" in s.flags:
+        state = "DEAD (a fault: only hiss in the headsets)"
     out = [f"SONAR: {state}"]
     out += reports[:3] if s.sonar_on else []
     cs = contacts(w)

@@ -45,7 +45,7 @@ function fuzz(seed, maxSteps) {
       digest.push([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2, w.ship.attention,
         w.ship.cohesion, w.dread(), live.length ? Dread.fsum(live.map((c) => c.fear)) / live.length : 0]);
       const nv = Dread.navigation(w);
-      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm]);
+      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm, w.ship.battery, w.ship.spares]);
       dmg.push(Dread.hullReport(w).map((h) => h.integrity));
     }
   }
