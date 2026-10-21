@@ -2228,7 +2228,12 @@
       "mundane_when": {},
       "mundane_cause": "The war, as it is.",
       "uncanny_cause": "Nobody on the boat remembers giving the order to flood the tubes.",
-      "effects": [],
+      "effects": [
+        {
+          "op": "tubes",
+          "state": "open"
+        }
+      ],
       "at_progress": 1.0,
       "choices": [
         {
@@ -2240,6 +2245,10 @@
           ],
           "cost": "If it misses, the screen is on top of you.",
           "effects": [
+            {
+              "op": "fire",
+              "n": 3
+            },
             {
               "op": "chance",
               "p": 0.6,
@@ -2306,6 +2315,10 @@
           ],
           "cost": "The mission is lost.",
           "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
             {
               "op": "mission_outcome",
               "value": "failed"
@@ -2668,7 +2681,12 @@
       "mundane_when": {},
       "mundane_cause": "A decision, in a war that asks for them.",
       "uncanny_cause": "She has not changed course. She has been waiting.",
-      "effects": [],
+      "effects": [
+        {
+          "op": "tubes",
+          "state": "open"
+        }
+      ],
       "at_progress": 1.0,
       "choices": [
         {
@@ -2680,6 +2698,10 @@
           ],
           "cost": "You cannot unsink her.",
           "effects": [
+            {
+              "op": "fire",
+              "n": 2
+            },
             {
               "op": "mission_outcome",
               "value": "success"
@@ -2737,6 +2759,10 @@
           ],
           "cost": "Exposed on the surface, in a war.",
           "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
             {
               "op": "time",
               "value": 0.08
@@ -2796,6 +2822,10 @@
           ],
           "cost": "A refused order, in your hand, in the log.",
           "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
             {
               "op": "mission_outcome",
               "value": "refused"

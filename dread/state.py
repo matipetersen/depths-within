@@ -109,6 +109,9 @@ class Ship:
     rest_cancelled: bool = False
     stand_down: bool = False   # all hands but a skeleton watch rest; the presence is fed by sleepers
     hours_submerged: int = 0
+    torpedoes: int = 12       # aboard, tubes included (exact)
+    tubes: List[str] = field(default_factory=lambda: ["loaded"] * 6)   # 1-4 bow, 5-6 stern: empty|loaded|flooded|open
+    scope_up: bool = False
     damage: Dict[str, float] = field(default_factory=lambda: {c: 0.0 for c in COMPARTMENTS})  # hull lost, by compartment
     routines: Dict[str, float] = field(
         default_factory=lambda: {k: 0.9 for k in ROUTINE_ITEMS})

@@ -123,9 +123,20 @@ def scrub_air(world):
     return "Fresh absorbent in the scrubbers."
 
 
+def raise_periscope(world):
+    world.ship.scope_up = True
+    return "The periscope rises. The sea is very bright."
+
+
+def lower_periscope(world):
+    world.ship.scope_up = False
+    return "The periscope is housed."
+
+
 def surface(world):
     s = world.ship
     s.surfaced = True
+    s.scope_up = False
     s.co2 = max(0.005, s.co2 - 0.01)
     s.attention = clamp(s.attention - 0.1)
     for c in _live(world):
@@ -178,5 +189,5 @@ ORDERS = {
     "release": release, "force_compartment": force_compartment, "cancel_rest": cancel_rest,
     "grant_rest": grant_rest, "ration": ration, "hold_ritual": hold_ritual,
     "address_crew": address_crew, "scrub_air": scrub_air, "surface": surface, "dive": dive,
-    "active_ping": active_ping, "silent_running": silent_running,
+    "raise_periscope": raise_periscope, "lower_periscope": lower_periscope, "active_ping": active_ping, "silent_running": silent_running,
 }

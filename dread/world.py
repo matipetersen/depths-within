@@ -268,6 +268,8 @@ class DreadWorld:
         d = self.dread()
         da = (0.003 * sum(1 for c in live if c.isolated) + 0.012 * d + 0.01 * s.moral_debt
               - 0.004 * routine * s.cohesion - 0.001)
+        if s.scope_up and not s.surfaced:
+            da += 0.004                                        # a raised periscope is a window both ways
         if s.surfaced:
             da -= 0.03
         s.attention = clamp(s.attention + da)
@@ -405,6 +407,7 @@ class DreadWorld:
         m = self.missions[i]
         self.run = MissionRun(m, self.tick_no)
         s = self.ship
+        s.tubes = ["loaded" if i < s.torpedoes else "empty" for i in range(6)]       # the torpedo room reloads between orders
         s.progress = 0.0
         s.orders_doubt = clamp(max(s.orders_doubt * 0.5, (1 - m.quality) * 0.6 + (0.15 if m.moral else 0.0)))
         self.log.append(f"[{self.tick_no:03d}] ORDERS: {m.title}. {m.briefing}")

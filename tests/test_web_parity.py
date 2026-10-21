@@ -14,7 +14,7 @@ import pytest
 
 from dread import orders as O
 from dread.endings import classify_ending
-from dread.nav import contacts, hull_report, navigation
+from dread.nav import contacts, hull_report, navigation, periscope, weapons
 from dread.play import available_orders
 from dread.world import DreadWorld
 from dread.state import clamp  # noqa: F401
@@ -34,7 +34,7 @@ def fuzz(seed, max_steps=2500):
         state = (state * 1664525 + 1013904223) % 2 ** 32
         return state >> 8
 
-    digest, nav, dmg, cts, steps = [], [], [], [], 0
+    digest, nav, dmg, cts, eye, steps = [], [], [], [], [], 0
     while not w.finished and steps < max_steps:
         steps += 1
         if w.pending:
@@ -56,6 +56,8 @@ def fuzz(seed, max_steps=2500):
                 item.run()
         w.tick()
         if steps % 3 == 0:
+            wp, ps = weapons(w), periscope(w, 0)
+            eye.append([",".join(wp["tubes"]), wp["stock"], [[x["bearing"], x["range_yd"], x["run_s"], x["gyro"]] for x in wp["solutions"]], ps["mode"], ([ps["ship"]["bearing"], ps["ship"]["range_nm"], ps["ship"]["kind"]] if ps["ship"] else None), ",".join(ps["distortions"]), ",".join(str(x) for x in ps["ghosts"])])
             cts.append([[c["bearing"], c["range_nm"]] for c in contacts(w)])
         if steps % 25 == 0:
             live = w.active_crew()
@@ -66,7 +68,7 @@ def fuzz(seed, max_steps=2500):
             nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"]])
             dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
-            "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts}
+            "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts, "eye": eye}
 
 
 @pytest.fixture(scope="module")
@@ -153,3 +155,17 @@ def test_the_scope_agrees(seed, js_runs):
     assert py["cts"] == js["cts"] or all(
         len(a) == len(b) and all(x[0] == y[0] and abs(x[1] - y[1]) <= 0.11 for x, y in zip(a, b))
         for a, b in zip(py["cts"], js["cts"]))
+
+
+@pytest.mark.parametrize("seed", SEEDS)
+def test_the_torpedo_room_and_the_periscope_agree(seed, js_runs):
+    py, js = fuzz(seed), js_runs[seed]
+    assert len(py["eye"]) == len(js["eye"])
+    for a, b in zip(py["eye"], js["eye"]):
+        assert a[0] == b[0] and a[1] == b[1] and a[3] == b[3] and a[5] == b[5] and a[6] == b[6], (a, b)
+        assert len(a[2]) == len(b[2])
+        for x, y in zip(a[2], b[2]):
+            assert abs(x[0] - y[0]) % 360 in (0, 1, 359) and abs(x[1] - y[1]) <= 20 and abs(x[2] - y[2]) <= 2, (x, y)
+        assert (a[4] is None) == (b[4] is None)
+        if a[4]:
+            assert abs(a[4][0] - b[4][0]) <= 1 and abs(a[4][1] - b[4][1]) <= 0.11 and a[4][2] == b[4][2]

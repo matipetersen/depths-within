@@ -76,7 +76,7 @@ def ledger(w) -> List[str]:
         f"  Hull      [{bar(s.hull)}] {s.hull * 100:3.0f}%      Diesel    [{bar(s.fuel)}] {s.fuel * 100:3.0f}%",
         f"  Food      [{bar(s.food)}] {s.food * 100:3.0f}%  (-{food_day:.0f}%/day)    Rations   {s.rations * 100:.0f}%",
         f"  Water     [{bar(s.water)}] {s.water * 100:3.0f}%  (-{water_day:.0f}%/day)    Absorbent [{bar(s.scrubber)}] {s.scrubber * 100:3.0f}%",
-        f"  Air       CO2 {s.co2 * 100:.1f}% ({air})    Men aboard: {live}",
+        f"  Air       CO2 {s.co2 * 100:.1f}% ({air})    Men aboard: {live}    Torpedoes {s.torpedoes}",
     ]
 
 
@@ -85,11 +85,24 @@ def instruments(w) -> List[str]:
     n = navigation(w)
     where = f"Grid {n['grid']}  Heading {n['heading']:03d}  Speed {n['speed']:.1f} kn  Depth {n['depth']} m"
     rng = (f"  Next: {n['next']}, {n['range_nm']} nm" + (f", {n['eta_h']} h of work left" if n["eta_h"] else "")) if n["next"] else "  On station."
+    from .nav import periscope, weapons
     hull = hull_report(w)
+    wp = weapons(w)
+    ps = periscope(w)
+    if ps["mode"] == "down":
+        eye = "Periscope: housed."
+    elif ps["ship"] is None:
+        eye = f"{'Bridge' if ps['mode'] == 'bridge' else 'Periscope'}: an empty horizon."
+    else:
+        sh = ps["ship"]
+        side = "in the field" if sh["in_field"] else f"off to {'starboard' if sh['rel'] > 0 else 'port'}, train the scope"
+        eye = f"{'Bridge' if ps['mode'] == 'bridge' else 'Periscope'}: a {sh['kind']}, bearing {sh['bearing']:03d}, {sh['range_nm']:.1f} nm, {side}."
+    tubes = "  ".join(f"{i + 1}:{t}" for i, t in enumerate(wp["tubes"]))
     cells = "  ".join(f"{h['name'].replace(' torpedo room', ' tubes').replace(' quarters', ' berths')} {h['integrity'] * 100:.0f}%"
                       + ("!" if h["state"] != "sound" else "") for h in hull)
     return ["INSTRUMENTS", "  " + where + f"  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
-            "  Hull by compartment: " + cells]
+            "  Hull by compartment: " + cells,
+            f"  Torpedoes aboard {wp['stock']}.  Tubes {tubes}", "  " + eye]
 
 
 _SAYS = ((0.25, "says he is fine"), (0.45, "says he is tired"), (0.65, "says it has been hard"),

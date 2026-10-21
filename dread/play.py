@@ -77,6 +77,10 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
         items.append(Item("Silent running" if not s.silent_running else "Resume normal running",
                           "quiet in a fight; slow in a race", lambda: O.silent_running(w, not s.silent_running)))
         items.append(Item("One active ping", "information; and a sound the water carries", lambda: O.active_ping(w)))
+    if not s.surfaced:
+        items.append(Item(("Lower the periscope" if s.scope_up else "Raise the periscope"),
+                          "you see; and you are seen" if not s.scope_up else "",
+                          (lambda: O.lower_periscope(w)) if s.scope_up else (lambda: O.raise_periscope(w))))
     if w.run is not None and "verified" not in w.run.phase_fired:
         items.append(Item("Ask headquarters to confirm the orders", "an answer is not the same as a source",
                           lambda: O.verify_orders(w)))

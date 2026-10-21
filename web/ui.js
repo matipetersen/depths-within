@@ -4,7 +4,7 @@
   'use strict';
   const SAVE_KEY = 'depths-within:save:v1';
   const app = document.getElementById('app');
-  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false, tabL: 'ledger', tabC: 'chart' };
+  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false, tabL: 'ledger', tabC: 'chart', train: 0 };
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pct = (x) => Math.round(x * 100);
@@ -73,7 +73,8 @@
     const v = g.view();
     if (!hadPending && v.pending) { state.shownAt = Date.now(); vibrate(40); Sound.ping(); }
     if (v.over) { Sound.hush(); vibrate([60, 80, 60]); }
-    state.sheet = null; state.pick = null;
+    if (state.sheet !== 'periscope') state.sheet = null;
+    state.pick = null;
     render();
   }
   function setSound(on) {
@@ -99,6 +100,7 @@
       ${ledgerRow('Air', L.scrubber, 'absorbent left')}
       <div class="air ${L.air}"><span>CO₂ <span class="num">${(L.co2 * 100).toFixed(1)}%</span></span><span>${L.air}</span></div>
       <div class="air"><span>Rations <span class="num">${pct(L.rations)}%</span></span><span>Men aboard <span class="num">${L.men}</span></span></div>
+      <div class="air"><span>Torpedoes <span class="num">${L.torpedoes}</span></span><span>aboard</span></div>
     </div>`;
   }
   // ------------------------------------------------------------------ the chart, the instruments, the hull
@@ -159,6 +161,20 @@
       ${msg ? `<p class="dim scopemsg">${msg}</p>` : `<ul class="cts">${rows}</ul>`}
       <p class="note">A contact is something the room heard. The scope does not say what it was.</p>`;
   }
+  const mmss = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  /** The torpedo room's readings. The stock is the ledger's; the rest is what the room reports. */
+  function weaponsView(v) {
+    const W = v.weapons;
+    const tubes = W.tubes.map((t, i) => `<div class="tube ${t.replace(' ', '-')}"><span class="tn">${i + 1}<small>${i < 4 ? 'bow' : 'stern'}</small></span><span class="ts">${esc(t)}</span></div>`).join('');
+    const sols = !W.manned ? '<p class="dim">The torpedo room does not answer.</p>'
+      : W.solutions.length ? `<table class="sol"><tr><th></th><th>Brg</th><th>Range</th><th>Run</th><th>Gyro</th></tr>${W.solutions.map((x) =>
+        `<tr><td><b>${x.tag}</b></td><td>${String(x.bearing).padStart(3, '0')}°</td><td>${x.range_yd} yd</td><td>${mmss(x.run_s)}</td><td>${x.gyro > 0 ? '+' : ''}${x.gyro}°</td></tr>`).join('')}</table>`
+        : '<p class="dim">No solution. Nothing on the scope.</p>';
+    return `<div class="wpn"><div class="gg wide"><span class="gk">Torpedoes aboard</span><span class="gv">${W.stock}<small> exact</small></span></div>
+      <p class="smcaps">Tubes · as reported</p><div class="tubes">${tubes}</div>
+      <p class="smcaps">Fire solutions · one per contact</p>${sols}
+      <p class="note">The room reports what it sees. The stock is the ledger's.</p></div>`;
+  }
   function hullView(v) {
     const segs = v.hull.map((h, i) => {
       const x = 4 + i * 20.4;
@@ -217,11 +233,65 @@
         <span class="t">${m ? `${m.index}/${m.total} · ${esc(m.title)}` : 'No orders'} ${pips(m)}</span>
         <span class="p">${m ? esc(m.provenance) : ''}</span></button>
       <div class="clock">Day ${v.day} · ${String(v.hour).padStart(2, '0')}:00${cal}</div>
+      <button class="icon-btn" data-a="sheet:periscope" aria-label="Periscope">◉</button>
       <button class="icon-btn ${state.sound ? '' : 'off'}" data-a="sound" aria-pressed="${state.sound}" aria-label="${state.sound ? 'Sound on' : 'Sound off'}">♪</button>
       <button class="icon-btn" data-a="sheet:help" aria-label="How to play">?</button>
     </div>`;
   }
 
+  // ------------------------------------------------------------------ the periscope
+  function hullShape(kind, markings) {
+    if (kind === 'capital') return `<path class="hull" d="M-26 0 L-24 -4 L22 -4 L28 -8 L28 0 Z"/><rect class="sup" x="-7" y="-13" width="11" height="9"/><rect class="sup" x="-14" y="-12" width="3" height="8"/><rect class="sup" x="8" y="-12" width="3" height="8"/><line class="mast" x1="-1.5" y1="-13" x2="-1.5" y2="-24"/>`;
+    const cross = markings ? '<rect class="red" x="-1" y="-6.4" width="2" height="5.2"/><rect class="red" x="-2.6" y="-4.8" width="5.2" height="2"/>' : '';
+    return `<path class="hull ${markings ? 'white' : ''}" d="M-20 0 L-19 -4 L16 -4 L20 -7 L20 0 Z"/><rect class="sup ${markings ? 'white' : ''}" x="-4" y="-10" width="9" height="6"/><rect class="sup" x="-12" y="-9" width="2.6" height="5"/>${cross}`;
+  }
+  const KIND = { capital: 'a capital ship', convoy: 'a convoy', steamer: 'a steamer' };
+  function periscopeSvg(ps) {
+    const Y = 47;
+    if (ps.mode === 'down') return `<svg class="eye" viewBox="0 0 160 90" role="img" aria-label="The periscope is housed"><rect width="160" height="90" fill="#05090c"/><text x="80" y="48" text-anchor="middle" class="gt" style="font-size:5px">PERISCOPE HOUSED</text></svg>`;
+    const sh = ps.ship, k = sh ? Math.max(0.35, Math.min(2.2, 9 / sh.range_nm)) : 1;
+    const X = sh && sh.in_field ? 80 + sh.rel / 25 * 70 : 80;
+    let scene = '';
+    if (sh && sh.in_field) {
+      let body = '';
+      if (sh.kind === 'convoy') for (let i = 0; i < sh.ships; i++) body += `<g transform="translate(${(i - (sh.ships - 1) / 2) * 38} ${(i % 2) * -2}) scale(.7)">${hullShape('steamer', false)}</g>`;
+      else {
+        body = hullShape(sh.kind, sh.markings);
+        for (let i = 0; i < sh.escorts; i++) body += `<g transform="translate(${(i % 2 ? 1 : -1) * (46 + 18 * i)} -1) scale(.5)">${hullShape('steamer', false)}</g>`;
+      }
+      scene += `<g class="vessel" transform="translate(${X.toFixed(1)} ${Y}) scale(${k.toFixed(2)})">${body}<path class="wake" d="M-30 1 L30 1" /></g>`;
+    }
+    ps.ghosts.forEach((rel) => { scene += `<g class="ghostv" transform="translate(${(80 + rel / 25 * 70).toFixed(1)} ${Y}) scale(.9)">${hullShape('steamer', false)}</g>`; });
+    const hx = sh && sh.in_field ? X : 80, hs = sh && sh.in_field ? k : 1;
+    ps.distortions.forEach((d, i) => {
+      const o = i * 6;
+      if (d === 'figures_on_rail') { let f = ''; for (let j = 0; j < 8; j++) f += `<rect class="fig" x="${-18 + j * 4.6}" y="-9" width=".9" height="3.2"/>`; scene += `<g transform="translate(${hx.toFixed(1)} ${Y}) scale(${hs.toFixed(2)})">${f}</g>`; }
+      else if (d === 'cross_on_hull') scene += `<g transform="translate(${(hx + 6).toFixed(1)} ${Y}) scale(${hs.toFixed(2)})"><rect class="red" x="-1" y="-6.4" width="2" height="5.2"/><rect class="red" x="-2.6" y="-4.8" width="5.2" height="2"/></g>`;
+      else if (d === 'second_hull') scene += `<g class="ghostv" transform="translate(${(hx + 20 + o).toFixed(1)} ${Y}) scale(${(hs * 0.9).toFixed(2)})">${hullShape('capital', false)}</g>`;
+      else if (d === 'lamp') scene += `<circle class="lamp" cx="${(hx + 5).toFixed(1)}" cy="${(Y - 10 * hs).toFixed(1)}" r="1.1"/>`;
+      else if (d === 'wake_wrong') scene += `<path class="wake" d="M${(hx + 30 * hs).toFixed(1)} ${Y + 1.5} l12 1.6 M${(hx + 30 * hs).toFixed(1)} ${Y + 1.5} l12 -0.6"/>`;
+    });
+    let edge = '';
+    if (sh && !sh.in_field) edge = sh.rel > 0 ? '<path class="edge" d="M148 45 l-6 -4 v8 z"/>' : '<path class="edge" d="M12 45 l6 -4 v8 z"/>';
+    let ticks = '';
+    for (let d = -20; d <= 20; d += 10) ticks += `<line class="rt" x1="${80 + d * 2.8}" y1="${d % 20 === 0 ? 70 : 72}" x2="${80 + d * 2.8}" y2="76"/>`;
+    return `<svg class="eye" viewBox="0 0 160 90" role="img" aria-label="${ps.mode === 'bridge' ? 'Bridge' : 'Periscope'} view, centre ${ps.centre}">
+      <defs><clipPath id="eyeclip"><circle cx="80" cy="45" r="43"/></clipPath></defs><rect width="160" height="90" fill="#05090c"/>
+      <g clip-path="url(#eyeclip)"><rect class="sky" y="0" width="160" height="${Y}"/><rect class="water" y="${Y}" width="160" height="${90 - Y}"/><line class="horizon" x1="0" y1="${Y}" x2="160" y2="${Y}"/>${scene}</g>
+      <circle class="rim" cx="80" cy="45" r="43"/><line class="ret" x1="80" y1="6" x2="80" y2="84"/><line class="ret" x1="40" y1="${Y}" x2="120" y2="${Y}"/>${ticks}${edge}</svg>`;
+  }
+  function sheetPeriscope(v) {
+    const ps = Dread.periscope(state.game.w, state.train), sh = ps.ship;
+    const up = v.orders.find((o) => o.id === 'raise_periscope' || o.id === 'lower_periscope');
+    const read = ps.mode === 'down' ? 'The periscope is housed. You see nothing, and are seen by nothing.'
+      : sh ? `${sh.in_field ? 'In the field' : (sh.rel > 0 ? 'To starboard' : 'To port')}: ${esc(KIND[sh.kind] || sh.kind)}${sh.kind === 'convoy' ? ` of ${sh.ships} ships` : sh.escorts ? ` with ${sh.escorts} escorts` : ''} · bearing ${String(sh.bearing).padStart(3, '0')}° · ${sh.range_nm.toFixed(1)} nm`
+        : 'An empty horizon.';
+    return `<div class="sheet scopesheet" role="dialog" aria-modal="true" aria-label="Periscope"><header><h2>${ps.mode === 'bridge' ? 'Bridge' : 'Periscope'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body"><div class="eyegrid"><div>${periscopeSvg(ps)}<p class="eyeread">${read}</p><p class="eyeread dim">Centre ${String(ps.centre).padStart(3, '0')}° · trained ${ps.train > 0 ? '+' : ''}${ps.train}°</p></div>
+        <div class="eyebtns"><button class="btn" data-a="train:-15">◀ Train left</button><button class="btn" data-a="train:15">Train right ▶</button>
+          ${up ? `<button class="btn primary" data-a="order:${up.id}">${esc(up.label)}<small>${esc(up.hint)}</small></button>` : '<p class="dim">On the surface: the bridge glasses.</p>'}
+          <button class="btn" data-a="wait">Watch an hour</button><p class="note">What the eye sees is not always what is there.</p></div></div></div></div>`;
+  }
   function sheetBriefing(v) {
     const m = v.mission;
     return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Orders"><header><h2>${m ? esc(m.title) : 'Orders'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
@@ -287,13 +357,13 @@
     if (!state.game) { app.innerHTML = `<div class="veil">${titleView()}</div>`; return; }
     const v = state.game.view();
     const sheet = v.over ? sheetEnding(v) : v.pending ? sheetDecision(v)
-      : state.sheet === 'briefing' ? sheetBriefing(v) : state.sheet === 'help' ? sheetHelp()
+      : state.sheet === 'briefing' ? sheetBriefing(v) : state.sheet === 'periscope' ? sheetPeriscope(v) : state.sheet === 'help' ? sheetHelp()
         : state.sheet === 'orders' ? sheetOrders(v) : '';
     const logEl = document.querySelector('.log-scroll');
     const stick = !logEl || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
     app.innerHTML = `${topView(v)}
       <div class="cols">
-        <section class="col" aria-label="${state.tabL === 'hull' ? 'Hull' : 'Ledger'}"><header class="tabs">${tabBtn('tabL', 'ledger', 'Ledger', state.tabL)}${tabBtn('tabL', 'hull', 'Hull', state.tabL)}</header><div class="scroll">${state.tabL === 'hull' ? hullView(v) : ledgerView(v)}</div></section>
+        <section class="col" aria-label="${state.tabL === 'hull' ? 'Hull' : state.tabL === 'tubes' ? 'Tubes' : 'Ledger'}"><header class="tabs">${tabBtn('tabL', 'ledger', 'Ledger', state.tabL)}${tabBtn('tabL', 'hull', 'Hull', state.tabL)}${tabBtn('tabL', 'tubes', 'Tubes', state.tabL)}</header><div class="scroll">${state.tabL === 'hull' ? hullView(v) : state.tabL === 'tubes' ? weaponsView(v) : ledgerView(v)}</div></section>
         <section class="col" aria-label="${state.tabC === 'men' ? 'The men' : state.tabC === 'scope' ? 'Scope' : 'Chart'}"><header class="tabs">${tabBtn('tabC', 'chart', 'Chart', state.tabC)}${tabBtn('tabC', 'scope', 'Scope', state.tabC)}${tabBtn('tabC', 'men', 'The men', state.tabC)}</header><div class="scroll">${state.tabC === 'men' ? menView(v) : state.tabC === 'scope' ? scopeView(v) : chartView(v)}</div></section>
         <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
           <div class="scroll log log-scroll">${logView(v)}</div>
@@ -326,6 +396,7 @@
     if (a === 'new') { store.clear(); begin(new Dread.Game(newSeed())); return; }
     if (a === 'continue') { const s = store.read(); if (s) begin(Dread.Game.restore(s)); return; }
     if (!g) return;
+    if (a.startsWith('train:')) { state.train = Math.max(-180, Math.min(180, state.train + Number(a.slice(6)))); return render(); }
     if (a.startsWith('tabL:')) { state.tabL = a.slice(5); return render(); }
     if (a.startsWith('tabC:')) { state.tabC = a.slice(5); return render(); }
     if (a === 'act') return act('o:act');

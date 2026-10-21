@@ -206,8 +206,9 @@
         attention: 0.0, progress: 0.0, food: 1.0, water: 1.0, fuel: 1.0, rations: 1.0,
         returning: false, owed: 0.0, orders_doubt: 0.0, moral_debt: 0.0, scrubber: 1.0,
         sonar_on: true, silent_running: false, surfaced: false, rest_cancelled: false,
-        stand_down: false, hours_submerged: 0,
+        stand_down: false, hours_submerged: 0, torpedoes: 12, scope_up: false,
       });
+      this.tubes = ['loaded', 'loaded', 'loaded', 'loaded', 'loaded', 'loaded'];
       this.damage = {};
       COMPARTMENTS.forEach((c) => { this.damage[c] = 0.0; });
       this.routines = {};
@@ -512,6 +513,14 @@
         for (const c of who(fx.who, world, target)) c.alive = false;
       } else if (op === 'combat') {
         world.combat(fx.severity);
+      } else if (op === 'tubes') {
+        for (let i = 0; i < 4; i++) if (world.ship.tubes[i] !== 'empty') world.ship.tubes[i] = fx.state;
+      } else if (op === 'fire') {
+        let n = 0;
+        for (let i = 0; i < 4; i++) {
+          const sh = world.ship;
+          if (n < fx.n && (sh.tubes[i] === 'open' || sh.tubes[i] === 'flooded') && sh.torpedoes > 0) { sh.tubes[i] = 'empty'; sh.torpedoes -= 1; n += 1; }
+        }
       } else if (op === 'leave_station') {
         world.log.push(`${tag(world.tick_no)} ${world.leave_station()}`);
       } else if (op === 'check_world') {
@@ -612,9 +621,11 @@
       s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1);
       return 'Fresh absorbent in the scrubbers.';
     },
+    raise_periscope(w) { w.ship.scope_up = true; return 'The periscope rises. The sea is very bright.'; },
+    lower_periscope(w) { w.ship.scope_up = false; return 'The periscope is housed.'; },
     surface(w) {
       const s = w.ship;
-      s.surfaced = true; s.co2 = Math.max(0.005, s.co2 - 0.01); s.attention = clamp(s.attention - 0.1);
+      s.surfaced = true; s.scope_up = false; s.co2 = Math.max(0.005, s.co2 - 0.01); s.attention = clamp(s.attention - 0.1);
       for (const c of w.active_crew()) c.fear = clamp(c.fear - 0.1);
       return 'Surfacing. The hatch opens on cold air.';
     },
@@ -833,6 +844,7 @@
       const d = this.dread();
       let da = 0.003 * live.filter((c) => c.isolated).length + 0.012 * d + 0.01 * s.moral_debt
         - 0.004 * routine * s.cohesion - 0.001;
+      if (s.scope_up && !s.surfaced) da += 0.004;
       if (s.surfaced) da -= 0.03;
       s.attention = clamp(s.attention + da);
       s.attention = Math.max(s.attention, ATTENTION_FLOOR * clamp((s.hours_submerged - 10) / 60));
@@ -962,6 +974,7 @@
     _start_mission(i) {
       this.mission_i = i;
       const m = this.missions[i];
+      this.ship.tubes = [0, 1, 2, 3, 4, 5].map((i) => (i < this.ship.torpedoes ? 'loaded' : 'empty'));
       this.run = {
         mission: m, start_tick: this.tick_no, outcome: null, phase_fired: new Set(),
         acts_done: 0, working: null, work_left: 0.0, lost: 0.0,
@@ -1231,7 +1244,7 @@
     if (s.silent_running && !s.surfaced) speed = Math.min(speed, 3.0);
     return {
       x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10, grid: gridRef(pos[0], pos[1]), heading,
-      speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.silent_running ? 90 : 60, range_nm: Math.round(rng), next: nxt,
+      speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.scope_up ? 14 : s.silent_running ? 90 : 60, range_nm: Math.round(rng), next: nxt,
       eta_h: run !== null && run.working !== null ? ceilDiv(run.work_left) : null, noise: s.noise,
     };
   }
@@ -1258,8 +1271,7 @@
     }
     return out;
   }
-  /** Real and false contacts, drawn alike: nothing here says which is which. */
-  function contacts(w) {
+  function contactRows(w) {
     const s = w.ship, run = w.run;
     if (!(s.sonar_on || s.surfaced)) return [];
     const raw = [], nv = navigation(w), me = [nv.x, nv.y];
@@ -1267,20 +1279,79 @@
     const drop = new PyRandom(w.tick_no * 3571 + 11).random() < 0.12;
     if (tgt && run.acts_done >= 1 && !drop) {
       const dist = Math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9;
-      if (dist <= SCOPE_NM) raw.push([bearing(me, tgt), dist, tgt[2]]);
+      if (dist <= SCOPE_NM) raw.push([bearing(me, tgt), dist, tgt[2], true]);
     }
     if (s.flags.has('in_combat')) {
       const k = Math.floor(w.tick_no / 5);
-      raw.push([(k * 83 + 17) % 360, 3 + (k * 7) % 6, 'fast screws, closing']);
+      raw.push([(k * 83 + 17) % 360, 3 + (k * 7) % 6, 'fast screws, closing', true]);
     }
     if (s.sonar_on) {
       for (const r of sonarReports(w)) {
         const p = r.p;
-        if (p !== null && p.kind === 'echo') raw.push([(p.id * 97 + 41 + p.age * 2) % 360, 4 + (p.id * 53 + p.age) % 22, LABEL_POOL[(p.id * 7) % LABEL_POOL.length]]);
+        if (p !== null && p.kind === 'echo') raw.push([(p.id * 97 + 41 + p.age * 2) % 360, 4 + (p.id * 53 + p.age) % 22, LABEL_POOL[(p.id * 7) % LABEL_POOL.length], false]);
       }
     }
     raw.sort((a, b) => a[0] - b[0]);
-    return raw.map((r, i) => ({ tag: `C${i + 1}`, bearing: Math.trunc(r[0]), range_nm: Math.round(r[1] * 10) / 10, label: r[2] }));
+    return raw;
+  }
+  /** Real and false contacts, drawn alike: nothing here says which is which. */
+  function contacts(w) {
+    return contactRows(w).map((r, i) => ({ tag: `C${i + 1}`, bearing: Math.trunc(r[0]), range_nm: Math.round(r[1] * 10) / 10, label: r[2] }));
+  }
+
+  // torpedoes and the periscope (dread/nav.py)
+  const YARDS_PER_NM = 2025, TORPEDO_KNOTS = 30, VIS_NM = 12, FIELD_DEG = 50;
+  const TUBE_STATES = ['empty', 'loaded', 'flooded', 'open'];
+  const DISTORTIONS = ['figures_on_rail', 'cross_on_hull', 'second_hull', 'lamp', 'wake_wrong'];
+  const wrap180 = (d) => ((((d % 360) + 360) % 360 + 180) % 360) - 180;
+  function weapons(w) {
+    const s = w.ship, crew = w.active_crew().filter((c) => c.role === 'torpedo'), stock = s.torpedoes;
+    if (!crew.length) return { stock, manned: false, tubes: Array(6).fill('no report'), solutions: [] };
+    const strain = fsum(crew.map((c) => (c.fear + c.fatigue) / 2)) / crew.length;
+    const p = Math.max(0.0, Math.min(0.6, 1.2 * strain - 0.2));
+    const look = new PyRandom(w.tick_no * 2711 + 3);
+    const tubes = s.tubes.map((st) => (look.random() < p ? look.choice(TUBE_STATES.filter((x) => x !== st)) : st));
+    const nv = navigation(w), sols = [];
+    for (const c of contacts(w)) {
+      const jb = look.random(), jr = look.random();
+      const brg = (((Math.round(c.bearing + (jb - 0.5) * 2 * p * 20)) % 360) + 360) % 360;
+      const rng = c.range_nm * (1 + (jr - 0.5) * p * 0.6);
+      sols.push({ tag: c.tag, bearing: brg, range_yd: Math.round(rng * YARDS_PER_NM / 10) * 10, run_s: Math.round(rng / TORPEDO_KNOTS * 3600), gyro: wrap180(brg - nv.heading) });
+    }
+    return { stock, manned: true, tubes, solutions: sols };
+  }
+  function periscope(w, train) {
+    train = train || 0;
+    const s = w.ship, nv = navigation(w);
+    const centre = (((nv.heading + train) % 360) + 360) % 360;
+    if (!(s.surfaced || s.scope_up)) return { mode: 'down', train, centre, ship: null, distortions: [], ghosts: [] };
+    const mode = s.surfaced ? 'bridge' : 'periscope', me = [nv.x, nv.y], run = w.run;
+    let ship = null;
+    const ch = run !== null && run.outcome === null ? run.mission.chart : null;
+    const tgt = ch ? ch.target : null;
+    if (tgt && run.acts_done >= 1) {
+      const dist = Math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9;
+      if (dist <= VIS_NM) {
+        const brg = bearing(me, tgt), rel = wrap180(brg - centre), sight = ch.sight || {};
+        ship = { bearing: brg, rel, range_nm: Math.round(dist * 10) / 10, in_field: Math.abs(rel) <= Math.floor(FIELD_DEG / 2),
+          kind: sight.kind || 'steamer', escorts: sight.escorts || 0, ships: sight.ships || 1, markings: !!sight.markings };
+      }
+    }
+    const live = w.active_crew();
+    const strain = live.length ? fsum(live.map((c) => (c.fear + c.fatigue) / 2)) / live.length : 1.0;
+    const p = Math.max(0.0, Math.min(0.7, strain + 0.3 * s.moral_debt + 0.3 * s.attention - 0.15));
+    const look = new PyRandom(Math.floor(w.tick_no / 3) * 6733 + 29), kinds = [];
+    if (look.random() < p) {
+      kinds.push(look.choice(DISTORTIONS));
+      if (look.random() < p * 0.5) kinds.push(look.choice(DISTORTIONS));
+    }
+    const g = new PyRandom(Math.floor(w.tick_no / 3) * 4219 + 7), ghosts = [];
+    for (const r of contactRows(w)) {
+      if (r[3]) continue;
+      const rel = wrap180(r[0] - centre);
+      if (Math.abs(rel) <= Math.floor(FIELD_DEG / 2) && g.random() < 0.5) ghosts.push(Math.trunc(rel));
+    }
+    return { mode, train, centre, ship, distortions: kinds, ghosts };
   }
   /** Every mission's waypoints, for drawing the chart: those behind, the one under way, those to come. */
   function chartTracks(w) {
@@ -1319,6 +1390,7 @@
     add(s.silent_running ? 'normal_running' : 'silent_running', s.silent_running ? 'Resume normal running' : 'Silent running',
       'quiet in a fight; slow in a race', () => orders.silent_running(w, !s.silent_running));
     add('active_ping', 'One active ping', 'information; and a sound the water carries', () => orders.active_ping(w));
+    if (!s.surfaced) add(s.scope_up ? 'lower_periscope' : 'raise_periscope', s.scope_up ? 'Lower the periscope' : 'Raise the periscope', s.scope_up ? '' : 'you see; and you are seen', () => (s.scope_up ? orders.lower_periscope(w) : orders.raise_periscope(w)));
     if (w.run !== null && !w.run.phase_fired.has('verified')) {
       add('verify_orders', 'Ask headquarters to confirm the orders', 'an answer is not the same as a source', () => orders.verify_orders(w));
     }
@@ -1450,12 +1522,12 @@
         mission: m ? { title: m.title, briefing: m.briefing, provenance: provenanceLine(m), index: w.mission_i + 1, total: w.missions.length, step: this._step() } : null,
         ledger: {
           hull: s.hull, fuel: s.fuel, food: s.food, water: s.water, scrubber: s.scrubber, rations: s.rations,
-          co2: s.co2, air: AIR(s.co2), men: live,
+          co2: s.co2, air: AIR(s.co2), men: live, torpedoes: s.torpedoes,
           food_day: 0.0036 * share * s.rations * 24 * 100, water_day: 0.0042 * share * s.rations * 24 * 100,
         },
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
-        nav: navigation(w), hull: hullReport(w), contacts: contacts(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
+        nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
         log: w.log.filter((l) => l.trim()),
         pending,
         orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
@@ -1475,7 +1547,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, navigation, hullReport, contacts, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

@@ -281,3 +281,37 @@ def test_the_scope_draws_contacts_alike_and_goes_dark_when_the_sonar_is_off(brow
     assert "RADAR" in page.inner_text(".scopehead")
     shown = page.inner_text("#app").lower()
     assert "phantom" not in shown and "false" not in shown and "real contact" not in shown
+
+
+def test_the_tubes_tab_and_the_periscope_sheet(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.locator("[data-a='tabL:tubes']").tap()
+    assert page.locator(".tube").count() == 6 and "exact" in page.inner_text(".wpn").lower()
+    assert "torpedoes" in page.inner_text("#app").lower()
+    page.locator("[data-a='tabL:ledger']").tap()
+    assert "torpedoes" in page.inner_text(".led").lower()
+    page.locator("[data-a='sheet:periscope']").tap()
+    assert "housed" in page.inner_text(".eyeread").lower()
+    page.locator(".eyebtns [data-a^='order:']").tap()                 # raise it
+    assert page.evaluate("dreadDebug.state.game.w.ship.scope_up") is True
+    page.locator("[data-a='train:15']").tap()
+    assert "+15" in page.inner_text(".eyeread.dim")
+    assert page.locator("svg.eye").count() == 1
+    page.locator("[data-a=close]").tap()
+    assert "14" in page.inner_text(".gauges")                          # periscope depth on the gauge
+
+
+def test_a_ship_in_the_periscope_and_what_the_tired_eye_adds(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.evaluate("""() => { const w = dreadDebug.state.game.w; w.run.acts_done = 2; w.run.working = 2; w.run.work_left = 0.5;
+      w._set_progress(); w.ship.scope_up = true; w.ship.moral_debt = 0.9; w.ship.attention = 0.7;
+      for (const c of w.crew) { c.fear = 0.8; c.fatigue = 0.7; }
+      const sh = dreadDebug.Dread.periscope(w, 0).ship; dreadDebug.state.train = Math.round(sh.rel);
+      dreadDebug.state.sheet = 'periscope'; dreadDebug.render(); }""")
+    assert page.locator("svg.eye .vessel").count() == 1
+    assert "capital ship" in page.inner_text(".eyeread")
+    seen = page.inner_text("#app").lower()
+    for word in ("phantom", "illusion", "hallucinat", "false"):
+        assert word not in seen

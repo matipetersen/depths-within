@@ -244,6 +244,17 @@ def apply_effects(effects: List[dict], world, target=None):
                 c.alive = False
         elif op == "combat":
             world.combat(fx["severity"])
+        elif op == "tubes":
+            for i in range(4):                                   # the bow tubes: state changes only where a fish is loaded
+                if ship.tubes[i] != "empty":
+                    ship.tubes[i] = fx["state"]
+        elif op == "fire":
+            n = 0
+            for i in range(4):
+                if n < fx["n"] and ship.tubes[i] in ("open", "flooded") and ship.torpedoes > 0:
+                    ship.tubes[i] = "empty"
+                    ship.torpedoes -= 1
+                    n += 1
         elif op == "leave_station":
             world.log.append(f"[{world.tick_no:03d}] {world.leave_station()}")
         elif op == "check_world":

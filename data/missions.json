@@ -57,7 +57,12 @@
             }
           },
           "why": "There is nobody left in the torpedo room to do it.",
-          "effects": []
+          "effects": [
+            {
+              "op": "tubes",
+              "state": "flooded"
+            }
+          ]
         }
       ],
       "chart": {
@@ -87,7 +92,12 @@
           36,
           34,
           "heavy screws, steady"
-        ]
+        ],
+        "sight": {
+          "kind": "capital",
+          "escorts": 3,
+          "markings": false
+        }
       }
     },
     {
@@ -159,7 +169,12 @@
           18,
           24,
           "many screws, slow"
-        ]
+        ],
+        "sight": {
+          "kind": "convoy",
+          "ships": 6,
+          "markings": false
+        }
       }
     },
     {
@@ -214,7 +229,12 @@
             }
           },
           "why": "There is nobody left in the torpedo room to do it.",
-          "effects": []
+          "effects": [
+            {
+              "op": "tubes",
+              "state": "flooded"
+            }
+          ]
         }
       ],
       "chart": {
@@ -244,7 +264,12 @@
           56,
           66,
           "single screw, steady"
-        ]
+        ],
+        "sight": {
+          "kind": "steamer",
+          "escorts": 0,
+          "markings": true
+        }
       }
     },
     {
