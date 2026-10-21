@@ -56,7 +56,7 @@ def classify_ending(w, initial_crew: int) -> str:
     done = sum(1 for r in w.results if r["outcome"] in ("success", "altered"))
     if "fishermen_sunk" in s.flags:
         return "the_lamp"                    # twelve men who could not have hurt anyone
-    if "civilian_sunk" in s.flags:
+    if "civilian_sunk" in s.flags or "neutral_sunk" in s.flags:
         return "stained_victory"             # the crew knows, whatever HQ's ledger says
     # Disobedience only counts if the orders are on record. Sometimes there is no
     # record at all (m4_unrecorded): nobody can court-martial you for an order
@@ -88,7 +88,12 @@ def debrief_documents(w) -> Dict[str, List[str]]:
         log.append(f"{m.title}: {r['outcome']}. Orders: {m.uncanny_origin}")
     for f in w.fired:
         ev = w.engine.events[f.id]
-        if ev.get("beat") or ev.get("mission"):
+        if ev.get("beat") or ev.get("mission") or ev.get("radio"):
             official.append(f"Day {f.tick // 24 + 1}: {ev['mundane_cause']}")
             log.append(f"Day {f.tick // 24 + 1}: {ev['uncanny_cause']}")
+    s = w.ship
+    n = s.log_true + s.log_soft + s.log_blank
+    if n:
+        official.append(f"The deck log was kept in good order: {n} entr{'y' if n == 1 else 'ies'}.")
+        log.append(f"{s.log_true} written as it happened, {s.log_soft} softened, {s.log_blank} left blank. Somebody else wrote the rest.")
     return {"official": official, "log": log}

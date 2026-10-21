@@ -95,7 +95,7 @@ def hold_ritual(world):
     s = world.ship
     for item in sorted(s.routines, key=s.routines.get)[:2]:
         s.routines[item] = clamp(s.routines[item] + 0.4)
-    world.lose_hours(1.5)
+    world.lose_hours(0.75)
     for c in _live(world):
         c.fear = clamp(c.fear - 0.03)
     return "The crew eats together. Someone finds a deck of cards."
@@ -131,6 +131,31 @@ def raise_periscope(world):
 def lower_periscope(world):
     world.ship.scope_up = False
     return "The periscope is housed."
+
+
+def listen_radio(world):
+    from . import people
+    return people.listen_radio(world)
+
+
+def call_council(world):
+    from . import people
+    return people.call_council(world)
+
+
+def sick_call(world):
+    from . import people
+    return people.sick_call(world)
+
+
+def write_log(world):
+    from . import people
+    return people.write_log(world)
+
+
+def take_fix(world):
+    from . import sea
+    return sea.take_fix(world)
 
 
 def surface(world):
@@ -209,5 +234,6 @@ ORDERS = {
     "release": release, "force_compartment": force_compartment, "cancel_rest": cancel_rest,
     "grant_rest": grant_rest, "ration": ration, "hold_ritual": hold_ritual,
     "address_crew": address_crew, "scrub_air": scrub_air, "surface": surface, "dive": dive,
-    "raise_periscope": raise_periscope, "lower_periscope": lower_periscope, "active_ping": active_ping, "silent_running": silent_running,
+    "listen_radio": listen_radio, "call_council": call_council, "sick_call": sick_call, "write_log": write_log,
+    "take_fix": take_fix, "raise_periscope": raise_periscope, "lower_periscope": lower_periscope, "active_ping": active_ping, "silent_running": silent_running,
 }

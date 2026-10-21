@@ -6,7 +6,7 @@ from .conditions import evaluate
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
 from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
-from . import systems
+from . import combat, people, sea, systems
 from .state import COMPARTMENTS, Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 
 DEFAULT_NAMES = ("Brandt", "Keller", "Vogel", "Hahn", "Lenz", "Ostrow",
@@ -45,6 +45,9 @@ class DreadWorld:
         self.legacy_loss = 0.0    # progress lost to rituals when no mission is running
         self.peak_dread = 0.0
         self._hull_seen = 1.0
+        self.engagement = None
+        self.traffic = []
+        self.traffic_id = 0
         # Missions (DESIGN.md section 7). missions=[] disables them (the live game
         # supplies its own); None loads the default sequence.
         self.missions = load_missions() if missions is None else list(missions)
@@ -88,6 +91,14 @@ class DreadWorld:
     @property
     def on_station(self) -> bool:
         return self.run is not None and self.run.mission.kind == "hold"
+
+    @property
+    def ill_count(self) -> float:
+        return float(sum(1 for c in self.active_crew() if c.ill))
+
+    @property
+    def traffic_near(self) -> float:
+        return float(sea.traffic_near(self))
 
     @property
     def depth_m(self) -> int:
@@ -170,6 +181,8 @@ class DreadWorld:
         self._physics()
         self._resources()
         systems.tick(self)
+        people.health_tick(self)
+        sea.update_traffic(self)
         self._voyage()
         self._rumors()
         self.deck.tick(self)
@@ -178,7 +191,8 @@ class DreadWorld:
         if self.on_station:
             self.vigil_ticks += 1
         self._mutiny()
-        ev = self.engine.select(self)
+        combat.tick(self)
+        ev = self.engine.select(self) if self.pending is None and self.engagement is None else None
         if ev is not None:
             self.engine.fire(ev, self)
         self.settle_damage()
@@ -375,7 +389,7 @@ class DreadWorld:
         s = self.ship
         s.returning = False
         p = min(0.8, 0.08 + 0.35 * s.owed + 0.2 * ("survivors_taken" in s.flags or "extra_man" in s.flags)
-                + 0.03 * self.names_known)
+                + 0.015 * self.names_known)
         if self.rng.random() < p:
             s.flags.add("home_unaccounted")
             self.log.append(f"[{self.tick_no:03d}] The pier is there. The count on the gangway does not match the roll, "
@@ -451,9 +465,17 @@ class DreadWorld:
             return a, False, "Already under way."
         if self.ship.surfaced:
             return a, False, "We are on the surface. Dive first."
-        if not evaluate(a.requires, self):
-            return a, False, a.why or "It cannot be done now."
+        why = self._unmet(a)
+        if why:
+            return a, False, why
         return a, True, ""
+
+    def _unmet(self, a) -> str:
+        """Why this step cannot be done now: the first need that is not met says so ('' if all are)."""
+        for need in a.needs:
+            if not evaluate(need.get("requires"), self):
+                return need.get("why") or "It cannot be done now."
+        return ""
 
     @property
     def working(self):
@@ -473,9 +495,11 @@ class DreadWorld:
             return "We are on the surface."
         if self.ship.stand_down:
             return "The crew is asleep."
+        if self.engagement is not None:
+            return "We are under attack."
         if self.ship.battery <= 0 and not self.ship.surfaced:
             return "The batteries are flat."
-        return "" if evaluate(a.requires, self) else (a.why or "It cannot go on.")
+        return self._unmet(a)
 
     def do_act(self) -> str:
         """Order the next step of the mission. The hours then pass tick by tick."""
@@ -602,18 +626,6 @@ class DreadWorld:
             s.flags.add("deposed")
             self.log.append(f"[{self.tick_no:03d}] The crew takes the control room. You are relieved of command.")
 
-    # -- combat (the external clock) -----------------------------------------
+    # -- combat: an engagement of decisions (combat.py) ----------------------
     def combat(self, severity: float):
-        s = self.ship
-        warned = self.rng.random() < self.deck.real_detection_chance(s)
-        noise = s.noise * (0.5 if warned else 1.0) * (0.4 if s.silent_running else 1.0)
-        s.hull = clamp(s.hull - severity * (0.25 + 0.75 * noise) * (1.0 if warned else 1.6))
-        for c in self.active_crew():
-            c.fear = clamp(c.fear + 0.08 * severity * (1.0 if warned else 1.5))
-            c.fatigue = clamp(c.fatigue + 0.12 * severity)
-        s.noise = clamp(s.noise + 0.2)
-        s.flags.add("in_combat")
-        self.flag_expiry["in_combat"] = self.tick_no + 5
-        self.log.append(f"[{self.tick_no:03d}] " + (
-            "Contact warned in time. Rigged for silent running." if warned
-            else "No warning. Charges close aboard."))
+        combat.start(self, severity)

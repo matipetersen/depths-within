@@ -2,7 +2,7 @@
 from dread import hud
 from dread import orders as O
 from dread.endings import classify_ending
-from dread.nav import COLUMNS, grid_ref, hull_report, navigation
+from dread.nav import COLUMNS, grid_ref, hull_report, navigation, true_xy
 from dread.state import COMPARTMENTS
 from dread.world import DreadWorld
 
@@ -19,15 +19,15 @@ def test_the_station_is_grid_k7_and_the_chart_agrees_with_the_grid():
 
 def test_the_boat_moves_only_as_the_work_is_done():
     w = DreadWorld(seed=3)
-    n0 = navigation(w)
+    n0 = true_xy(w)
     for _ in range(5):
         w.tick()
-    assert navigation(w)["x"] == n0["x"]                  # waiting goes nowhere
+    assert true_xy(w) == n0                               # waiting goes nowhere
     w.do_act()
-    last = navigation(w)["x"]
+    last = true_xy(w)[0]
     for _ in range(4):
         w.tick()
-    assert navigation(w)["x"] != last
+    assert true_xy(w)[0] != last
     assert navigation(w)["eta_h"] is not None
 
 
@@ -40,7 +40,7 @@ def test_the_boat_reaches_each_waypoint_when_its_step_is_done():
         w.tick()
     n = navigation(w)
     x, y, label = w.missions[0].chart["points"][0]
-    assert (n["x"], n["y"]) == (x, y) and n["next"] == "Contact bearing"
+    assert true_xy(w) == (x, y) and n["next"] == "Contact bearing"
 
 
 def test_speed_and_depth_follow_what_the_boat_is_doing():
@@ -59,9 +59,12 @@ def test_on_station_the_boat_is_at_k7_and_going_home_it_moves_toward_base():
     w.ship.fuel = 1.0
     w.leave_station()
     for _ in range(9):
+        if w.pending is not None:
+            w.choose(w.pending.choices[0].key)
         w.tick()
     n = navigation(w)
-    assert n["next"] == "Base" and 100 - 1 <= n["x"] <= 104 and n["y"] < 66
+    tx, ty = true_xy(w)
+    assert n["next"] == "Base" and 100 - 1 <= tx <= 104 and ty < 66
 
 
 def test_damage_is_booked_to_a_compartment_and_repair_heals_the_worst_first():
@@ -304,7 +307,7 @@ def test_a_calm_clean_eye_sees_only_the_sea_and_a_troubled_one_sees_more():
     O.raise_periscope(w)
     calm = 0
     for t in range(60):
-        w.tick_no = t
+        w.tick_no = 2 + (t % 10)                                    # broad day
         calm += len(periscope(w)["distortions"])
     assert calm == 0
     w.ship.moral_debt, w.ship.attention = 0.8, 0.6
@@ -354,12 +357,13 @@ def test_the_solution_error_is_the_rooms_unless_the_eye_has_the_target():
     assert room > 0.4
     O.raise_periscope(w)
     w.tick_no = 7
+    w.ship.flags.discard("fog")
     clear = solution_error(w)
     assert clear < room and abs(clear - room * 0.4) < 1e-9       # a clear eye mends the room's error
     w.ship.moral_debt, w.ship.attention = 0.9, 0.8               # ...a troubled one makes it worse
     for c in w.crew:
         c.fear, c.fatigue = 0.8, 0.8
-    bad = [solution_error(_set_tick(w, t)) for t in range(0, 300, 3)]
+    bad = [solution_error(_set_tick(w, 2 + (t % 10))) for t in range(0, 300, 3)]
     assert max(bad) == 0.5
 
 

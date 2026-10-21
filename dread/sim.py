@@ -48,6 +48,16 @@ def vigil_choice(policy: str, w: DreadWorld, pending) -> str:
         return pick("leave" if ("peace_known" in s.flags or "notice_received" in s.flags) else "hold", "hold")
     if ev == "offering_proposal":
         return pick({"mission_first": "forbid", "crew_first": "forbid", "paranoid": "name_him"}[policy])
+    if ev == "engagement_turn":
+        prefs = {"mission_first": ("hold", "evade", "deep", "silent"), "crew_first": ("silent", "decoy", "deep", "hold"),
+                 "paranoid": ("deep", "silent", "decoy", "hold")}[policy]
+        return pick(*prefs)
+    if ev == "m2_fishing_boat" and policy == "mission_first":
+        return pick("sink" if w.tick_no % 2 == 0 else "let_go", "take_skipper")   # even the hard captain is not always the same man
+    if ev == "log_entry":
+        return pick({"mission_first": "soft", "crew_first": "true", "paranoid": "true"}[policy])
+    if ev == "officers_unasked":
+        return pick({"mission_first": "forbid", "crew_first": "join", "paranoid": "join"}[policy])
     if ev == "further_notice":
         return pick("verify" if policy == "paranoid" else "obey")
     if ev in ("sea_gives_fish", "sea_gives_rain"):
@@ -60,7 +70,7 @@ def vigil_choice(policy: str, w: DreadWorld, pending) -> str:
     return pending.choices[0].key
 
 
-VIGIL_EVENTS = {"station_council", "offering_proposal", "further_notice", "sea_gives_fish",
+VIGIL_EVENTS = {"m2_fishing_boat", "log_entry", "officers_unasked", "engagement_turn", "station_council", "offering_proposal", "further_notice", "sea_gives_fish",
                 "sea_gives_rain", "larder_short", "voyage_charts_wrong"}
 
 
@@ -76,31 +86,74 @@ def pick_choice(policy: str, pending, prng=None, world=None) -> str:
     return ranked[0].key
 
 
+def _fix(w: DreadWorld):
+    s = w.ship
+    scope = s.scope_up
+    if not s.surfaced and not s.scope_up:
+        O.raise_periscope(w)
+    O.take_fix(w)
+    if not s.surfaced and not scope:
+        O.lower_periscope(w)
+
+
 def _carry_on(policy: str, w: DreadWorld, fatigue: float):
     """Give the mission's next order, the way each kind of captain would."""
     s = w.ship
+    if w.working is not None and "Take a fix" in w.work_blocked:       # the work stopped for want of a position
+        _fix(w)
     a, ok, why = w.act_status()
     if a is None:
         return
-    if not ok and not s.sonar_on and a.requires and "sonar_on" in str(a.requires):
+    if not ok and not s.sonar_on and "sonar_on" in str(a.needs):
         O.restore_sonar(w)                                   # even a wary captain has to listen to search
         a, ok, why = w.act_status()
+    if not ok and "Take a fix" in why:                       # a captain who does not know where he is finds out
+        _fix(w)
+        a, ok, why = w.act_status()
     # the cautious captain lets a worn crew sleep before asking more of it
-    if ok and not (policy == "crew_first" and fatigue > 0.55):
+    if policy == "crew_first" and fatigue > 0.65 and not s.stand_down and not w.engagement:
+        O.stand_down(w)                                              # a worn crew is let to sleep before it is asked for more
+    if ok and not (policy == "crew_first" and fatigue > 0.6):
         w.do_act()
+
+
+def _settle(policy: str, w: DreadWorld):
+    """A policy answers at once whatever its own order raised, so that a patrol can go on ticking."""
+    while w.pending is not None:
+        w.choose(pick_choice(policy, w.pending, None, w))
 
 
 def _machinery(policy: str, w: DreadWorld, fatigue: float):
     """What a sensible captain does about the batteries, the speed and what is broken."""
     s = w.ship
-    if not s.surfaced and s.battery < 0.3:
+    if not s.surfaced and s.battery < 0.1:
         O.surface(w)                                                  # the batteries are the clock
     elif s.surfaced and s.battery > 0.85 and "checking" not in s.flags and s.co2 < 0.02:
         O.dive(w)
+    elif not s.surfaced and not w.engagement:                         # charge on the snorkel and keep working
+        if s.battery < 0.4 and not s.snorkel:
+            O.raise_periscope(w)
+            O.snorkel(w, True)
+        elif s.snorkel and s.battery > 0.9:
+            O.snorkel(w, False)
+            O.lower_periscope(w)
+    if w.tick_no % 12 == 6 and any(c.ill for c in w.active_crew()):
+        O.sick_call(w)                                                # the medic goes berth by berth
+    if policy == "crew_first" and w.tick_no % 24 == 12:
+        O.call_council(w)                                             # the one who asks his officers
+        O.write_log(w)
+        _settle(policy, w)
+    if policy in ("crew_first", "paranoid") and w.tick_no % 20 == 10 and not s.surfaced and not w.engagement:
+        up = s.scope_up                                               # the cautious ones listen for orders that may not be orders
+        O.raise_periscope(w)
+        O.listen_radio(w)
+        if not up:
+            O.lower_periscope(w)
+        _settle(policy, w)
     if s.hull < 0.7 and s.spares > 0.2 and not s.dc_active:
         O.damage_control(w, True)
     want = {"mission_first": "flank" if s.battery > 0.5 and fatigue < 0.7 else "standard",
-            "crew_first": "slow" if fatigue > 0.5 else "standard", "paranoid": "slow" if fatigue > 0.4 else "standard"}.get(policy)
+            "crew_first": "slow" if fatigue > 0.7 else "standard", "paranoid": "slow" if fatigue > 0.6 else "standard"}.get(policy)
     if want and s.speed_order != want and s.helm_pending is None:
         O.set_speed(w, want)
     if policy == "paranoid" and not s.surfaced and s.helm_pending is None:     # the wary one hides in the deep
@@ -186,11 +239,15 @@ def random_orders(w: DreadWorld, prng: random.Random):
         return
     s, live = w.ship, w.active_crew()
     choice = prng.choice(["cancel_rest", "grant_rest", "hold_ritual", "scrub_air", "silence_sonar",
-                          "restore_sonar", "surface", "dive", "isolate", "address_crew", "verify_orders"])
+                          "restore_sonar", "surface", "dive", "isolate", "address_crew", "verify_orders", "listen_radio",
+                          "call_council", "sick_call", "take_fix", "raise_periscope", "lower_periscope", "damage_control",
+                          "write_log"])
     if choice == "isolate":
         O.isolate(w, prng.choice(live).id)
     else:
         O.ORDERS[choice](w)
+    while w.pending is not None:                    # an order (the radio, the log) can raise a decision of its own
+        w.choose(prng.choice(w.pending.choices).key)
 
 
 def run_patrol(policy: str, seed: int, patrol_ticks: int = 72, verbose: bool = False) -> Dict:

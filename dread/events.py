@@ -17,7 +17,7 @@ GLOBAL_COOLDOWN = 3
 BEAT_GAP = 14          # ticks without the presence showing itself before one is forced
 BEAT_START = 8         # no forced beat before this tick
 CREW_STATS = ("fear", "fatigue", "guilt", "trust")
-SHIP_CLAMP = {"co2": (0.0, 0.1)}
+SHIP_CLAMP = {"co2": (0.0, 0.1), "dr_error": (0.0, 40.0)}
 
 
 def load_events(path: str = DEFAULT_PATH) -> List[dict]:
@@ -118,7 +118,17 @@ class EventEngine:
         weights = [e.get("weight", 1.0) for e in cands]
         return world.rng.choices(cands, weights=weights, k=1)[0]
 
+    def radio_ready(self, ev, world) -> bool:
+        """A radio message is heard only at the set, once its conditions hold and it has not just been heard."""
+        if world.tick_no - self.last_fired.get(ev["id"], -99) < ev.get("cooldown", 18):
+            return False
+        if ev.get("once") and ev["id"] in self.last_fired:
+            return False
+        return evaluate(ev.get("requires"), world)
+
     def _ready(self, ev, t, act, world, check_global=True) -> bool:
+        if ev.get("radio"):
+            return False                       # heard only by listening
         if "at_progress" in ev:
             return False                       # phase events fire from select(), not the pool
         if "mission" in ev:
@@ -249,6 +259,9 @@ def apply_effects(effects: List[dict], world, target=None):
                 c.alive = False
         elif op == "combat":
             world.combat(fx["severity"])
+        elif op == "engage_order":
+            from . import combat
+            combat.order(world, fx["order"])
         elif op == "tubes":
             for i in range(4):                                   # the bow tubes: state changes only where a fish is loaded
                 if ship.tubes[i] != "empty":
@@ -267,6 +280,18 @@ def apply_effects(effects: List[dict], world, target=None):
                     ship.tubes[i] = "empty"
                     ship.torpedoes -= 1
                     n += 1
+        elif op == "log_entry":
+            k = fx["kind"]
+            setattr(ship, f"log_{k}", getattr(ship, f"log_{k}") + 1)
+        elif op == "peace_news":
+            if world.truth["war_over"]:
+                ship.flags.add("peace_known")
+                world.log.append(f"[{world.tick_no:03d}] The radio man reads the date aloud twice. It is eleven months after an armistice nobody told us about.")
+            else:
+                world.log.append(f"[{world.tick_no:03d}] Something about a date, and a word that might be 'armistice', or 'amnesty', or a man's name.")
+        elif op == "traffic_act":
+            from . import sea
+            sea.traffic_act(world, fx["action"])
         elif op == "leave_station":
             world.log.append(f"[{world.tick_no:03d}] {world.leave_station()}")
         elif op == "check_world":

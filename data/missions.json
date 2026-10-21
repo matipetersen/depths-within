@@ -21,16 +21,20 @@
           "label": "Search the northern lane",
           "hint": "hours at the headsets; the boat must be listening",
           "hours": 8,
-          "requires": {
-            "path": "ship.sonar_on",
-            "op": ">=",
-            "value": 1
-          },
-          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
           "effects": [
             {
               "op": "flag",
               "name": "m1_located"
+            }
+          ],
+          "needs": [
+            {
+              "requires": {
+                "path": "ship.sonar_on",
+                "op": ">=",
+                "value": 1
+              },
+              "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
           ]
         },
@@ -51,16 +55,28 @@
           "label": "Order the tubes flooded",
           "hint": "the last thing before the order itself",
           "hours": 1,
-          "requires": {
-            "crew_where": {
-              "role": "torpedo"
-            }
-          },
-          "why": "There is nobody left in the torpedo room to do it.",
           "effects": [
             {
               "op": "tubes",
               "state": "flooded"
+            }
+          ],
+          "needs": [
+            {
+              "requires": {
+                "crew_where": {
+                  "role": "torpedo"
+                }
+              },
+              "why": "There is nobody left in the torpedo room to do it."
+            },
+            {
+              "requires": {
+                "path": "ship.dr_error",
+                "op": "<",
+                "value": 4.0
+              },
+              "why": "We cannot fire from a position we cannot name. Take a fix first."
             }
           ]
         }
@@ -120,16 +136,20 @@
           "label": "Search the grid for smoke",
           "hint": "hours at the headsets; the boat must be listening",
           "hours": 10,
-          "requires": {
-            "path": "ship.sonar_on",
-            "op": ">=",
-            "value": 1
-          },
-          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
           "effects": [
             {
               "op": "flag",
               "name": "m2_searched"
+            }
+          ],
+          "needs": [
+            {
+              "requires": {
+                "path": "ship.sonar_on",
+                "op": ">=",
+                "value": 1
+              },
+              "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
           ]
         },
@@ -138,13 +158,25 @@
           "label": "Transmit at the relay window",
           "hint": "say what you saw; or something else",
           "hours": 2,
-          "requires": {
-            "crew_where": {
-              "role": "radio"
+          "effects": [],
+          "needs": [
+            {
+              "requires": {
+                "crew_where": {
+                  "role": "radio"
+                }
+              },
+              "why": "There is no radio man to send it."
+            },
+            {
+              "requires": {
+                "path": "ship.dr_error",
+                "op": "<",
+                "value": 4.0
+              },
+              "why": "You cannot report a position you do not have. Take a fix first."
             }
-          },
-          "why": "There is no radio man to send it.",
-          "effects": []
+          ]
         }
       ],
       "chart": {
@@ -191,23 +223,27 @@
       },
       "mundane_origin": "An order slipped to the captain by a rival staff faction, or enemy deception designed to make a boat commit a war crime.",
       "uncanny_origin": "It was written in the captain's own hand by something that wanted the ship sunk.",
-      "window": 2.2,
+      "window": 3.0,
       "acts": [
         {
           "id": "find",
           "label": "Search for the steamer",
           "hint": "hours at the headsets; the boat must be listening",
           "hours": 6,
-          "requires": {
-            "path": "ship.sonar_on",
-            "op": ">=",
-            "value": 1
-          },
-          "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing.",
           "effects": [
             {
               "op": "flag",
               "name": "m3_found"
+            }
+          ],
+          "needs": [
+            {
+              "requires": {
+                "path": "ship.sonar_on",
+                "op": ">=",
+                "value": 1
+              },
+              "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
           ]
         },
@@ -223,16 +259,28 @@
           "label": "Order the tubes flooded",
           "hint": "the last thing before the order itself",
           "hours": 1,
-          "requires": {
-            "crew_where": {
-              "role": "torpedo"
-            }
-          },
-          "why": "There is nobody left in the torpedo room to do it.",
           "effects": [
             {
               "op": "tubes",
               "state": "flooded"
+            }
+          ],
+          "needs": [
+            {
+              "requires": {
+                "crew_where": {
+                  "role": "torpedo"
+                }
+              },
+              "why": "There is nobody left in the torpedo room to do it."
+            },
+            {
+              "requires": {
+                "path": "ship.dr_error",
+                "op": "<",
+                "value": 4.0
+              },
+              "why": "We cannot fire from a position we cannot name. Take a fix first."
             }
           ]
         }
@@ -286,7 +334,7 @@
       },
       "mundane_origin": "Standing return instructions the mate copied into the log and forgot.",
       "uncanny_origin": "Nobody wrote it. It was already in the log.",
-      "window": 2.2,
+      "window": 3.0,
       "acts": [
         {
           "id": "steer",
@@ -300,7 +348,17 @@
           "label": "Make the rendezvous",
           "hint": "the boat will be expected, or it will not",
           "hours": 4,
-          "effects": []
+          "effects": [],
+          "needs": [
+            {
+              "requires": {
+                "path": "ship.dr_error",
+                "op": "<",
+                "value": 4.0
+              },
+              "why": "We are not where we think we are, and the rendezvous will not wait. Take a fix first."
+            }
+          ]
         }
       ],
       "chart": {

@@ -729,3 +729,34 @@ Método: se leyó el código y los datos tal como están (no lo que dice el dise
 5. Navegación con incertidumbre (5), tráfico (7), consejo de oficiales (8), sanidad (9), diario (10).
 
 Riesgos a vigilar: (a) un simulador de combate muy completo aplasta lo sutil, de modo que cada mecánica debe pasar el "criterio de la cena": ¿qué dice la tripulación de esto?; (b) cada mecánica nueva exige una política de prueba que la use, o el balance se mide a ciegas (hallazgo 7); (c) la paridad Python ↔ JavaScript se amplía con cada una: todo cálculo de pantalla sigue siendo determinista y sin dados del mundo.
+
+# 15. Lo que se construyó a partir de la auditoría (§14)
+
+Todo lo de esta sección existe igual en Python (`dread/`) y en JavaScript (`web/engine.js`), con la prueba de paridad que compara patrullas enteras línea por línea, más los instrumentos, el casco, el scope, la sala de torpedos, el periscopio, la deriva de posición y el tráfico.
+
+## 15.1 Timón, batería, profundidad, averías (`dread/systems.py`)
+- **Órdenes de marcha:** velocidad (lento / normal / máxima) y profundidad (60 / 120 / 180 m). Cambian el ritmo del trabajo (`pace`), el ruido, el consumo y, a profundidad, el casco y el ánimo (a 120 m "el casco habla"; a 180 m las filtraciones y el miedo crecen).
+- **Quien ejecuta, falla.** Una orden de timón la cumple el timonel: si está asustado o agotado (o no hay), la repite tarde (`helm_lag`, "repite la orden anterior"). Una sala de control dañada también retrasa.
+- **Batería:** se gasta sumergido según la marcha, se carga en superficie o con el snorkel (periscopio arriba; ruidoso y gasta diésel). Plana, el barco no se mueve; por debajo de 25 % las luces bajan: miedo y atención suben.
+- **Averías que inutilizan:** motor dañado limita la marcha (y muerto, a lento), sala de control muerta traba los planos, la proa dañada da menos tubos y anegada ninguno, los alojamientos dañados dan mal sueño. Control de averías (orden) repara el peor compartimento y gasta *repuestos* (recurso finito, en el ledger).
+- **Fallas:** sonar y radio mueren por horas; "las fallas siguen a un hombre" abre el rumor de sabotaje.
+
+## 15.2 El combate como secuencia (`dread/combat.py`)
+Un ataque ya no es una tirada: es un `engagement` de escoltas y turnos (cada turno, una hora). El capitán ordena una cosa por turno (mantener, profundizar, silencio, máxima y virar hacia ellos, señuelo). El escolta adivina una profundidad; la probabilidad de impacto sale del ruido, de si estás en la banda adivinada y de lo ordenado. **El miedo decide lo táctico:** el timonel asustado obedece tarde; con el miedo medio alto un hombre abre la válvula equivocada, dispara un tubo sin orden o deja caer una llave. Con la presencia cerca, las cargas "caen siempre al mismo lado" y nadie lo explica. No se trabaja en la misión mientras dura.
+
+## 15.3 Posición incierta, mar vivo (`dread/sea.py`)
+- **Estima.** El instrumento muestra la posición *creída*; el error real crece con la marcha, con un timonel cansado y con la atención. Se corrige con una **toma de posición** (periscopio, estrellas de noche, marcaciones de radio; una hora). Algunos pasos (disparar, informar posición, el encuentro) exigen error < 4 nm. Un evento mueve la costa.
+- **Visibilidad.** 12 nm de día, menos de noche, mucho menos con niebla; la oscuridad y la niebla alimentan al ojo que ve cosas.
+- **Tráfico.** Mercantes y pesqueros reales cruzan el mar; salen en el scope igual que cualquier contacto y en el periscopio como cascos. Su bandera es oculta (neutral o enemiga) y el ojo puede mentir al leerla. Decisión: dejarlo pasar, seguirlo tres horas, o hundirlo (neutral o pesquero = la mancha moral; enemigo = nadie vitorea).
+
+## 15.4 La gente cuenta (`dread/people.py`)
+- **Radio y cifra.** Escuchar cuesta una hora, exige periscopio arriba o superficie y un radiotelegrafista; trae estática o un mensaje (confirmación dudosa, nombres en la estática, la orden de volver firmada por un muerto, la petición de acuse que rompe el silencio, noticias de paz). Un operador asustado lee *otro* mensaje.
+- **Consejo de oficiales.** Primer oficial, jefe de máquinas y médico dan consejo honesto en proporción a su confianza y candor; si no, adulan. Preguntar a quien confía en vos lo acerca; preguntar a quien no, lo aleja. Si no preguntás, los oficiales se reúnen sin vos.
+- **Sanidad.** La enfermedad crece con aire viciado y hambre y contagia; los asustados la esconden. La visita sanitaria del médico los encuentra; sin tratamiento mueren.
+- **Diario.** Escribir (o no) la entrada del día es una decisión: verdad, suavizada, en blanco; el informe final contrasta ambas versiones.
+
+## 15.5 Ambigüedad y balance tras estos cambios
+La ambigüedad de los eventos tempranos se mantiene ≥ 85 % en las tres políticas. El juego es más exigente: el progreso medio de las misiones baja respecto a antes de la auditoría (por el combate que bloquea el trabajo y por las tomas de posición) y se compensó con ventanas de misión más generosas (×1,8 por defecto). Las políticas del simulador ahora gobiernan batería, velocidad, averías, enfermedad, consejo y diario (`dread/sim.py`).
+
+## 15.6 Lo que queda
+El oficio de cubierta (`deck`) sigue sin efecto propio; el tiempo atmosférico se reduce a niebla y noche; no hay minas, cañón de cubierta ni tipos de torpedo. Todo lo demás de la auditoría §14 está construido.

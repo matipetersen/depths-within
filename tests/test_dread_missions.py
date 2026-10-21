@@ -10,7 +10,7 @@ from dread.orders import verify_orders
 from dread.world import DreadWorld
 
 
-def _play(w, policy="crew_first", max_ticks=400):
+def _play(w, policy="mission_first", max_ticks=500):
     """Play a whole patrol with one of the simulator's captains."""
     from dread.sim import issue_orders, pick_choice
     while not w.finished and w.tick_no < max_ticks:
@@ -59,12 +59,13 @@ def test_briefing_is_logged_with_provenance_not_origin():
 def test_missions_run_in_sequence_and_each_fires_its_own_events():
     fired, completed = set(), 0
     for seed in range(10):
-        w = _play(DreadWorld(seed=seed))
-        ids = [m.id for m in w.missions]
-        got = [r["mission"] for r in w.results]
-        assert got == ids[:len(got)]                  # strictly in order; a lost boat may stop early
-        completed += len(got) == len(ids)
-        fired |= {f.id for f in w.fired}
+        for policy in ("mission_first", "crew_first"):
+            w = _play(DreadWorld(seed=seed), policy)
+            ids = [m.id for m in w.missions]
+            got = [r["mission"] for r in w.results]
+            assert got == ids[:len(got)]              # strictly in order; a lost boat may stop early
+            completed += policy == "crew_first" and len(got) == len(ids)
+            fired |= {f.id for f in w.fired}
     assert {"m1_contact", "m1_attack", "m2_smoke", "m2_ack", "m3_sighting", "m3_decision",
             "m4_survivors", "m4_unrecorded"} <= fired
     assert completed >= 5

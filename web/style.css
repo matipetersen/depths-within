@@ -140,6 +140,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--brass)
 .eye .red { fill: var(--rust); } .eye .fig { fill: #02040a; } .eye .lamp { fill: #e8c46a; } .eye .wake { stroke: #a9c3b6; stroke-width: .5; fill: none; opacity: .6; }
 .eye .ghostv { opacity: .35; } .eye .ghostv .hull, .eye .ghostv .sup { fill: #1c2a30; } .eye .edge { fill: var(--brass); }
 .eyeread { margin: 6px 0 0; font-size: 13px; } .eyebtns { display: grid; gap: 8px; }
+.chart .errc { fill: rgba(209,166,78,.10); stroke: var(--brass); stroke-width: .3; stroke-dasharray: 1 1; }
+.eye .mist { fill: rgba(150,170,170,.35); }
+.sheet.attack { border-top: 3px solid var(--rust); } .sheet.attack > header h2 { color: var(--rust); }
+.grp { margin: 12px 0 6px; } .grp:first-child { margin-top: 0; }
 .gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 8px; }
 .gg { background: var(--panel-hi); border: 1px solid var(--line); border-radius: 3px; padding: 4px 6px; display: grid; gap: 1px; min-width: 0; }
 .gg.wide { grid-column: 1 / -1; }

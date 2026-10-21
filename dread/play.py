@@ -97,6 +97,11 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
     if s.hull < 0.999 or s.dc_active:
         items.append(Item("Stand the damage control party down" if s.dc_active else "Damage control: all hands to the worst compartment",
                           f"spares {s.spares * 100:.0f}%", (lambda: O.damage_control(w, not s.dc_active))))
+    items.append(Item("Listen at the radio", "surfaced or periscope up; an hour at the set", lambda: O.listen_radio(w)))
+    items.append(Item("Call the officers", "an hour; they say what they say", lambda: O.call_council(w)))
+    items.append(Item("Sick call", "the medic goes berth by berth", lambda: O.sick_call(w)))
+    items.append(Item("Write the day's entry", "what you leave out, someone will read", lambda: O.write_log(w)))
+    items.append(Item("Take a fix", "periscope, stars or radio bearings; an hour", lambda: O.take_fix(w)))
     if w.run is not None and "verified" not in w.run.phase_fired:
         items.append(Item("Ask headquarters to confirm the orders", "an answer is not the same as a source",
                           lambda: O.verify_orders(w)))

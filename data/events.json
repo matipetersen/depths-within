@@ -4901,6 +4901,581 @@
           "value": 0.02
         }
       ]
+    },
+    {
+      "id": "traffic_crossing",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "path": "world.traffic_near",
+        "op": ">=",
+        "value": 1
+      },
+      "text": "A vessel crosses ahead, making her own business, lights burning. At this distance there is no flag you can read with any confidence.",
+      "mundane_when": {},
+      "mundane_cause": "The sea is a road; other people use it.",
+      "uncanny_cause": "She is on the exact bearing where the log said, three days ago, that nothing would be.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "pass",
+          "text": "Let her pass.",
+          "tags": [
+            "care"
+          ],
+          "cost": "You will never know what she was.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "pass"
+            }
+          ]
+        },
+        {
+          "key": "shadow",
+          "text": "Shadow her for three hours until you can read her flag.",
+          "tags": [
+            "listen",
+            "paranoid"
+          ],
+          "cost": "Hours of the window, and she may see you.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "shadow"
+            }
+          ]
+        },
+        {
+          "key": "sink",
+          "text": "Sink her.",
+          "tags": [
+            "mission",
+            "attack"
+          ],
+          "cost": "Two torpedoes, and the flag you did not read.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "sink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fog_bank",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 40,
+      "text": "A bank of fog comes down. At the periscope the sea ends at arm's length, and things begin in it.",
+      "mundane_when": {},
+      "mundane_cause": "Warm air over a cold current.",
+      "uncanny_cause": "It closed behind the boat as it closed ahead.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fog",
+          "ttl": 10
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        }
+      ]
+    },
+    {
+      "id": "coast_moved",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "path": "ship.attention",
+        "op": ">=",
+        "value": 0.3
+      },
+      "text": "The chart puts a headland on the beam. The periscope shows open water. The navigator checks his arithmetic twice, and then a third time, and says nothing.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Dead reckoning across hours of current, and a tired man's sums.",
+      "uncanny_cause": "The headland was where the chart said. We were not.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "dr_error",
+          "value": 6.0
+        },
+        {
+          "op": "crew",
+          "who": "role:helm",
+          "stat": "fear",
+          "value": 0.06
+        }
+      ]
+    },
+    {
+      "id": "r_traffic",
+      "weight": 1.0,
+      "cooldown": 24,
+      "text": "Routine traffic: weather, a list of ships due in. The boat is on the list, in port, since Tuesday.",
+      "mundane_when": {},
+      "mundane_cause": "A clerk in a hurry copies yesterday's list.",
+      "uncanny_cause": "She is in port. She has been in port for some time.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.03
+        },
+        {
+          "op": "crew",
+          "who": "role:radio",
+          "stat": "fear",
+          "value": 0.03
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_confirm",
+      "weight": 1.2,
+      "cooldown": 30,
+      "requires": {
+        "path": "ship.orders_doubt",
+        "op": ">=",
+        "value": 0.2
+      },
+      "text": "A confirmation of your orders, relayed through a station you cannot identify. It uses the right words in the wrong order.",
+      "mundane_when": {},
+      "mundane_cause": "A relay station, and an operator who learned the code from a manual.",
+      "uncanny_cause": "The signature is that of an officer who left the staff two years ago.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": -0.15
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_names",
+      "weight": 0.8,
+      "cooldown": 40,
+      "target": {
+        "role": "radio",
+        "select": "random"
+      },
+      "text": "Under the traffic, a voice reads names. {target} hears his own, and then a date that has not happened yet.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Cross-talk from another circuit, and a tired man hearing what he fears.",
+      "uncanny_cause": "They are reading the roll for a muster that has not been called.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "target",
+          "stat": "fear",
+          "value": 0.12
+        },
+        {
+          "op": "rumor",
+          "id": "names",
+          "text": "The radio read our names.",
+          "intensity": 0.6,
+          "seed": "target"
+        },
+        {
+          "op": "phantom",
+          "kind": "voice",
+          "audible": "target",
+          "intensity": 0.5
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_recall",
+      "weight": 0.7,
+      "cooldown": 50,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.moral_debt",
+            "op": ">=",
+            "value": 0.2
+          },
+          {
+            "path": "ship.orders_doubt",
+            "op": ">=",
+            "value": 0.3
+          }
+        ]
+      },
+      "text": "RETURN TO BASE IMMEDIATELY. The signature is that of an officer you know to be dead.",
+      "mundane_when": {},
+      "mundane_cause": "A misfiled authority list: the dead are not struck from it quickly.",
+      "uncanny_cause": "He is the only one who can call us home.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "obey",
+          "text": "Obey. Turn for home.",
+          "tags": [
+            "abort",
+            "retreat"
+          ],
+          "cost": "The patrol is entered as abandoned.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "aborted"
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Ignore it. The orders you have are the orders you have.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "If he is dead, he is not wrong.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "crew",
+              "who": "role:radio",
+              "stat": "fear",
+              "value": 0.08
+            }
+          ]
+        },
+        {
+          "key": "verify",
+          "text": "Ask for confirmation.",
+          "tags": [
+            "verify",
+            "paranoid"
+          ],
+          "cost": "You must transmit, and what answers you will hear.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_ack",
+      "weight": 1.0,
+      "cooldown": 30,
+      "text": "Acknowledge: transmit your position and state of readiness. The call sign is right. The hour is not one anyone keeps.",
+      "mundane_when": {},
+      "mundane_cause": "A routine position request, from a watch officer ashore working to a clock of his own.",
+      "uncanny_cause": "They already know where we are. They want to hear us say it.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "reply",
+          "text": "Transmit.",
+          "tags": [
+            "report",
+            "comply"
+          ],
+          "cost": "Radio silence broken; and for a minute everyone aboard is a transmitter.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "dr_error",
+              "value": -3.0
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": -0.08
+            },
+            {
+              "op": "flag",
+              "name": "silence_broken"
+            }
+          ]
+        },
+        {
+          "key": "silent",
+          "text": "Stay silent.",
+          "tags": [
+            "silence",
+            "paranoid"
+          ],
+          "cost": "They will take silence as an answer.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "role:radio",
+              "stat": "fear",
+              "value": 0.04
+            }
+          ]
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_peace",
+      "weight": 0.5,
+      "cooldown": 60,
+      "text": "A man's voice, calm, reads a date and a word that sounds like the end of something.",
+      "mundane_when": {},
+      "mundane_cause": "A broadcast from a station that is not on the schedule: news, as people hear it ashore.",
+      "uncanny_cause": "It is a very old recording, read as if it had just happened.",
+      "effects": [
+        {
+          "op": "peace_news"
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "fault_radio",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 40,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.85
+          },
+          {
+            "path": "crew.avg.fatigue",
+            "op": ">=",
+            "value": 0.5
+          }
+        ]
+      },
+      "text": "The radio set dies in the middle of a word. Its valves are warm. It will not say why.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.95
+      },
+      "mundane_cause": "Damp in the set, and a boat that has been knocked about.",
+      "uncanny_cause": "It stopped the moment it was about to say a name.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fault_radio",
+          "ttl": 8
+        },
+        {
+          "op": "crew",
+          "who": "role:radio",
+          "stat": "fear",
+          "value": 0.05
+        }
+      ]
+    },
+    {
+      "id": "officers_unasked",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "ship.orders_doubt",
+            "op": ">=",
+            "value": 0.35
+          },
+          {
+            "path": "crew.avg.trust",
+            "op": "<",
+            "value": 0.65
+          },
+          {
+            "no_flag": "council_recent"
+          }
+        ]
+      },
+      "text": "The officers have met without you. Nobody tells you what was said. The first officer will not meet your eye.",
+      "mundane_when": {},
+      "mundane_cause": "Officers confer; it is what they are for, and nobody remembers to tell the captain.",
+      "uncanny_cause": "There was an extra chair, and nobody will say who sat in it.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "join",
+          "text": "Ask to join them.",
+          "tags": [
+            "care",
+            "listen"
+          ],
+          "cost": "It will be a different meeting with you in it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.04
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": -0.04
+            }
+          ]
+        },
+        {
+          "key": "forbid",
+          "text": "Forbid it. Officers do not meet behind the captain's back.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "An order the men read as fear. Some of them will not forgive it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            },
+            {
+              "op": "chance",
+              "p": 0.35,
+              "then": [
+                {
+                  "op": "flag",
+                  "name": "mutiny_brewing"
+                }
+              ],
+              "else": []
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Pretend you did not notice.",
+          "tags": [
+            "silence"
+          ],
+          "cost": "They will notice you did.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "food_spoiled",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 50,
+      "requires": {
+        "path": "ship.food",
+        "op": "<",
+        "value": 0.65
+      },
+      "text": "The cook opens a locker and shuts it again. The meat has gone, not the way meat goes. He says nothing and does not need to.",
+      "mundane_when": {},
+      "mundane_cause": "A damp boat, and a locker whose seal was never good.",
+      "uncanny_cause": "It was fresh in the morning. It was not fresh in the morning.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "food",
+          "value": -0.08
+        },
+        {
+          "op": "rumor",
+          "id": "larder",
+          "text": "The meat went off in an hour.",
+          "intensity": 0.5,
+          "seed": "all"
+        }
+      ]
     }
   ]
 }

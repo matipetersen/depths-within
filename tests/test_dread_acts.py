@@ -17,7 +17,7 @@ def _answer_all(w):
 
 def test_waiting_alone_never_advances_a_mission():
     w = DreadWorld(seed=3)
-    for _ in range(40):
+    for _ in range(90):
         if w.pending is not None:
             w.choose(w.pending.choices[-1].key)
         if w.run.mission.id != "m1_battleship":
@@ -103,7 +103,7 @@ def test_hours_spent_on_the_crew_shorten_the_window():
     w = DreadWorld(seed=3)
     d0 = w.run.deadline
     O.hold_ritual(w)
-    assert w.run.deadline == d0 - 1.5
+    assert w.run.deadline == d0 - 0.75
 
 
 def test_a_captain_who_gives_the_orders_finishes_the_mission():
@@ -129,5 +129,5 @@ def test_every_mission_but_the_station_has_steps_and_each_names_its_hours():
             continue
         assert len(m.acts) >= 2
         assert all(a.hours > 0 and a.label for a in m.acts)
-        assert all(a.why for a in m.acts if a.requires)
+        assert all(n.get("why") for a in m.acts for n in a.needs)
         assert sum(a.hours for a in m.acts) < m.ticks * m.window     # it can be done inside its window

@@ -148,11 +148,11 @@
         channel: (m.provenance && m.provenance.channel) || '', signed: (m.provenance && m.provenance.signed) || '',
         quality: (m.provenance && m.provenance.quality !== undefined) ? m.provenance.quality : 0.5,
         mundane_origin: m.mundane_origin, uncanny_origin: m.uncanny_origin,
-        window: m.window !== undefined ? m.window : 1.25,
+        window: m.window !== undefined ? m.window : 1.8,
         chart: m.chart || null,
         acts: (m.acts || []).map((a) => ({
           id: a.id, label: a.label, hint: a.hint || '', hours: Number(a.hours),
-          requires: a.requires || null, why: a.why || '', effects: a.effects || [],
+          needs: a.needs || [], effects: a.effects || [],
         })),
       })),
     };
@@ -169,6 +169,7 @@
       Object.assign(this, {
         id, name, role, section, candor, fear: 0.1, fatigue: 0.1, guilt: 0.0, trust: 0.8,
         alive: true, missing: false, isolated: false, isolated_ticks: 0, name_known: false,
+        ill: false, hides: false, ill_ticks: 0,
       });
       this.believes = new Set();
     }
@@ -188,6 +189,7 @@
       if (this.trust < 0.4) out.push('silent when the captain speaks');
       if (this.guilt > 0.4 && this.fear > 0.4) out.push('leaves small offerings');
       if (this.believes.size > 0 && this.fear > 0.3) out.push('repeats rumors');
+      if (this.ill && !this.hides) out.push('feverish');
       return out;
     }
   }
@@ -206,7 +208,8 @@
         attention: 0.0, progress: 0.0, food: 1.0, water: 1.0, fuel: 1.0, rations: 1.0,
         returning: false, owed: 0.0, orders_doubt: 0.0, moral_debt: 0.0, scrubber: 1.0,
         sonar_on: true, silent_running: false, surfaced: false, rest_cancelled: false,
-        stand_down: false, hours_submerged: 0, torpedoes: 12, scope_up: false,
+        stand_down: false, hours_submerged: 0, torpedoes: 12, scope_up: false, decoys: 4,
+        dr_error: 0.0, last_fix: 0, last_log: -99, log_true: 0, log_soft: 0, log_blank: 0,
         speed_order: 'standard', depth_order: 'shallow', battery: 1.0, snorkel: false, spares: 1.0, dc_active: false,
         helm_pending: null, helm_lag: 0,
       });
@@ -374,12 +377,11 @@
       for (const p of this.phantoms) p.intensity = clamp(p.intensity - 0.15);
       this.phantoms = this.phantoms.filter((p) => p.intensity > 0.0);
     }
-    real_detection_chance(ship) { return ship.sonar_on ? 0.9 : 0.3; }
   }
 
   // ---------------------------------------------------------------- events
   const GLOBAL_COOLDOWN = 3, BEAT_GAP = 14, BEAT_START = 8;
-  const SHIP_CLAMP = { co2: [0.0, 0.1] };
+  const SHIP_CLAMP = { co2: [0.0, 0.1], dr_error: [0.0, 40.0] };
 
   class EventEngine {
     constructor(events, useSchedule) {
@@ -412,7 +414,13 @@
       if (!cands.length) return null;
       return world.rng.choices1(cands, cands.map((e) => (e.weight !== undefined ? e.weight : 1.0)));
     }
+    radioReady(ev, world) {
+      if (world.tick_no - (this.last_fired.has(ev.id) ? this.last_fired.get(ev.id) : -99) < (ev.cooldown !== undefined ? ev.cooldown : 18)) return false;
+      if (ev.once && this.last_fired.has(ev.id)) return false;
+      return evaluate(ev.requires, world);
+    }
     _ready(ev, t, act, world) {
+      if (ev.radio) return false;
       if ('at_progress' in ev) return false;
       if ('mission' in ev) {
         const ms = Array.isArray(ev.mission) ? ev.mission : [ev.mission];
@@ -515,6 +523,17 @@
         for (const c of who(fx.who, world, target)) c.alive = false;
       } else if (op === 'combat') {
         world.combat(fx.severity);
+      } else if (op === 'log_entry') {
+        world.ship[`log_${fx.kind}`] += 1;
+      } else if (op === 'peace_news') {
+        if (world.truth.war_over) {
+          world.ship.flags.add('peace_known');
+          world.log.push(`${tag(world.tick_no)} The radio man reads the date aloud twice. It is eleven months after an armistice nobody told us about.`);
+        } else world.log.push(`${tag(world.tick_no)} Something about a date, and a word that might be 'armistice', or 'amnesty', or a man's name.`);
+      } else if (op === 'traffic_act') {
+        trafficAct(world, fx.action);
+      } else if (op === 'engage_order') {
+        engageOrder(world, fx.order);
       } else if (op === 'tubes') {
         for (let i = 0; i < 4; i++) if (world.ship.tubes[i] !== 'empty') world.ship.tubes[i] = fx.state;
       } else if (op === 'fire') {
@@ -612,7 +631,7 @@
       const s = w.ship;
       const order = Object.keys(s.routines).map((k, i) => [k, i]).sort((a, b) => (s.routines[a[0]] - s.routines[b[0]]) || (a[1] - b[1]));
       for (const [item] of order.slice(0, 2)) s.routines[item] = clamp(s.routines[item] + 0.4);
-      w.lose_hours(1.5);
+      w.lose_hours(0.75);
       for (const c of w.active_crew()) c.fear = clamp(c.fear - 0.03);
       return 'The crew eats together. Someone finds a deck of cards.';
     },
@@ -648,6 +667,11 @@
       w.ship.silent_running = on;
       return on ? 'Silent running.' : 'Resuming normal running.';
     },
+    take_fix(w) { return takeFix(w); },
+    listen_radio(w) { return listenRadio(w); },
+    call_council(w) { return callCouncil(w); },
+    sick_call(w) { return sickCall(w); },
+    write_log(w) { return writeLog(w); },
     set_speed(w, level) { return setSpeed(w, level); },
     set_depth(w, level) { return setDepth(w, level); },
     snorkel(w, on) { return setSnorkel(w, on); },
@@ -678,7 +702,7 @@
   // ---------------------------------------------------------------- the boat's machinery (dread/systems.py)
   const SPEEDS = { slow: [0.5, 4.0], standard: [1.0, 8.0], flank: [1.6, 13.0] };
   const DEPTHS = { shallow: 60, deep: 120, test: 180 };
-  const DRAIN = { slow: 0.004, standard: 0.009, flank: 0.03 }, HOTEL = 0.0015, IDLE_DRAIN = 0.003;
+  const DRAIN = { slow: 0.003, standard: 0.006, flank: 0.02 }, HOTEL = 0.001, IDLE_DRAIN = 0.002;
   const ENGINE_FACTOR = { ok: 1.0, damaged: 0.6, dead: 0.3 };
   const integrity = (w, comp) => Math.max(0.0, Math.min(1.0, 1.0 - 2.0 * w.ship.damage[comp]));
   const systemState = (w, comp) => { const i = integrity(w, comp); return i < 0.35 ? 'dead' : i < 0.7 ? 'damaged' : 'ok'; };
@@ -748,10 +772,11 @@
         w.log.push(`${tag(t)} The helm answers: ${kind === 'speed' ? 'ahead ' + level : DEPTHS[level] + ' metres'}.`);
       }
     }
+    s.dr_error = Math.min(40.0, s.dr_error + (movingNow(w) ? 0.12 : 0.03) * (1.0 + 1.5 * roleError(w, 'helm') + s.attention));
     if (s.snorkel && !(s.scope_up && !s.surfaced)) { s.snorkel = false; w.log.push(`${tag(t)} The diesels stop; there is no snorkel to breathe through.`); }
-    if (s.surfaced) s.battery = clamp(s.battery + 0.035);
+    if (s.surfaced) s.battery = clamp(s.battery + 0.06);
     else if (s.snorkel) {
-      s.battery = clamp(s.battery + 0.02); s.fuel = clamp(s.fuel - 0.005); s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1); s.attention = clamp(s.attention + 0.004);
+      s.battery = clamp(s.battery + 0.03); s.fuel = clamp(s.fuel - 0.005); s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1); s.attention = clamp(s.attention + 0.004);
     } else {
       const rate = movingNow(w) ? DRAIN[s.speed_order] : IDLE_DRAIN;
       s.battery = clamp(s.battery - (rate * (s.silent_running ? 0.6 : 1.0) + HOTEL));
@@ -785,6 +810,99 @@
     }
   }
 
+  // ---------------------------------------------------------------- the engagement (dread/combat.py)
+  const ORDER_FACTOR = { hold: 1.0, deep: 0.9, silent: 0.8, evade: 0.55, decoy: 0.5 };
+  function combatStart(w, severity) {
+    const s = w.ship;
+    if (w.engagement !== null) { w.engagement.turns_left += 1; return; }
+    const escorts = 1 + Math.trunc(severity * 3);
+    w.engagement = { severity, escorts, turns_left: 1 + Math.trunc(severity * 4), turn: 0, order: null, wide_said: false, prev: null };
+    s.flags.add('in_combat');
+    const warned = s.sonar_on && !s.flags.has('fault_sonar');
+    for (const c of w.active_crew()) c.fear = clamp(c.fear + 0.04 * severity * (warned ? 1.0 : 1.5));
+    w.log.push(`${tag(w.tick_no)} ` + (warned ? 'Screws on the headsets, closing. ' : 'No warning. ') + `${escorts === 1 ? 'One escort' : escorts + ' escorts'} working the water above us.`);
+  }
+  function engagementDecision(w) {
+    const e = w.engagement, s = w.ship;
+    const shaky = roleError(w, 'helm') >= 0.3 ? ' The helmsman is shaking.' : '';
+    const mk = (key, text, tags, cost) => ({ key, text, tags, cost, effects: [{ op: 'engage_order', order: key }] });
+    const ch = [mk('hold', 'Hold course and depth.', ['mission'], 'They know where you were.')];
+    if (systemState(w, 'control room') !== 'dead' && s.depth_order === 'shallow') ch.push(mk('deep', 'Go deep.', ['care'], 'Down where the hull speaks.' + shaky));
+    ch.push(mk('silent', 'Rig for silent running.', ['care', 'comply'], 'Nothing moves and nobody speaks; the men must keep still.'));
+    if (systemState(w, 'engine room') === 'ok' && s.battery > 0.2) ch.push(mk('evade', 'Turn into the screws and run at flank.', ['mission', 'attack'], 'Fast, loud, and the batteries go.' + shaky));
+    if (s.decoys > 0) ch.push(mk('decoy', 'Release a decoy.', ['care'], `${s.decoys} left. It may not be believed.`));
+    const text = `Charges. ${e.escorts} escort${e.escorts > 1 ? 's' : ''} above; turn ${e.turn + 1}, and the pattern is still falling. Your order?`;
+    return { event_id: 'engagement_turn', text, target_id: null, choices: ch };
+  }
+  function engageOrder(w, key) {
+    const e = w.engagement, s = w.ship;
+    if (e === null) return;
+    e.order = key;
+    if (e.prev === null) e.prev = [s.speed_order, s.depth_order, s.silent_running];
+    if (key === 'deep') w.log.push(`${tag(w.tick_no)} ` + setDepth(w, 'deep'));
+    else if (key === 'silent') s.silent_running = true;
+    else if (key === 'evade') w.log.push(`${tag(w.tick_no)} ` + setSpeed(w, 'flank'));
+    else if (key === 'decoy') s.decoys -= 1;
+  }
+  function engagementResolve(w) {
+    const e = w.engagement, s = w.ship, live = w.active_crew();
+    const r0 = w.rng.random();
+    const guess = r0 < 0.5 ? 'shallow' : r0 < 0.85 ? 'deep' : 'test';
+    const close = s.depth_order === guess;
+    const threat = 0.2 + 0.35 * e.severity + 0.1 * (e.escorts - 1);
+    const loud = Math.max(0.2, Math.min(1.5, s.noise * 2.5));
+    let pHit = threat * loud * (close ? 1.0 : 0.35) * ORDER_FACTOR[e.order];
+    if (s.attention >= 0.5) {
+      pHit *= 0.5;
+      if (!e.wide_said) { e.wide_said = true; w.log.push(`${tag(w.tick_no)} The charges fall a hundred yards wide. Again, on the same side.`); }
+    }
+    if (live.length) {
+      const meanFear = fsum(live.map((c) => c.fear)) / live.length;
+      if (w.rng.random() < clamp(meanFear - 0.45, 0.0, 0.45)) {
+        const man = maxBy(live, (c) => c.fear);
+        const kind = Math.trunc(w.rng.random() * 3);
+        const valve = w.engine.byId.get('valve_panic');
+        if (kind === 0 && valve && w.tick_no - (w.engine.last_fired.has('valve_panic') ? w.engine.last_fired.get('valve_panic') : -99) >= (valve.cooldown !== undefined ? valve.cooldown : 14)) w.engine.fire(valve, w);
+        else if (kind === 0) { s.hull = clamp(s.hull - 0.04); w.log.push(`${tag(w.tick_no)} ${man.name} opens the wrong valve. Water, cold, and a smell of the sea at the bottom of it.`); }
+        else if (kind === 1 && s.torpedoes > 0) {
+          s.torpedoes -= 1; s.noise = clamp(s.noise + 0.15); pHit = clamp(pHit + 0.1, 0.0, 0.9);
+          w.log.push(`${tag(w.tick_no)} ${man.name} fires a tube without orders. The whole boat hears it go.`);
+        } else { s.noise = clamp(s.noise + 0.15); pHit = clamp(pHit + 0.15, 0.0, 0.9); w.log.push(`${tag(w.tick_no)} ${man.name} drops a wrench. In the silence it is a bell.`); }
+        man.fear = clamp(man.fear + 0.05);
+        for (const c of live) c.trust = clamp(c.trust - 0.01);
+      }
+    }
+    if (w.rng.random() < clamp(pHit, 0.02, 0.9)) {
+      s.hull = clamp(s.hull - e.severity * (0.08 + 0.12 * w.rng.random()));
+      for (const c of live) { c.fear = clamp(c.fear + 0.07); c.fatigue = clamp(c.fatigue + 0.05); }
+      w.log.push(`${tag(w.tick_no)} A charge close aboard. The lights flicker; something in the hull rings like a struck glass.`);
+    } else {
+      for (const c of live) c.fear = clamp(c.fear + 0.025);
+      w.log.push(`${tag(w.tick_no)} The charges fall wide.`);
+    }
+    if (e.order === 'decoy' && w.rng.random() < 0.5) { e.turns_left = Math.min(e.turns_left, 1); w.log.push(`${tag(w.tick_no)} One escort goes after the decoy.`); }
+    e.order = null; e.turn += 1; e.turns_left -= 1;
+  }
+  function combatTick(w) {
+    const e = w.engagement;
+    if (e === null) return;
+    if (e.order !== null) engagementResolve(w);
+    if (e.turns_left <= 0) {
+      for (const c of w.active_crew()) c.fatigue = clamp(c.fatigue + 0.1 * e.severity);
+      w.engagement = null;
+      const s = w.ship;
+      s.flags.delete('in_combat');
+      w.log.push(`${tag(w.tick_no)} The screws fade. The sea goes back to being the sea.`);
+      if (e.prev !== null && (s.speed_order !== e.prev[0] || s.depth_order !== e.prev[1] || s.silent_running !== e.prev[2])) {
+        [s.speed_order, s.depth_order, s.silent_running] = e.prev;
+        s.helm_pending = null;
+        w.log.push(`${tag(w.tick_no)} Normal running resumes.`);
+      }
+      return;
+    }
+    if (w.pending === null) w.pending = engagementDecision(w);
+  }
+
   class World {
     constructor(seed, opts) {
       if (!DATA) throw new Error('Dread.setData() first');
@@ -805,6 +923,9 @@
       this.legacy_loss = 0.0;
       this.peak_dread = 0.0;
       this._hull_seen = 1.0;
+      this.engagement = null;
+      this.traffic = [];
+      this.traffic_id = 0;
       this.missions = opts.missions !== undefined ? opts.missions : DATA.missions;
       this.run = null;
       this.mission_i = -1;
@@ -837,6 +958,8 @@
     }
     get solution_error() { return solutionError(this); }
     get depth_m() { return depthM(this); }
+    get traffic_near() { return trafficNear(this); }
+    get ill_count() { return this.active_crew().filter((c) => c.ill).length; }
     get finished() {
       const f = this.ship.flags;
       const done = this.missions.length ? this.mission_i >= this.missions.length : this.ship.progress >= 1.0;
@@ -884,6 +1007,8 @@
       this._physics();
       this._resources();
       systemsTick(this);
+      healthTick(this);
+      updateTraffic(this);
       this._voyage();
       this._rumors();
       this.deck.tick(this);
@@ -891,7 +1016,8 @@
       this._mission_flow();
       if (this.on_station) this.vigil_ticks += 1;
       this._mutiny();
-      const ev = this.engine.select(this);
+      combatTick(this);
+      const ev = this.pending === null && this.engagement === null ? this.engine.select(this) : null;
       if (ev !== null) this.engine.fire(ev, this);
       this.settle_damage();
       this.peak_dread = Math.max(this.peak_dread, this.dread());
@@ -1061,7 +1187,7 @@
       const s = this.ship;
       s.returning = false;
       const extra = (s.flags.has('survivors_taken') || s.flags.has('extra_man')) ? 1 : 0;
-      const p = Math.min(0.8, 0.08 + 0.35 * s.owed + 0.2 * extra + 0.03 * this.names_known);
+      const p = Math.min(0.8, 0.08 + 0.35 * s.owed + 0.2 * extra + 0.015 * this.names_known);
       if (this.rng.random() < p) {
         s.flags.add('home_unaccounted');
         this.log.push(`${tag(this.tick_no)} The pier is there. The count on the gangway does not match the roll, and nobody can say which of us is the extra.`);
@@ -1179,8 +1305,13 @@
       if (a === null) return { act: null, ok: false, why: '' };
       if (this.run.working !== null) return { act: a, ok: false, why: 'Already under way.' };
       if (this.ship.surfaced) return { act: a, ok: false, why: 'We are on the surface. Dive first.' };
-      if (!evaluate(a.requires, this)) return { act: a, ok: false, why: a.why || 'It cannot be done now.' };
+      const why = this._unmet(a);
+      if (why) return { act: a, ok: false, why };
       return { act: a, ok: true, why: '' };
+    }
+    _unmet(a) {
+      for (const need of a.needs) if (!evaluate(need.requires, this)) return need.why || 'It cannot be done now.';
+      return '';
     }
     get working() {
       const run = this.run;
@@ -1191,8 +1322,9 @@
       if (a === null) return '';
       if (this.ship.surfaced) return 'We are on the surface.';
       if (this.ship.stand_down) return 'The crew is asleep.';
+      if (this.engagement !== null) return 'We are under attack.';
       if (this.ship.battery <= 0 && !this.ship.surfaced) return 'The batteries are flat.';
-      return evaluate(a.requires, this) ? '' : (a.why || 'It cannot go on.');
+      return this._unmet(a);
     }
     do_act() {
       const { act, ok, why } = this.act_status();
@@ -1244,20 +1376,7 @@
       }
     }
 
-    combat(severity) {
-      const s = this.ship;
-      const warned = this.rng.random() < this.deck.real_detection_chance(s);
-      const noise = s.noise * (warned ? 0.5 : 1.0) * (s.silent_running ? 0.4 : 1.0);
-      s.hull = clamp(s.hull - severity * (0.25 + 0.75 * noise) * (warned ? 1.0 : 1.6));
-      for (const c of this.active_crew()) {
-        c.fear = clamp(c.fear + 0.08 * severity * (warned ? 1.0 : 1.5));
-        c.fatigue = clamp(c.fatigue + 0.12 * severity);
-      }
-      s.noise = clamp(s.noise + 0.2);
-      s.flags.add('in_combat');
-      this.flag_expiry.set('in_combat', this.tick_no + 5);
-      this.log.push(`${tag(this.tick_no)} ` + (warned ? 'Contact warned in time. Rigged for silent running.' : 'No warning. Charges close aboard.'));
-    }
+    combat(severity) { combatStart(this, severity); }
   }
 
   // Python's round(x, 2) rounds the exact binary value to the nearest decimal; so does toFixed.
@@ -1300,7 +1419,7 @@
     if (f.has('peace_known') && f.has('left_station')) return 'forgotten_post';
     const done = w.results.filter((r) => r.outcome === 'success' || r.outcome === 'altered').length;
     if (f.has('fishermen_sunk')) return 'the_lamp';
-    if (f.has('civilian_sunk')) return 'stained_victory';
+    if (f.has('civilian_sunk') || f.has('neutral_sunk')) return 'stained_victory';
     const onRecord = !f.has('orders_unrecorded');
     if (f.has('orders_defied') && onRecord) return 'court_martial';
     if (done >= 3) {
@@ -1321,13 +1440,200 @@
     }
     for (const f of w.fired) {
       const ev = w.engine.byId.get(f.id);
-      if (ev.beat || ev.mission) {
+      if (ev.beat || ev.mission || ev.radio) {
         const day = Math.floor(f.tick / 24) + 1;
         official.push(`Day ${day}: ${ev.mundane_cause}`);
         log.push(`Day ${day}: ${ev.uncanny_cause}`);
       }
     }
+    const sh = w.ship, n = sh.log_true + sh.log_soft + sh.log_blank;
+    if (n) {
+      official.push(`The deck log was kept in good order: ${n} entr${n === 1 ? 'y' : 'ies'}.`);
+      log.push(`${sh.log_true} written as it happened, ${sh.log_soft} softened, ${sh.log_blank} left blank. Somebody else wrote the rest.`);
+    }
     return { official, log };
+  }
+
+  // ---------------------------------------------------------------- the people's side (dread/people.py)
+  function listenRadio(w) {
+    const s = w.ship;
+    if (!(s.surfaced || s.scope_up)) return 'The antenna is under water. Raise the periscope or surface.';
+    if (!w.active_crew().some((c) => c.role === 'radio')) return 'There is no radio man to listen.';
+    if (s.flags.has('fault_radio')) return 'The set is dead.';
+    w.lose_hours(1.0);
+    s.attention = clamp(s.attention + 0.01);
+    const allr = w.engine.events.filter((e) => e.radio);
+    const err = roleError(w, 'radio');
+    const ready = allr.filter((e) => w.engine.radioReady(e, w));
+    if (w.rng.random() < 0.35 || !ready.length) return 'Static. Under it, something that might be music, or someone counting.';
+    let pool = ready;
+    if (w.rng.random() < err * 0.8) { pool = allr; w.log.push(`${tag(w.tick_no)} The clerk reads it twice, and the second reading is not the first.`); }
+    const ev = w.rng.choices1(pool, pool.map((e) => (e.weight !== undefined ? e.weight : 1.0)));
+    w.engine.fire(ev, w);
+    return 'The radio man hands you a slip.';
+  }
+  function officersOf(w) {
+    const out = [], live = w.active_crew();
+    const first = (role) => live.find((c) => c.role === role) || null;
+    for (const [title, c] of [['first officer', w.crew.length && w.crew[0].active ? w.crew[0] : null], ['chief engineer', first('engine')], ['doctor', first('medic')]]) {
+      if (c !== null && out.every((o) => o[1] !== c)) out.push([title, c]);
+    }
+    return out;
+  }
+  function honestAdvice(w, title) {
+    const s = w.ship, live = w.active_crew(), n = Math.max(1, live.length);
+    const fatigue = fsum(live.map((c) => c.fatigue)) / n, fear = fsum(live.map((c) => c.fear)) / n;
+    if (title === 'chief engineer') {
+      if (s.hull < 0.7) return 'She is hurt, sir. I would not ask more of her.';
+      if (s.battery < 0.3) return 'We have to charge, sir, and soon.';
+      if (s.spares < 0.3) return 'We are nearly out of things to mend her with.';
+      return 'The engines are sound.';
+    }
+    if (title === 'doctor') {
+      const ill = live.filter((c) => c.ill).length;
+      if (ill) return `${ill === 1 ? 'One man is' : ill + ' men are'} sick, sir, and some of them are hiding it.`;
+      if (fear > 0.5) return 'It is fear, sir. Not fever.';
+      return 'They will do.';
+    }
+    if (fatigue > 0.6) return 'The men are close to the end, sir. Let them sleep.';
+    if (s.orders_doubt > 0.3) return 'I would like those orders verified, sir.';
+    if (s.moral_debt > 0.3) return 'They are not sleeping, sir. Not since the steamer.';
+    return 'Steady, sir. Nothing that is not on the board.';
+  }
+  function callCouncil(w) {
+    const s = w.ship, officers = officersOf(w);
+    if (!officers.length) return 'There is nobody to ask.';
+    w.lose_hours(0.5);
+    const look = new PyRandom(w.tick_no * 8101 + 13);
+    for (const [title, c] of officers) {
+      const p = Math.max(0.0, Math.min(1.0, c.candor * c.trust * (0.6 + 0.4 * s.cohesion)));
+      const said = look.random() < p ? honestAdvice(w, title) : 'Whatever you think best, sir.';
+      w.log.push(`${tag(w.tick_no)} ${c.name}, ${title}: "${said}"`);
+      c.trust = clamp(c.trust + (c.trust > 0.5 ? 0.02 : -0.02));
+    }
+    s.flags.add('council_recent');
+    w.flag_expiry.set('council_recent', w.tick_no + 24);
+    return 'The officers are called to the wardroom.';
+  }
+  function healthTick(w) {
+    const s = w.ship, live = w.active_crew();
+    const illN = live.filter((c) => c.ill && !c.isolated).length;
+    for (const c of live) {
+      if (!c.ill) {
+        const p = 0.0015 + ((s.food < 0.4 || s.water < 0.4) ? 0.004 : 0.0) + (s.co2 > 0.03 ? 0.003 : 0.0) + 0.002 * illN;
+        if (w.rng.random() < p) { c.ill = true; c.ill_ticks = 0; c.hides = c.candor < 0.5 && c.trust < 0.6; }
+      } else {
+        c.ill_ticks += 1;
+        c.fatigue = clamp(c.fatigue + 0.008);
+        c.fear = clamp(c.fear + 0.002);
+        if (c.ill_ticks > 40 && w.rng.random() < 0.02) {
+          c.alive = false;
+          w.log.push(`${tag(w.tick_no)} ${c.name} does not wake. The medic says what it was; nobody remembers the word.`);
+        } else if (w.rng.random() < 0.01) { c.ill = false; c.hides = false; }
+      }
+    }
+  }
+  function sickCall(w) {
+    const live = w.active_crew();
+    if (!live.some((c) => c.role === 'medic')) return 'There is no medic. You do what you can, and it is not much.';
+    w.lose_hours(0.5);
+    const sick = live.filter((c) => c.ill);
+    if (!sick.length) return 'Every man is fit, or says so.';
+    const cured = [];
+    for (const c of sick) { c.hides = false; if (w.rng.random() < 0.7) { c.ill = false; cured.push(c.name); } }
+    w.log.push(`${tag(w.tick_no)} The medic goes berth by berth. ` + (cured.length ? `${cured.join(', ')} ${cured.length === 1 ? 'is' : 'are'} treated.` : 'He can do nothing.'));
+    return `${sick.length} sick found.`;
+  }
+  function writeLog(w) {
+    const s = w.ship;
+    if (w.tick_no - s.last_log < 24) return 'Not yet. The page is still wet from the last entry.';
+    s.last_log = w.tick_no;
+    const mk = (key, text, tags, cost, effects) => ({ key, text, tags, cost, effects });
+    w.pending = { event_id: 'log_entry', text: 'The day\'s entry. Three things happened that you would rather not have written down.', target_id: null, choices: [
+      mk('true', 'Write what happened, as it happened.', ['care'], 'It is on record. So is the rest.', [{ op: 'log_entry', kind: 'true' }, { op: 'ship', stat: 'moral_debt', value: -0.03 }, { op: 'crew', who: 'all', stat: 'trust', value: 0.01 }]),
+      mk('soft', 'Soften it. A rough night, a difficult man.', ['comply'], 'Easier. The page will be read, someday.', [{ op: 'log_entry', kind: 'soft' }, { op: 'ship', stat: 'moral_debt', value: 0.02 }]),
+      mk('blank', 'Leave the page blank.', ['silence'], 'The men notice what the captain does not write.', [{ op: 'log_entry', kind: 'blank' }, { op: 'crew', who: 'all', stat: 'trust', value: -0.01 }]),
+    ] };
+    return 'You open the log.';
+  }
+
+  // ---------------------------------------------------------------- the living sea (dread/sea.py)
+  const hourOf = (w) => (6 + w.tick_no) % 24;
+  const isNight = (w) => { const h = hourOf(w); return h >= 20 || h < 5; };
+  function visibility(w) {
+    let v = 12.0;
+    if (isNight(w)) v *= 0.4;
+    if (w.ship.flags.has('fog')) v *= 0.25;
+    return v;
+  }
+  function updateTraffic(w) {
+    for (const o of w.traffic.slice()) {
+      o.x += o.vx; o.y += o.vy; o.age += 1;
+      if (o.age >= o.life) w.traffic.splice(w.traffic.indexOf(o), 1);
+    }
+    if (w.engagement === null && w.traffic.length < 3 && w.rng.random() < 0.05) {
+      const [bx, by] = trueXY(w);
+      const d = DIRS[Math.trunc(w.rng.random() * 8)];
+      const dist = 12 + Math.trunc(w.rng.random() * 14);
+      const v = DIRS[Math.trunc(w.rng.random() * 8)];
+      const speed = 4 + w.rng.random() * 4;
+      const kind = w.rng.random() < 0.6 ? 'merchant' : 'fishing';
+      const flag = w.rng.random() < 0.5 ? 'neutral' : 'enemy';
+      const life = 12 + Math.trunc(w.rng.random() * 18);
+      w.traffic_id += 1;
+      w.traffic.push({ id: w.traffic_id, kind, flag, x: bx + d[0] * dist, y: by + d[1] * dist, vx: v[0] * speed, vy: v[1] * speed, age: 0, life });
+    }
+  }
+  function trafficRange(w, o) { const [bx, by] = trueXY(w); return Math.hypot(o.x - bx, o.y - by) * 0.9; }
+  function trafficNear(w) { return w.engagement !== null ? 0 : w.traffic.filter((o) => trafficRange(w, o) <= 7.0).length; }
+  function takeFix(w) {
+    const s = w.ship;
+    let factor, how;
+    if (s.surfaced) {
+      if (isNight(w)) { factor = 0.15; how = 'the stars'; }
+      else if (w.active_crew().some((c) => c.role === 'radio') && !s.flags.has('fault_radio')) { factor = 0.5; how = 'radio bearings'; }
+      else return 'No stars, and no radio to take bearings on.';
+    } else if (s.scope_up) {
+      if (visibility(w) < 4.0) return 'There is nothing to take a bearing on in this visibility.';
+      factor = 0.4; how = 'the coast through the periscope';
+      s.attention = clamp(s.attention + 0.01);
+    } else return 'A fix needs the periscope or the surface.';
+    s.dr_error = Math.max(0.3, s.dr_error * factor);
+    s.last_fix = w.tick_no;
+    w.lose_hours(1.0);
+    return `Fix by ${how}. We are within about ${s.dr_error.toFixed(1)} nm of where we think we are.`;
+  }
+  const eyeLies = (w, o) => periscope(w, 0).distortions.length > 0 && (o.id + w.tick_no) % 3 === 0;
+  function trafficAct(w, action) {
+    const s = w.ship;
+    const near = w.traffic.filter((o) => trafficRange(w, o) <= 7.0);
+    if (!near.length) { w.log.push(`${tag(w.tick_no)} There is nothing there now.`); return; }
+    let o = near[0];
+    for (const x of near) if (trafficRange(w, x) < trafficRange(w, o)) o = x;
+    const kind = o.kind === 'merchant' ? 'steamer' : 'fishing boat';
+    if (action === 'pass') w.log.push(`${tag(w.tick_no)} The ${kind} crosses and goes on about her business.`);
+    else if (action === 'shadow') {
+      w.lose_hours(3.0);
+      s.attention = clamp(s.attention + 0.02);
+      const seen = !eyeLies(w, o) ? o.flag : (o.flag === 'neutral' ? 'enemy' : 'neutral');
+      w.log.push(`${tag(w.tick_no)} Three hours on her quarter. She wears ${seen === 'neutral' ? "a neutral's stripes" : 'an enemy ensign'}.`);
+    } else if (action === 'sink') {
+      const n = Math.min(2, s.torpedoes);
+      if (n === 0) { w.log.push(`${tag(w.tick_no)} There is nothing left to fire.`); return; }
+      s.torpedoes -= n;
+      s.noise = clamp(s.noise + 0.2);
+      w.traffic.splice(w.traffic.indexOf(o), 1);
+      if (o.flag === 'neutral' || o.kind === 'fishing') {
+        s.moral_debt = clamp(s.moral_debt + 0.35);
+        for (const c of w.active_crew()) { c.guilt = clamp(c.guilt + 0.15); c.trust = clamp(c.trust - 0.06); }
+        s.flags.add('neutral_sunk');
+        w.log.push(`${tag(w.tick_no)} The ${kind} goes down by the stern. There is a flag on the surface, and it is not the one you were told to expect.`);
+      } else {
+        for (const c of w.active_crew()) { c.trust = clamp(c.trust + 0.03); c.guilt = clamp(c.guilt + 0.03); }
+        s.flags.add('enemy_sunk');
+        w.log.push(`${tag(w.tick_no)} The ${kind} breaks in two. Nobody cheers, and nobody looks at the others.`);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- navigation and instruments (dread/nav.py)
@@ -1337,7 +1643,7 @@
   const bearing = (a, b) => ((Math.round(Math.atan2(b[0] - a[0], a[1] - b[1]) * 180 / Math.PI) % 360) + 360) % 360;
   const ceilDiv = (x) => Math.max(1, Math.ceil(x));
 
-  function navigation(w) {
+  function where(w) {
     const s = w.ship, run = w.run;
     const ch = run !== null ? run.mission.chart : null;
     const pts = ch ? [ch.from].concat(ch.points) : [];
@@ -1363,6 +1669,15 @@
       nxt = pts[i + 1][2];
       rng = Math.hypot(pts[i + 1][0] - pos[0], pts[i + 1][1] - pos[1]) * 0.9;
     }
+    return { pos, heading, nxt, rng };
+  }
+  const DIRS = [[1.0, 0.0], [0.7, 0.7], [0.0, 1.0], [-0.7, 0.7], [-1.0, 0.0], [-0.7, -0.7], [0.0, -1.0], [0.7, -0.7]];
+  const trueXY = (w) => { const p = where(w).pos; return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; };
+  function navigation(w) {
+    const s = w.ship, run = w.run;
+    const { pos, heading, nxt, rng } = where(w);
+    const off = s.dr_error / 0.9, d = DIRS[(Math.floor(w.tick_no / 12) * 5 + 3) % 8];
+    const est = [Math.max(0.0, Math.min(109.9, pos[0] + d[0] * off)), Math.max(0.0, Math.min(79.9, pos[1] + d[1] * off))];
     const moving = s.returning || (w.working !== null && !w.work_blocked);
     let speed;
     if (s.surfaced) speed = moving ? 11.0 : 4.0;
@@ -1372,7 +1687,7 @@
     if (s.battery <= 0 && !s.surfaced) speed = 0.0;
     if (s.silent_running && !s.surfaced) speed = Math.min(speed, 3.0);
     return {
-      x: Math.round(pos[0] * 10) / 10, y: Math.round(pos[1] * 10) / 10, grid: gridRef(pos[0], pos[1]), heading,
+      x: Math.round(est[0] * 10) / 10, y: Math.round(est[1] * 10) / 10, grid: gridRef(est[0], est[1]), heading, err_nm: Math.round(s.dr_error * 10) / 10,
       speed: Math.round(speed * 10) / 10, depth: s.surfaced ? 0 : s.scope_up ? 14 : DEPTHS[s.depth_order], range_nm: Math.round(rng), next: nxt,
       eta_h: run !== null && run.working !== null ? ceilDiv(run.work_left) : null, noise: s.noise,
     };
@@ -1404,7 +1719,7 @@
   function contactRows(w) {
     const s = w.ship, run = w.run;
     if (!(s.sonar_on || s.surfaced) || s.flags.has('fault_sonar')) return [];
-    const raw = [], nv = navigation(w), me = [nv.x, nv.y];
+    const raw = [], me = trueXY(w);
     const tgt = run !== null && run.outcome === null && run.mission.chart ? run.mission.chart.target : null;
     const drop = new PyRandom(w.tick_no * 3571 + 11).random() < 0.12;
     if (tgt && run.acts_done >= 1 && !drop) {
@@ -1412,8 +1727,12 @@
       if (dist <= SCOPE_NM) raw.push([bearing(me, tgt), dist, tgt[2], true]);
     }
     if (s.flags.has('in_combat')) {
-      const k = Math.floor(w.tick_no / 5);
-      raw.push([(k * 83 + 17) % 360, 3 + (k * 7) % 6, 'fast screws, closing', true]);
+      const k = Math.floor(w.tick_no / 5), n = w.engagement !== null ? w.engagement.escorts : 1;
+      for (let i = 0; i < n; i++) raw.push([(k * 83 + 17 + i * 71) % 360, 3 + (k * 7 + i * 5) % 6, 'fast screws, closing', true]);
+    }
+    for (const o of w.traffic) {
+      const dist = Math.hypot(o.x - me[0], o.y - me[1]) * 0.9;
+      if (dist <= SCOPE_NM) raw.push([bearing(me, [o.x, o.y]), dist, o.kind === 'merchant' ? LABEL_POOL[0] : LABEL_POOL[3], true]);
     }
     if (s.sonar_on) {
       for (const r of sonarReports(w)) {
@@ -1466,14 +1785,14 @@
     train = train || 0;
     const s = w.ship, nv = navigation(w);
     const centre = (((nv.heading + train) % 360) + 360) % 360;
-    if (!(s.surfaced || s.scope_up)) return { mode: 'down', train, centre, ship: null, distortions: [], ghosts: [] };
-    const mode = s.surfaced ? 'bridge' : 'periscope', me = [nv.x, nv.y], run = w.run;
+    if (!(s.surfaced || s.scope_up)) return { mode: 'down', train, centre, ship: null, distortions: [], ghosts: [], others: [], visibility: 0.0 };
+    const mode = s.surfaced ? 'bridge' : 'periscope', me = trueXY(w), run = w.run, vis = visibility(w);
     let ship = null;
     const ch = run !== null && run.outcome === null ? run.mission.chart : null;
     const tgt = ch ? ch.target : null;
     if (tgt && run.acts_done >= 1) {
       const dist = Math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9;
-      if (dist <= VIS_NM) {
+      if (dist <= vis) {
         const brg = bearing(me, tgt), rel = wrap180(brg - centre), sight = ch.sight || {};
         ship = { bearing: brg, rel, range_nm: Math.round(dist * 10) / 10, in_field: Math.abs(rel) <= Math.floor(FIELD_DEG / 2),
           kind: sight.kind || 'steamer', escorts: sight.escorts || 0, ships: sight.ships || 1, markings: !!sight.markings };
@@ -1481,7 +1800,7 @@
     }
     const live = w.active_crew();
     const strain = live.length ? fsum(live.map((c) => (c.fear + c.fatigue) / 2)) / live.length : 1.0;
-    const p = Math.max(0.0, Math.min(0.7, strain + 0.3 * s.moral_debt + 0.3 * s.attention - 0.15));
+    const p = Math.max(0.0, Math.min(0.7, strain + 0.3 * s.moral_debt + 0.3 * s.attention - 0.15 + (isNight(w) ? 0.08 : 0.0) + (s.flags.has('fog') ? 0.12 : 0.0)));
     const look = new PyRandom(Math.floor(w.tick_no / 3) * 6733 + 29), kinds = [];
     if (look.random() < p) {
       kinds.push(look.choice(DISTORTIONS));
@@ -1493,7 +1812,15 @@
       const rel = wrap180(r[0] - centre);
       if (Math.abs(rel) <= Math.floor(FIELD_DEG / 2) && g.random() < 0.5) ghosts.push(Math.trunc(rel));
     }
-    return { mode, train, centre, ship, distortions: kinds, ghosts };
+    const others = [];
+    for (const o of w.traffic) {
+      const dist = Math.hypot(o.x - me[0], o.y - me[1]) * 0.9;
+      if (dist <= vis) {
+        const brg = bearing(me, [o.x, o.y]), rel = wrap180(brg - centre);
+        others.push({ kind: o.kind, bearing: brg, rel, range_nm: Math.round(dist * 10) / 10, in_field: Math.abs(rel) <= Math.floor(FIELD_DEG / 2) });
+      }
+    }
+    return { mode, train, centre, ship, distortions: kinds, ghosts, others, visibility: vis };
   }
   /** Every mission's waypoints, for drawing the chart: those behind, the one under way, those to come. */
   function chartTracks(w) {
@@ -1503,6 +1830,8 @@
       reached: i < w.mission_i ? 99 : i === w.mission_i && w.run ? w.run.acts_done : 0,
     }));
   }
+
+  const TITLES = { engagement_turn: 'UNDER ATTACK', log_entry: "THE DAY'S ENTRY", council: 'THE OFFICERS' };
 
   // ---------------------------------------------------------------- the captain's orders menu
   const WAIT_LIMIT = 12;
@@ -1543,6 +1872,11 @@
       if (s.scope_up) add(s.snorkel ? 'snorkel_off' : 'snorkel_on', s.snorkel ? 'Stop the diesels' : 'Run the diesels at snorkel depth', s.snorkel ? '' : 'charges the batteries; loud, and the sea can hear it', () => orders.snorkel(w, !s.snorkel));
     }
     if (s.hull < 0.999 || s.dc_active) add('damage_control', s.dc_active ? 'Stand the damage control party down' : 'Damage control: all hands to the worst compartment', `spares ${(s.spares * 100).toFixed(0)}%`, () => orders.damage_control(w, !s.dc_active));
+    add('listen_radio', 'Listen at the radio', 'surfaced or periscope up; an hour at the set', () => orders.listen_radio(w));
+    add('call_council', 'Call the officers', 'an hour; they say what they say', () => orders.call_council(w));
+    add('sick_call', 'Sick call', 'the medic goes berth by berth', () => orders.sick_call(w));
+    add('write_log', "Write the day's entry", 'what you leave out, someone will read', () => orders.write_log(w));
+    add('take_fix', 'Take a fix', 'periscope, stars or radio bearings; an hour', () => orders.take_fix(w));
     if (w.run !== null && !w.run.phase_fired.has('verified')) {
       add('verify_orders', 'Ask headquarters to confirm the orders', 'an answer is not the same as a source', () => orders.verify_orders(w));
     }
@@ -1662,7 +1996,7 @@
       const m = w.run ? w.run.mission : null;
       const pending = w.pending ? {
         id: w.pending.event_id, text: w.pending.text,
-        title: w.pending.event_id.replace(/^m\d_/, '').replace(/_/g, ' ').toUpperCase(),
+        title: TITLES[w.pending.event_id] || w.pending.event_id.replace(/^m\d_/, '').replace(/_/g, ' ').toUpperCase(),
         choices: w.pending.choices.map((c) => ({ label: c.text, cost: c.cost })),
       } : null;
       const v = {
@@ -1700,7 +2034,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, visibility, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

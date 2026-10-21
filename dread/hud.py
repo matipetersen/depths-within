@@ -103,7 +103,8 @@ def instruments(w) -> List[str]:
     tubes = "  ".join(f"{i + 1}:{t}" for i, t in enumerate(wp["tubes"]))
     cells = "  ".join(f"{h['name'].replace(' torpedo room', ' tubes').replace(' quarters', ' berths')} {h['integrity'] * 100:.0f}%"
                       + ("!" if h["state"] != "sound" else "") for h in hull)
-    return ["INSTRUMENTS", "  " + where + f"  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
+    fixed = f"last fix {w.tick_no - s.last_fix} h ago" if s.last_fix else "no fix since the pier"
+    return ["INSTRUMENTS", f"  Position: within {n['err_nm']:.1f} nm of where we think ({fixed}).", "  " + where + f"  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
             "  Hull by compartment: " + cells,
             f"  Torpedoes aboard {wp['stock']}.  Tubes {tubes}", "  " + eye]
 
@@ -179,15 +180,22 @@ def _decision_lines(title: str, text: str, options) -> List[str]:
     return out
 
 
+TITLES = {"engagement_turn": "UNDER ATTACK", "log_entry": "THE DAY'S ENTRY", "council": "THE OFFICERS"}
+
+
+def _title(event_id: str) -> str:
+    return TITLES.get(event_id) or re.sub(r"^m\d_", "", event_id).replace("_", " ").upper()
+
+
 def decision(pending) -> List[str]:
-    title = re.sub(r"^m\d_", "", pending.event_id).replace("_", " ").upper()
+    title = _title(pending.event_id)
     return _decision_lines(title, pending.text, [(c.text, c.cost) for c in pending.choices])
 
 
 def decision_from(d) -> List[str]:
     """The same, from the game's ``engine.decisions.Decision`` (dread or legacy)."""
     if getattr(d, "source", "") == "dread":
-        title = re.sub(r"^m\d_", "", d.id).replace("_", " ").upper()
+        title = _title(d.id)
     else:
         title = d.title.upper()
     return _decision_lines(title, d.description, [(o.text, o.tooltip) for o in d.options])

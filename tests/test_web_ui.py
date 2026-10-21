@@ -315,3 +315,57 @@ def test_a_ship_in_the_periscope_and_what_the_tired_eye_adds(browser, page_file)
     seen = page.inner_text("#app").lower()
     for word in ("phantom", "illusion", "hallucinat", "false"):
         assert word not in seen
+
+
+def test_the_new_orders_are_all_on_the_orders_sheet(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.locator("[data-a=orders]").tap()
+    text = page.inner_text(".sheet .body").lower()
+    for want in ("ahead flank", "ahead slow", "go to 120 metres", "take a fix", "listen at the radio", "call the officers",
+                 "sick call", "write the day", "raise the periscope"):
+        assert want in text, want
+    page.locator(".orders-grid .opt", has_text="Ahead flank").tap()
+    assert page.evaluate("dreadDebug.state.game.w.ship.speed_order") in ("flank", "standard")   # a tired helm may be late
+    page.locator("[data-a=orders]").tap()
+    page.locator(".orders-grid .opt", has_text="Write the day").tap()
+    assert "THE DAY" in page.inner_text(".sheet.decision").upper() and page.locator(".sheet.decision .opt").count() == 3
+
+
+def test_the_ledger_shows_the_battery_and_the_spares_and_the_chart_the_doubt(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    led = page.inner_text(".led").lower()
+    assert "battery" in led and "spares" in led
+    assert page.locator("svg.chart .errc").count() == 1 and "within" in page.inner_text(".gauges").lower()
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.dr_error = 9; dreadDebug.render(); }")
+    r = float(page.get_attribute("svg.chart .errc", "r"))
+    assert r > 9                                                 # the uncertainty circle grows with the doubt
+
+
+def test_an_attack_is_a_decision_with_five_ways_and_a_red_header(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.combat(0.6); dreadDebug.act('t'); }")
+    page.wait_for_selector(".sheet.decision.attack")
+    assert "UNDER ATTACK" in page.inner_text(".sheet.decision").upper()
+    assert page.locator(".sheet.decision .opt").count() >= 4
+    page.wait_for_timeout(400)
+    page.locator(".sheet.decision .opt").first.tap()
+    assert page.evaluate("!!dreadDebug.state.game.w.engagement")
+
+
+def test_the_periscope_shows_fog_and_other_hulls_and_says_how_far_it_sees(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.evaluate("""() => { const w = dreadDebug.state.game.w; w.tick_no = 2; w.ship.scope_up = true;
+      const [bx, by] = dreadDebug.Dread.navigation(w) && [dreadDebug.Dread.navigation(w).x, dreadDebug.Dread.navigation(w).y];
+      w.traffic.push({ id: 1, kind: 'merchant', flag: 'neutral', x: bx + 4, y: by, vx: 0, vy: 0, age: 0, life: 20 });
+      const o = dreadDebug.Dread.periscope(w, 0).others[0];
+      dreadDebug.state.sheet = 'periscope'; dreadDebug.state.train = Math.round(o.rel); dreadDebug.render(); }""")
+    assert page.locator("svg.eye .vessel.other").count() == 1
+    assert "you can see 12.0 nm" in page.inner_text(".eyeread.dim")
+    page.evaluate("() => { dreadDebug.state.game.w.ship.flags.add('fog'); dreadDebug.render(); }")
+    assert page.locator("svg.eye .mist").count() == 1
+    shown = page.inner_text("#app").lower()
+    assert "neutral" not in shown and "enemy" not in shown       # nobody tells you her flag

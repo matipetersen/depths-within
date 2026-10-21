@@ -26,6 +26,7 @@ function fuzz(seed, maxSteps) {
       continue;
     }
     if (nxt() % 3 === 0) w.do_act();
+    if (nxt() % 9 === 0) { if (!w.ship.surfaced) Dread.orders.raise_periscope(w); Dread.orders.take_fix(w); }
     if (nxt() % 5 === 0) {
       const items = Dread.availableOrders(w);
       const item = items[nxt() % items.length];
@@ -37,15 +38,16 @@ function fuzz(seed, maxSteps) {
         item.run();
       }
     }
+    if (w.pending) continue;                       // an order (the radio, the log) can raise a decision of its own
     w.tick();
-    if (steps % 3 === 0) { const wp = Dread.weapons(w), ps = Dread.periscope(w, 0); eye.push([wp.tubes.join(','), wp.stock, wp.solutions.map((x) => [x.bearing, x.range_yd, x.run_s, x.gyro]), ps.mode, ps.ship ? [ps.ship.bearing, ps.ship.range_nm, ps.ship.kind] : null, ps.distortions.join(','), ps.ghosts.join(',')]); }
+    if (steps % 3 === 0) { const wp = Dread.weapons(w), ps = Dread.periscope(w, 0); eye.push([wp.tubes.join(','), wp.stock, wp.solutions.map((x) => [x.bearing, x.range_yd, x.run_s, x.gyro]), ps.mode, ps.ship ? [ps.ship.bearing, ps.ship.range_nm, ps.ship.kind] : null, ps.distortions.join(','), ps.ghosts.join(','), ps.others.length, ps.visibility]); }
     if (steps % 3 === 0) cts.push(Dread.contacts(w).map((c) => [c.bearing, c.range_nm]));
     if (steps % 25 === 0) {
       const live = w.active_crew();
       digest.push([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2, w.ship.attention,
         w.ship.cohesion, w.dread(), live.length ? Dread.fsum(live.map((c) => c.fear)) / live.length : 0]);
       const nv = Dread.navigation(w);
-      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm, w.ship.battery, w.ship.spares]);
+      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm, w.ship.battery, w.ship.spares, nv.err_nm, w.traffic.length, w.traffic.map((o) => [o.kind, o.flag, Math.round(o.x * 10), Math.round(o.y * 10)])]);
       dmg.push(Dread.hullReport(w).map((h) => h.integrity));
     }
   }

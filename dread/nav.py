@@ -36,8 +36,8 @@ def _bearing(a, b) -> int:
     return int(round(math.degrees(math.atan2(b[0] - a[0], a[1] - b[1])))) % 360
 
 
-def navigation(w) -> Dict:
-    """Position, heading, speed, depth and range for the boat as it is now."""
+def _where(w):
+    """Where the boat truly is: (position, heading, next waypoint name, range to it in nm)."""
     s, run = w.ship, w.run
     pts = _points(run) if run is not None else []
     station = None
@@ -63,6 +63,25 @@ def navigation(w) -> Dict:
         heading = _bearing(pts[i], pts[i + 1])
         nxt = pts[i + 1][2]
         rng_nm = math.hypot(pts[i + 1][0] - pos[0], pts[i + 1][1] - pos[1]) * 0.9
+    return pos, heading, nxt, rng_nm
+
+
+# eight unit-ish directions with no trigonometry in them, so Python and JavaScript agree to the last digit
+DIRS = ((1.0, 0.0), (0.7, 0.7), (0.0, 1.0), (-0.7, 0.7), (-1.0, 0.0), (-0.7, -0.7), (0.0, -1.0), (0.7, -0.7))
+
+
+def true_xy(w):
+    pos = _where(w)[0]
+    return (round(pos[0], 1), round(pos[1], 1))
+
+
+def navigation(w) -> Dict:
+    """What the instruments say: the position we believe we are at, heading, speed, depth and range."""
+    s, run = w.ship, w.run
+    pos, heading, nxt, rng_nm = _where(w)
+    off = s.dr_error / 0.9                                   # the error in chart units, in a direction that drifts slowly
+    d = DIRS[((w.tick_no // 12) * 5 + 3) % 8]
+    est = (max(0.0, min(109.9, pos[0] + d[0] * off)), max(0.0, min(79.9, pos[1] + d[1] * off)))
     moving = s.returning or (w.working is not None and not w.work_blocked)
     if s.surfaced:
         speed = 11.0 if moving else 4.0
@@ -78,7 +97,7 @@ def navigation(w) -> Dict:
         speed = min(speed, 3.0)
     depth = 0 if s.surfaced else 14 if s.scope_up else systems.DEPTHS[s.depth_order]
     return {
-        "x": round(pos[0], 1), "y": round(pos[1], 1), "grid": grid_ref(*pos), "heading": heading,
+        "x": round(est[0], 1), "y": round(est[1], 1), "grid": grid_ref(*est), "heading": heading, "err_nm": round(s.dr_error, 1),
         "speed": round(speed, 1), "depth": depth, "range_nm": round(rng_nm), "next": nxt,
         "eta_h": (max(1, int(-(-run.work_left // 1))) if run is not None and run.working is not None else None),
         "noise": s.noise,
@@ -129,8 +148,7 @@ def _rows(w) -> List[tuple]:
     if not (s.sonar_on or s.surfaced) or "fault_sonar" in s.flags:
         return []
     raw = []
-    nv = navigation(w)
-    me = (nv["x"], nv["y"])
+    me = true_xy(w)
     tgt = run.mission.chart.get("target") if run is not None and run.outcome is None else None
     drop = random.Random(w.tick_no * 3571 + 11).random() < 0.12
     if tgt and run.acts_done >= 1 and not drop:
@@ -139,7 +157,12 @@ def _rows(w) -> List[tuple]:
             raw.append((_bearing(me, tgt), dist, tgt[2], True))
     if "in_combat" in s.flags:
         k = w.tick_no // 5
-        raw.append(((k * 83 + 17) % 360, float(3 + (k * 7) % 6), "fast screws, closing", True))
+        for i in range(w.engagement.escorts if w.engagement is not None else 1):
+            raw.append(((k * 83 + 17 + i * 71) % 360, float(3 + (k * 7 + i * 5) % 6), "fast screws, closing", True))
+    for o in w.traffic:                                      # merchants and fishermen are real hulls too
+        dist = math.hypot(o["x"] - me[0], o["y"] - me[1]) * 0.9
+        if dist <= SCOPE_NM:
+            raw.append((_bearing(me, (o["x"], o["y"])), dist, LABEL_POOL[0] if o["kind"] == "merchant" else LABEL_POOL[3], True))
     if s.sonar_on:
         for p, _ in sonar_reports(w):
             if p is not None and p.kind == "echo":
@@ -226,16 +249,18 @@ def periscope(w, train: int = 0) -> Dict:
     nv = navigation(w)
     if not (s.surfaced or s.scope_up):
         return {"mode": "down", "train": train, "centre": (nv["heading"] + train) % 360, "ship": None,
-                "distortions": [], "ghosts": []}
+                "distortions": [], "ghosts": [], "others": [], "visibility": 0.0}
     mode = "bridge" if s.surfaced else "periscope"
     centre = (nv["heading"] + train) % 360
-    me = (nv["x"], nv["y"])
+    from . import sea
+    vis = sea.visibility(w)
+    me = true_xy(w)
     run = w.run
     ship = None
     tgt = run.mission.chart.get("target") if run is not None and run.outcome is None else None
     if tgt and run.acts_done >= 1:
         dist = math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9
-        if dist <= VIS_NM:
+        if dist <= vis:
             brg = _bearing(me, tgt)
             rel = ((brg - centre + 540) % 360) - 180
             sight = run.mission.chart.get("sight", {})
@@ -244,7 +269,8 @@ def periscope(w, train: int = 0) -> Dict:
                     "ships": sight.get("ships", 1), "markings": bool(sight.get("markings", False))}
     live = w.active_crew()
     strain = sum((c.fear + c.fatigue) / 2 for c in live) / len(live) if live else 1.0
-    p = max(0.0, min(0.7, strain + 0.3 * s.moral_debt + 0.3 * s.attention - 0.15))
+    p = max(0.0, min(0.7, strain + 0.3 * s.moral_debt + 0.3 * s.attention - 0.15
+                     + (0.08 if sea.night(w) else 0.0) + (0.12 if "fog" in s.flags else 0.0)))
     look = random.Random((w.tick_no // 3) * 6733 + 29)
     kinds = []
     if look.random() < p:
@@ -259,4 +285,13 @@ def periscope(w, train: int = 0) -> Dict:
         rel = ((r[0] - centre + 540) % 360) - 180
         if abs(rel) <= FIELD_DEG // 2 and g.random() < 0.5:
             ghosts.append(int(rel))
-    return {"mode": mode, "train": train, "centre": centre, "ship": ship, "distortions": kinds, "ghosts": ghosts}
+    others = []
+    for o in w.traffic:
+        dist = math.hypot(o["x"] - me[0], o["y"] - me[1]) * 0.9
+        if dist <= vis:
+            brg = _bearing(me, (o["x"], o["y"]))
+            rel = ((brg - centre + 540) % 360) - 180
+            others.append({"kind": o["kind"], "bearing": brg, "rel": rel, "range_nm": round(dist, 1),
+                           "in_field": abs(rel) <= FIELD_DEG // 2})
+    return {"mode": mode, "train": train, "centre": centre, "ship": ship, "distortions": kinds, "ghosts": ghosts,
+            "others": others, "visibility": vis}

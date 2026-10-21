@@ -125,10 +125,11 @@
         if (next || (tr.state === 'current' && reached && i === tr.reached)) t += `<text class="wl" x="${p[0]}" y="${p[1] + (p[1] > 66 ? -3.4 : 5)}" text-anchor="${p[0] > 85 ? 'end' : 'middle'}">${esc(p[2])}</text>`;
       });
     });
+    const err = `<circle class="errc" cx="${N.x}" cy="${N.y}" r="${Math.max(1.2, N.err_nm / 0.9).toFixed(1)}"/>`;
     const boat = `<g class="boat ${v.surfaced ? 'up' : ''}" transform="translate(${N.x} ${N.y}) rotate(${N.heading})"><circle class="halo" r="4.2"/><path d="M0 -4.6 L2.4 3.4 L0 2.2 L-2.4 3.4 Z"/></g>`;
     return `<svg class="chart" viewBox="0 0 110 80" role="img" aria-label="Chart: ${esc(N.grid)}, heading ${N.heading}">
       <rect class="sea" width="110" height="80"/>${g}
-      <path class="land" d="M90 0 L110 0 L110 21 L101 19 L95 9 Z"/><text class="wl" x="108" y="26" text-anchor="end">Base</text>${t}${boat}</svg>`;
+      <path class="land" d="M90 0 L110 0 L110 21 L101 19 L95 9 Z"/><text class="wl" x="108" y="26" text-anchor="end">Base</text>${t}${err}${boat}</svg>`;
   }
   function gauge(k, val, unit, extra) {
     return `<div class="gg"><span class="gk">${k}</span><span class="gv">${val}<small>${unit || ''}</small></span>${extra || ''}</div>`;
@@ -138,7 +139,7 @@
     const nxt = N.next ? `${esc(N.next)} · ${N.range_nm} nm${N.eta_h ? ` · ${N.eta_h} h` : ''}` : 'On station';
     return `${chartSvg(v)}<div class="gauges">
       ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn', `<span class="gk">ordered ${v.helm.speed}${v.helm.lag ? ' …' : ''}</span>`)}
-      ${gauge('Depth', N.depth, ' m')}${gauge('Grid', N.grid, '')}
+      ${gauge('Depth', N.depth, ' m')}${gauge('Grid', N.grid, '', `<span class="gk">within ${N.err_nm.toFixed(1)} nm</span>`)}
       ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
       <div class="gg wide"><span class="gk">Next</span><span class="gv sm">${nxt}</span></div></div>`;
   }
@@ -263,6 +264,11 @@
       }
       scene += `<g class="vessel" transform="translate(${X.toFixed(1)} ${Y}) scale(${k.toFixed(2)})">${body}<path class="wake" d="M-30 1 L30 1" /></g>`;
     }
+    (ps.others || []).forEach((o) => {
+      if (!o.in_field) return;
+      const k2 = Math.max(0.3, Math.min(1.6, 7 / Math.max(1, o.range_nm)));
+      scene += `<g class="vessel other" transform="translate(${(80 + o.rel / 25 * 70).toFixed(1)} ${Y}) scale(${k2.toFixed(2)})">${o.kind === 'fishing' ? '<path class="hull" d="M-8 0 L-7 -3 L7 -3 L9 -5 L9 0 Z"/><line class="mast" x1="0" y1="-3" x2="0" y2="-11"/>' : hullShape('steamer', false)}</g>`;
+    });
     ps.ghosts.forEach((rel) => { scene += `<g class="ghostv" transform="translate(${(80 + rel / 25 * 70).toFixed(1)} ${Y}) scale(.9)">${hullShape('steamer', false)}</g>`; });
     const hx = sh && sh.in_field ? X : 80, hs = sh && sh.in_field ? k : 1;
     ps.distortions.forEach((d, i) => {
@@ -280,7 +286,7 @@
     return `<svg class="eye" viewBox="0 0 160 90" role="img" aria-label="${ps.mode === 'bridge' ? 'Bridge' : 'Periscope'} view, centre ${ps.centre}">
       <defs><clipPath id="eyeclip"><circle cx="80" cy="45" r="43"/></clipPath></defs><rect width="160" height="90" fill="#05090c"/>
       <g clip-path="url(#eyeclip)"><rect class="sky" y="0" width="160" height="${Y}"/><rect class="water" y="${Y}" width="160" height="${90 - Y}"/><line class="horizon" x1="0" y1="${Y}" x2="160" y2="${Y}"/>${scene}</g>
-      <circle class="rim" cx="80" cy="45" r="43"/><line class="ret" x1="80" y1="6" x2="80" y2="84"/><line class="ret" x1="40" y1="${Y}" x2="120" y2="${Y}"/>${ticks}${edge}</svg>`;
+      ${ps.visibility < 5 ? '<rect class="mist" width="160" height="90" clip-path="url(#eyeclip)"/>' : ''}<circle class="rim" cx="80" cy="45" r="43"/><line class="ret" x1="80" y1="6" x2="80" y2="84"/><line class="ret" x1="40" y1="${Y}" x2="120" y2="${Y}"/>${ticks}${edge}</svg>`;
   }
   function sheetPeriscope(v) {
     const ps = Dread.periscope(state.game.w, state.train), sh = ps.ship;
@@ -289,7 +295,7 @@
       : sh ? `${sh.in_field ? 'In the field' : (sh.rel > 0 ? 'To starboard' : 'To port')}: ${esc(KIND[sh.kind] || sh.kind)}${sh.kind === 'convoy' ? ` of ${sh.ships} ships` : sh.escorts ? ` with ${sh.escorts} escorts` : ''} · bearing ${String(sh.bearing).padStart(3, '0')}° · ${sh.range_nm.toFixed(1)} nm`
         : 'An empty horizon.';
     return `<div class="sheet scopesheet" role="dialog" aria-modal="true" aria-label="Periscope"><header><h2>${ps.mode === 'bridge' ? 'Bridge' : 'Periscope'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
-      <div class="body"><div class="eyegrid"><div>${periscopeSvg(ps)}<p class="eyeread">${read}</p><p class="eyeread dim">Centre ${String(ps.centre).padStart(3, '0')}° · trained ${ps.train > 0 ? '+' : ''}${ps.train}°</p></div>
+      <div class="body"><div class="eyegrid"><div>${periscopeSvg(ps)}<p class="eyeread">${read}</p><p class="eyeread dim">Centre ${String(ps.centre).padStart(3, '0')}° · trained ${ps.train > 0 ? '+' : ''}${ps.train}° · you can see ${ps.visibility.toFixed(1)} nm</p></div>
         <div class="eyebtns"><button class="btn" data-a="train:-15">◀ Train left</button><button class="btn" data-a="train:15">Train right ▶</button>
           ${up ? `<button class="btn primary" data-a="order:${up.id}">${esc(up.label)}<small>${esc(up.hint)}</small></button>` : '<p class="dim">On the surface: the bridge glasses.</p>'}
           <button class="btn" data-a="wait">Watch an hour</button><p class="note">What the eye sees is not always what is there.</p></div></div></div></div>`;
@@ -313,6 +319,27 @@
         <span><b>There is no battle.</b> Nothing aboard will ever be confirmed as anything but possible.</span>
       </div></div></div></div>`;
   }
+  const GROUPS = [
+    ['Helm and navigation', /^(speed_|depth_|snorkel_|silent_running|normal_running|surface|dive|raise_periscope|lower_periscope|take_fix|active_ping)/],
+    ['Sensors and radio', /^(silence_sonar|restore_sonar|listen_radio|verify_orders)/],
+    ['The boat', /^(damage_control|scrub_air|force_compartment)/],
+    ['The men', /^(cancel_rest|grant_rest|stand_down|hold_ritual|address_crew|rations|isolate|release|sick_call|call_council|write_log)/],
+    ['Station', /^(check_world|leave_station)/],
+  ];
+  function ordersGrouped(orders) {
+    const btn = (o) => `<button class="opt" data-a="${o.needsCrew ? 'pick:' : 'order:'}${o.id}"><b>${esc(o.label)}${o.needsCrew ? ' …' : ''}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`;
+    const used = new Set();
+    let out = '';
+    for (const [name, re] of GROUPS) {
+      const items = orders.filter((o) => re.test(o.id));
+      if (!items.length) continue;
+      items.forEach((o) => used.add(o.id));
+      out += `<p class="smcaps grp">${name}</p><div class="orders-grid">${items.map(btn).join('')}</div>`;
+    }
+    const rest = orders.filter((o) => !used.has(o.id));
+    if (rest.length) out += `<p class="smcaps grp">Other</p><div class="orders-grid">${rest.map(btn).join('')}</div>`;
+    return out;
+  }
   function sheetOrders(v) {
     if (state.pick) {
       const item = v.orders.find((o) => o.id === state.pick);
@@ -322,12 +349,12 @@
         <footer><button class="btn" data-a="orders">Back</button></footer></div>`;
     }
     return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Orders"><header><h2>Orders</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
-      <div class="body"><div class="orders-grid">${v.orders.filter((o) => o.kind !== 'act').map((o) => `<button class="opt" data-a="${o.needsCrew ? 'pick:' : 'order:'}${o.id}"><b>${esc(o.label)}${o.needsCrew ? ' …' : ''}</b>${o.hint ? `<span>${esc(o.hint)}</span>` : ''}</button>`).join('')}</div>
+      <div class="body">${ordersGrouped(v.orders.filter((o) => o.kind !== 'act'))}
         <p class="note">Orders are not free. Most of what they cost, you will learn later.</p></div></div>`;
   }
   function sheetDecision(v) {
     const d = v.pending;
-    return `<div class="sheet decision" role="dialog" aria-modal="true" aria-label="Decision"><header><h2>CAPTAIN: ${esc(d.title)}</h2><span class="smcaps">the clock is stopped</span></header>
+    return `<div class="sheet decision ${d.id === 'engagement_turn' ? 'attack' : ''}" role="dialog" aria-modal="true" aria-label="Decision"><header><h2>CAPTAIN: ${esc(d.title)}</h2><span class="smcaps">the clock is stopped</span></header>
       <div class="body"><div class="grid"><div class="story">${esc(d.text)}</div>
         <div class="opts">${d.choices.map((c, i) => `<button class="opt" data-a="choose:${i}"><b>${esc(c.label)}</b>${c.cost ? `<span>${esc(c.cost)}</span>` : ''}</button>`).join('')}</div></div></div></div>`;
   }

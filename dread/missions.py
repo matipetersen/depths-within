@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "missions.json")
 OUTCOMES = ("success", "failed", "refused", "altered", "left")
-WINDOW_FACTOR = 1.25
+WINDOW_FACTOR = 1.8
 
 
 @dataclass
@@ -23,8 +23,7 @@ class Act:
     label: str
     hint: str
     hours: float
-    requires: Optional[dict]
-    why: str
+    needs: List[dict]            # [{'requires': condition, 'why': text}]: all must hold; the first that does not says why
     effects: List[dict]
 
 
@@ -88,7 +87,7 @@ def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:
                                 prov.get("signed", ""), q, m["mundane_origin"], m["uncanny_origin"],
                                 float(m.get("window", WINDOW_FACTOR)),
                                 [Act(a["id"], a["label"], a.get("hint", ""), float(a["hours"]),
-                                     a.get("requires"), a.get("why", ""), list(a.get("effects", [])))
+                                     list(a.get("needs", [])), list(a.get("effects", [])))
                                  for a in m.get("acts", [])],
                                 dict(m.get("chart", {}))))
     return missions

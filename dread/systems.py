@@ -7,9 +7,9 @@ from .state import clamp
 
 SPEEDS = {"slow": (0.5, 4.0), "standard": (1.0, 8.0), "flank": (1.6, 13.0)}      # work rate, knots
 DEPTHS = {"shallow": 60, "deep": 120, "test": 180}
-DRAIN = {"slow": 0.004, "standard": 0.009, "flank": 0.03}                          # battery per hour under way
-HOTEL = 0.0015                                                                     # lights, galley, air
-IDLE_DRAIN = 0.003
+DRAIN = {"slow": 0.003, "standard": 0.006, "flank": 0.02}                          # battery per hour under way
+HOTEL = 0.001                                                                     # lights, galley, air
+IDLE_DRAIN = 0.002
 SYSTEM_OF = {"engine room": "propulsion", "control room": "planes", "bow torpedo room": "bow tubes",
              "after torpedo room": "stern tubes", "crew quarters": "berths"}
 
@@ -128,14 +128,17 @@ def tick(w):
             s.helm_pending = None
             _apply_helm(w, kind, level)
             w.log.append(f"[{t:03d}] The helm answers: {'ahead ' + level if kind == 'speed' else str(DEPTHS[level]) + ' metres'}.")
+    # dead reckoning drifts: faster when under way, when the helm is tired and when the presence leans on the chart
+    g = (0.12 if moving(w) else 0.03) * (1.0 + 1.5 * role_error(w, "helm") + s.attention)
+    s.dr_error = min(40.0, s.dr_error + g)
     # batteries
     if s.snorkel and not (s.scope_up and not s.surfaced):
         s.snorkel = False
         w.log.append(f"[{t:03d}] The diesels stop; there is no snorkel to breathe through.")
     if s.surfaced:
-        s.battery = clamp(s.battery + 0.035)
+        s.battery = clamp(s.battery + 0.06)
     elif s.snorkel:
-        s.battery = clamp(s.battery + 0.02)
+        s.battery = clamp(s.battery + 0.03)
         s.fuel = clamp(s.fuel - 0.005)
         s.co2 = clamp(s.co2 - 0.004, 0.005, 0.1)
         s.attention = clamp(s.attention + 0.004)

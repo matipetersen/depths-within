@@ -38,6 +38,9 @@ class Crew:
     isolated_ticks: int = 0
     name_known: bool = False  # the presence learned this name
     believes: Set[str] = field(default_factory=set)
+    ill: bool = False
+    hides: bool = False       # a sick man who hides it
+    ill_ticks: int = 0
 
     @property
     def active(self) -> bool:
@@ -71,6 +74,8 @@ class Crew:
             out.append("leaves small offerings")
         if self.believes and self.fear > 0.3:
             out.append("repeats rumors")
+        if self.ill and not self.hides:
+            out.append("feverish")
         return out
 
 
@@ -120,6 +125,13 @@ class Ship:
     dc_active: bool = False
     helm_pending: object = None        # (kind, level) the helm has not carried out yet
     helm_lag: int = 0
+    decoys: int = 4
+    dr_error: float = 0.0              # nm between where we are and where we believe we are
+    last_fix: int = 0
+    last_log: int = -99
+    log_true: int = 0
+    log_soft: int = 0
+    log_blank: int = 0
     damage: Dict[str, float] = field(default_factory=lambda: {c: 0.0 for c in COMPARTMENTS})  # hull lost, by compartment
     routines: Dict[str, float] = field(
         default_factory=lambda: {k: 0.9 for k in ROUTINE_ITEMS})
