@@ -38,9 +38,11 @@ def browser():
         b.close()
 
 
-def open_page(browser, page_file, size=(844, 390), touch=True):
+def open_page(browser, page_file, size=(844, 390), touch=True, tutorial=False):
     ctx = browser.new_context(viewport={"width": size[0], "height": size[1]}, has_touch=touch, is_mobile=touch,
                               device_scale_factor=2)
+    if not tutorial:                       # a veteran: the first-run tutorial has been read
+        ctx.add_init_script("try { localStorage.setItem('depths-within:tutorial:v1', '1'); } catch (e) {}")
     page = ctx.new_page()
     page.errors = []
     page.on("pageerror", lambda e: page.errors.append(str(e)))
@@ -240,6 +242,7 @@ def test_the_chart_and_the_instruments_show_where_the_boat_is_and_move_with_the_
         assert label.lower() in page.inner_text(".gauges").lower()
     before = page.get_attribute("svg.chart .boat", "transform")
     page.locator("button.step").tap()
+    page.locator(".sheet .opt").first.tap()                       # the plain way
     for _ in range(4):
         if page.locator(".sheet.decision").count():
             break
@@ -388,3 +391,43 @@ def test_the_keel_the_kinds_of_torpedo_and_the_lookout_are_on_screen(browser, pa
     text = page.inner_text(".sonar:last-of-type").lower() + page.inner_text(".cols").lower()
     assert "lookout" in text
     assert "enemy" not in page.inner_text("#app").lower()
+
+
+def test_first_time_the_tutorial_opens_and_is_remembered(browser, page_file):
+    page = open_page(browser, page_file, tutorial=True)
+    begin(page)
+    text = page.inner_text(".sheet").lower()
+    assert "before you take command" in text and "nothing happens while you wait" in text and page.locator(".tut li").count() == 6
+    page.locator("footer [data-a=close]").tap()
+    assert page.locator(".sheet").count() == 0
+    page.evaluate("dreadDebug.state.game = null; dreadDebug.render()")
+    begin(page)
+    assert page.locator(".sheet").count() == 0                    # it is not shown twice
+    page.locator("[data-a='sheet:help']").tap()
+    assert "how to play" in page.inner_text(".sheet").lower()
+
+
+def test_the_step_button_asks_how_and_each_way_is_done_differently(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    page.locator("button.step").tap()
+    assert page.locator(".sheet .opt").count() == 3 and "how will you do it" in page.inner_text(".sheet").lower()
+    assert "plain" in page.inner_text(".sheet .opt").lower()
+    page.locator(".sheet .opt").nth(2).tap()                    # the flank way
+    assert page.evaluate("dreadDebug.state.game.w.run.method") == "flank"
+    assert page.evaluate("dreadDebug.state.game.w.ship.speed_order") in ("flank", "standard")   # a tired helm may be late
+    assert "(run the grid at flank)" in page.inner_text(".log-scroll").lower()
+
+
+def test_what_needs_doing_is_always_on_screen_and_one_tap_does_it(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    assert "what needs doing" in page.inner_text(".adv").lower() and "next step" in page.inner_text(".adv").lower()
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.dr_error = 6; dreadDebug.render(); }")
+    assert "where we are" in page.inner_text(".adv .advtxt")
+    page.locator(".advnext").tap()
+    page.locator(".advtxt").tap()                               # cycles to a tip with an order and runs it
+    page.evaluate("() => { const w = dreadDebug.state.game.w; w.ship.battery = 0.2; dreadDebug.render(); }")
+    assert "batteries" in page.inner_text(".adv").lower() or "where we are" in page.inner_text(".adv").lower()
+    box = page.locator(".advtxt").bounding_box()
+    assert box["height"] >= 40 and page.locator(".advnext").bounding_box()["width"] >= 40

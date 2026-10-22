@@ -25,6 +25,7 @@ class Act:
     hours: float
     needs: List[dict]            # [{'requires': condition, 'why': text}]: all must hold; the first that does not says why
     effects: List[dict]
+    methods: List[dict] = field(default_factory=list)   # the ways to do it: [{'id','label','hint','hours_mult','dark_mult','effects'}]
 
 
 @dataclass
@@ -55,6 +56,9 @@ class MissionRun:
     acts_done: int = 0
     working: Optional[int] = None    # index of the act being carried out
     work_left: float = 0.0           # hours of work still to do on it
+    work_total: float = 1.0          # hours the chosen way of doing it takes
+    method: Optional[str] = None     # how the captain chose to do it
+    prev: Optional[tuple] = None     # speed and silence before the method changed them
     lost: float = 0.0                # hours of the window spent on anything but the mission
 
     @property
@@ -87,7 +91,7 @@ def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:
                                 prov.get("signed", ""), q, m["mundane_origin"], m["uncanny_origin"],
                                 float(m.get("window", WINDOW_FACTOR)),
                                 [Act(a["id"], a["label"], a.get("hint", ""), float(a["hours"]),
-                                     list(a.get("needs", [])), list(a.get("effects", [])))
+                                     list(a.get("needs", [])), list(a.get("effects", [])), list(a.get("methods", [])))
                                  for a in m.get("acts", [])],
                                 dict(m.get("chart", {}))))
     return missions

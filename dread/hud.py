@@ -206,8 +206,14 @@ def decision_from(d) -> List[str]:
     return _decision_lines(title, d.description, [(o.text, o.tooltip) for o in d.options])
 
 
+def needs(w) -> List[str]:
+    from .advice import advice
+    tips = advice(w)
+    return ["WHAT NEEDS DOING"] + [f"  {'>' if i == 0 else '-'} {t['text']}" for i, t in enumerate(tips[:3])] if tips else []
+
+
 def screen(w, pending=None, items=None, notice: str = "") -> str:
-    parts: List[str] = header(w) + ledger(w) + instruments(w) + [""] + crew(w) + [""] + sonar(w) + [""] + log_tail(w)
+    parts: List[str] = header(w) + needs(w) + ledger(w) + instruments(w) + [""] + crew(w) + [""] + sonar(w) + [""] + log_tail(w)
     if notice:
         parts += ["", f"> {notice}"]
     parts.append("")

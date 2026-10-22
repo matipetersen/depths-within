@@ -262,6 +262,10 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "engage_order":
             from . import combat
             combat.order(world, fx["order"])
+        elif op == "order":                                      # a captain's order given as part of a way of doing a step
+            from .orders import ORDERS
+            args = [fx["arg"]] if fx.get("arg") is not None else []
+            ORDERS[fx["name"]](world, *args)
         elif op == "depth_order":
             ship.depth_order = fx["value"]
             ship.depth_extra = 0

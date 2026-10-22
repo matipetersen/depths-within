@@ -152,7 +152,7 @@
         chart: m.chart || null,
         acts: (m.acts || []).map((a) => ({
           id: a.id, label: a.label, hint: a.hint || '', hours: Number(a.hours),
-          needs: a.needs || [], effects: a.effects || [],
+          needs: a.needs || [], effects: a.effects || [], methods: a.methods || [],
         })),
       })),
     };
@@ -536,6 +536,8 @@
         trafficAct(world, fx.action);
       } else if (op === 'engage_order') {
         engageOrder(world, fx.order);
+      } else if (op === 'order') {
+        orders[fx.name](world, ...(fx.arg !== undefined && fx.arg !== null ? [fx.arg] : []));
       } else if (op === 'depth_order') {
         world.ship.depth_order = fx.value; world.ship.depth_extra = 0;
       } else if (op === 'emergency_surface') {
@@ -1332,7 +1334,7 @@
       this.ship.tubes = [0, 1, 2, 3, 4, 5].map((i) => (i < this.ship.torpedoes ? 'loaded' : 'empty'));
       this.run = {
         mission: m, start_tick: this.tick_no, outcome: null, phase_fired: new Set(),
-        acts_done: 0, working: null, work_left: 0.0, lost: 0.0,
+        acts_done: 0, working: null, work_left: 0.0, work_total: 1.0, method: null, prev: null, lost: 0.0,
       };
       const s = this.ship;
       s.progress = 0.0;
@@ -1428,22 +1430,37 @@
       if (this.ship.battery <= 0 && !this.ship.surfaced) return 'The batteries are flat.';
       return this._unmet(a);
     }
-    do_act() {
+    method_for(a, methodId) {
+      if (!a.methods.length) return { id: '', label: '', hours_mult: 1.0, effects: [] };
+      return a.methods.find((m) => m.id === methodId) || a.methods[0];
+    }
+    method_hours(a, m) {
+      let mult = m.hours_mult !== undefined ? m.hours_mult : 1.0;
+      if (m.dark_mult !== undefined && (isNight(this) || this.ship.flags.has('fog'))) mult = m.dark_mult;
+      return Number(a.hours) * mult;
+    }
+    do_act(methodId) {
       const { act, ok, why } = this.act_status();
       if (act === null) return 'There is nothing to order. The rest is waiting.';
       if (!ok) return why;
-      const run = this.run;
+      const run = this.run, m = this.method_for(act, methodId);
       run.working = run.acts_done;
-      run.work_left = Number(act.hours);
+      run.work_total = this.method_hours(act, m);
+      run.work_left = run.work_total;
+      run.method = m.id || null;
+      const s = this.ship;
+      run.prev = [s.speed_order, s.silent_running];
+      applyEffects(m.effects, this);
       this._set_progress();
-      const msg = `You order it: ${act.label}.`;
+      const how = m.label && act.methods.length && act.methods[0] !== m ? ` (${m.label})` : '';
+      const msg = `You order it: ${act.label}${how}.`;
       this.log.push(`${tag(this.tick_no)} > ${msg}`);
       return msg;
     }
     _set_progress() {
       const run = this.run, n = run.mission.acts.length;
       let part = 0.0;
-      if (run.working !== null) part = 1.0 - run.work_left / run.mission.acts[run.working].hours;
+      if (run.working !== null) part = 1.0 - run.work_left / run.work_total;
       this.ship.progress = clamp((run.acts_done + part) / n);
     }
     _work() {
@@ -1456,6 +1473,11 @@
         run.work_left = 0.0;
         run.acts_done += 1;
         run.working = null;
+        if (run.prev !== null && (this.ship.speed_order !== run.prev[0] || this.ship.silent_running !== run.prev[1])) {
+          [this.ship.speed_order, this.ship.silent_running] = run.prev;
+          this.ship.helm_pending = null;
+        }
+        run.prev = null;
         this.log.push(`${tag(this.tick_no)} Done: ${a.label}.`);
         applyEffects(a.effects, this);
       }
@@ -1803,7 +1825,7 @@
     } else {
       const n = pts.length - 1;
       let i = Math.min(run.acts_done, n - 1), t = 0.0;
-      if (run.working !== null) t = 1.0 - run.work_left / run.mission.acts[run.working].hours;
+      if (run.working !== null) t = 1.0 - run.work_left / run.work_total;
       if (run.acts_done >= n) { i = n - 1; t = 1.0; }
       pos = lerp2(pts[i], pts[i + 1], t);
       heading = bearing(pts[i], pts[i + 1]);
@@ -1899,8 +1921,9 @@
     const strain = fsum(crew.map((c) => (c.fear + c.fatigue) / 2)) / crew.length;
     return Math.max(0.0, Math.min(0.6, 1.2 * strain - 0.2));
   }
+  const s_flags_has = (w, f) => w.ship.flags.has(f);
   function solutionError(w) {
-    const s = w.ship, pRoom = roomError(w.active_crew().filter((c) => c.role === 'torpedo'));
+    const s = w.ship, pRoom = roomError(w.active_crew().filter((c) => c.role === 'torpedo')) * (s_flags_has(w, 'double_checked') ? 0.6 : 1.0);
     if (s.surfaced || s.scope_up) {
       const ps = periscope(w, 0);
       if (ps.ship !== null) return ps.distortions.length ? 0.5 : pRoom * 0.4;
@@ -1974,6 +1997,32 @@
 
   const TITLES = { engagement_turn: 'UNDER ATTACK', log_entry: "THE DAY'S ENTRY", council: 'THE OFFICERS' };
 
+  // ---------------------------------------------------------------- what the boat needs (dread/advice.py)
+  function advice(w) {
+    const s = w.ship, run = w.run, tips = [];
+    const add = (text, order) => tips.push({ text, order: order || null });
+    const st = w.act_status();
+    const blocked = w.working !== null ? w.work_blocked : (st.ok ? '' : st.why);
+    if (blocked) {
+      const lower = blocked.toLowerCase();
+      add(blocked, blocked.includes('Take a fix') ? 'take_fix' : blocked.includes('listening') ? 'restore_sonar' : lower.includes('surface') ? 'dive' : lower.includes('batteries are flat') ? 'snorkel_on' : null);
+    }
+    if (!s.surfaced && s.battery < 0.35 && !s.snorkel) add('The batteries are low. Charge them: the periscope up and the diesels on the snorkel, or surface.', s.scope_up ? 'snorkel_on' : 'raise_periscope');
+    if (s.dr_error >= 3.0 && !tips.some((t) => t.order === 'take_fix')) add(`We are not sure where we are: within ${s.dr_error.toFixed(0)} nm. Take a fix (periscope, stars or the radio).`, 'take_fix');
+    if (s.hull < 0.75 && s.spares > 0.1 && !s.dc_active) add('The hull is damaged. Put a damage control party on it.', 'damage_control');
+    if (s.co2 >= 0.02) add('The air is going foul. Break out fresh absorbent, or surface.', 'scrub_air');
+    if (Math.min(s.food, s.water) < 0.3) add('The stores are running low.' + (w.on_station ? ' Ration them, or think about going home.' : ''), w.on_station ? 'rations' : null);
+    const rows = w.report();
+    const worn = rows.filter((r) => r.says >= 0.45 || r.symptoms.includes('errors at station') || r.symptoms.includes('microsleeps')).length;
+    if (worn >= 3 && !s.stand_down) add('The men look worn out. Let them sleep, or have them eat together.', 'stand_down');
+    if (rows.some((r) => r.symptoms.includes('feverish'))) add('A man is feverish. Hold a sick call.', 'sick_call');
+    if (st.ok && st.act !== null && w.working === null) add(`Next step: ${st.act.label}. Pick how to do it.`, 'act');
+    else if (w.working !== null && !blocked) add(`Under way: ${w.working.label}. Let the hours pass; watch the men.`, null);
+    else if (w.on_station) add('Hold position. Nothing is asked of you but to stay; watch the men, the stores and the sea.', null);
+    if (run !== null && run.acts_done === 0 && run.working === null && !run.phase_fired.has('verified') && run.mission.kind !== 'hold') add('New orders, from a source you cannot name. You may ask for confirmation; it costs time, and an answer is not a source.', 'verify_orders');
+    return tips.slice(0, 4);
+  }
+
   // ---------------------------------------------------------------- the captain's orders menu
   const WAIT_LIMIT = 12;
 
@@ -1987,7 +2036,9 @@
       add('act', `Under way: ${w.working.label}`, `about ${left} h more`, () => '', false, 'act', w.work_blocked || 'The hours must pass.');
     } else if (st.act !== null) {
       const a = st.act;
-      add('act', a.label, a.hint ? `${a.hours} h; ${a.hint}` : `${a.hours} h`, () => w.do_act(), false, 'act', st.ok ? '' : st.why);
+      if (a.methods.length) {
+        a.methods.forEach((m, i) => add(i === 0 ? 'act' : `act:${m.id}`, m.label, `${w.method_hours(a, m).toFixed(1)} h; ${m.hint}`, () => w.do_act(m.id), false, 'act', st.ok ? '' : st.why));
+      } else add('act', a.label, a.hint ? `${a.hours} h; ${a.hint}` : `${a.hours} h`, () => w.do_act(), false, 'act', st.ok ? '' : st.why);
     }
     if (s.sonar_on) add('silence_sonar', 'Silence the sonar', 'the headsets go quiet; so does the warning', () => orders.silence_sonar(w));
     else add('restore_sonar', 'Switch the sonar back on', 'you will hear what they heard', () => orders.restore_sonar(w));
@@ -2087,10 +2138,11 @@
       } else if (kind === 'w') {
         this._advance(WAIT_LIMIT, true);
       } else if (kind === 'o') {
-        const item = availableOrders(w).find((i) => i.id === a);
+        const id = a === 'act' && b !== undefined ? `act:${b}` : a;               // 'o:act:flank' is the act, done the flank way
+        const item = availableOrders(w).find((i) => i.id === id);
         if (!item) return;
         if (item.why) { this.notice = item.why; return; }
-        this.notice = String(item.run(b !== undefined ? Number(b) : undefined) || '');
+        this.notice = String(item.run(a !== 'act' && b !== undefined ? Number(b) : undefined) || '');
       } else {
         return;
       }
@@ -2158,7 +2210,7 @@
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
         helm: { speed: s.speed_order, depth: s.depth_order, snorkel: s.snorkel, dc: s.dc_active, lag: s.helm_pending !== null },
-        lookout: lookout(w), nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
+        advice: advice(w), lookout: lookout(w), nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
         log: w.log.filter((l) => l.trim()),
         pending,
         orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
@@ -2178,7 +2230,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, visibility, lookout, seabedAt, crushDepth, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, visibility, lookout, seabedAt, crushDepth, advice, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

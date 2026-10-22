@@ -56,7 +56,7 @@ def _where(w):
         i = min(run.acts_done, n - 1)
         t = 0.0
         if run.working is not None:
-            t = 1.0 - run.work_left / run.mission.acts[run.working].hours
+            t = 1.0 - run.work_left / run.work_total
         if run.acts_done >= n:
             i, t = n - 1, 1.0
         pos = _lerp(pts[i], pts[i + 1], t)
@@ -206,7 +206,7 @@ def solution_error(w) -> float:
     """How far off the shot will be: the room's real error, unless the captain has the target in the eyepiece.
     A clear eye mends the room's error; an eye that is seeing things makes it worse. Hidden: never shown."""
     s = w.ship
-    p_room = _room_error(_torpedo_room(w))
+    p_room = _room_error(_torpedo_room(w)) * (0.6 if "double_checked" in s.flags else 1.0)
     if s.surfaced or s.scope_up:
         ps = periscope(w, 0)
         if ps["ship"] is not None:

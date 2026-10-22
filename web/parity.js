@@ -25,7 +25,7 @@ function fuzz(seed, maxSteps) {
       w.choose(w.pending.choices[nxt() % w.pending.choices.length].key);
       continue;
     }
-    if (nxt() % 3 === 0) w.do_act();
+    if (nxt() % 3 === 0) { const act = w.next_act(); const k = nxt(); w.do_act(act && act.methods.length ? act.methods[k % act.methods.length].id : undefined); }
     if (nxt() % 11 === 0) Dread.orders.load_torpedoes(w, ['steam', 'electric', 'acoustic'][nxt() % 3]);
     if (nxt() % 7 === 0) Dread.orders.set_depth(w, ['shallow', 'deep', 'test'][nxt() % 3]);
     if (nxt() % 13 === 0) { if (w.ship.surfaced) Dread.orders.dive(w); else Dread.orders.surface(w); }
@@ -43,7 +43,7 @@ function fuzz(seed, maxSteps) {
     }
     if (w.pending) continue;                       // an order (the radio, the log) can raise a decision of its own
     w.tick();
-    if (steps % 3 === 0) { const wp = Dread.weapons(w), ps = Dread.periscope(w, 0); eye.push([wp.tubes.join(','), wp.stock, wp.solutions.map((x) => [x.bearing, x.range_yd, x.run_s, x.gyro]), ps.mode, ps.ship ? [ps.ship.bearing, ps.ship.range_nm, ps.ship.kind] : null, ps.distortions.join(','), ps.ghosts.join(','), ps.others.length, ps.visibility, Dread.lookout(w).join('|')]); }
+    if (steps % 3 === 0) { const wp = Dread.weapons(w), ps = Dread.periscope(w, 0); eye.push([wp.tubes.join(','), wp.stock, wp.solutions.map((x) => [x.bearing, x.range_yd, x.run_s, x.gyro]), ps.mode, ps.ship ? [ps.ship.bearing, ps.ship.range_nm, ps.ship.kind] : null, ps.distortions.join(','), ps.ghosts.join(','), ps.others.length, ps.visibility, Dread.lookout(w).join('|'), Dread.advice(w).map((t) => `${t.order || ''}:${t.text}`).join('|')]); }
     if (steps % 3 === 0) cts.push(Dread.contacts(w).map((c) => [c.bearing, c.range_nm]));
     if (steps % 25 === 0) {
       const live = w.active_crew();

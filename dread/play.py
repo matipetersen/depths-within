@@ -54,6 +54,10 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
     if w.working is not None:
         left = max(1, int(-(-w.run.work_left // 1)))
         items.append(Item(f"Under way: {w.working.label}", f"about {left} h more", lambda: "", why=w.work_blocked or "The hours must pass."))
+    elif a is not None and a.methods:
+        for m in a.methods:                                  # one order for each way of doing the step
+            items.append(Item(m["label"], f"{w.method_hours(a, m):.1f} h; {m['hint']}", (lambda mid=m["id"]: w.do_act(mid)),
+                              why="" if ok else why))
     elif a is not None:
         hint = f"{a.hours:g} h; {a.hint}" if a.hint else f"{a.hours:g} h"
         items.append(Item(a.label, hint, w.do_act, why="" if ok else why))

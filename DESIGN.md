@@ -792,3 +792,21 @@ La profundidad ya no es solo "esconderse a cambio de crujidos": es una apuesta p
 - **Más cargado el hidrófono.** A 120 m o más nacen más ecos y las voces son más probables (con nombres aprendidos).
 - **Dos eventos propios.** "La presión quiebra a un hombre" (volver a su puesto, subir a 60 m o sedarlo; cada una tiene su coste) y "los golpes bajo la quilla" (tres golpes, la sonda no ve nada). Ambos con par mundano/inquietante.
 - A eso se suman los de §16.1 (el casco que cede, la sonda que no devuelve nada, el hundimiento sin orden).
+
+## 17. Qué hay que hacer, y de qué manera
+
+El juego se sentía lineal ("hacé el siguiente paso") y opaco ("no entiendo qué hacer"). Tres respuestas, ninguna toca el estado oculto.
+
+## 17.1 Cada paso tiene varias maneras (`data/missions.json`, `dread/world.py`)
+- Cada acto de misión trae `methods`: p. ej. *buscar* = escuchar (lento y callado), periscopio (más rápido de día, inútil de noche o con niebla, y el mar también te ve) o a flanco (rápido, ruidoso, gasta baterías); *acercarse* = normal, en silencio (más lento) o a flanco; *preparar* = inundar tubos o comprobar dos veces (más lento, evita un error); *transmitir* = completo, breve o con confirmación; *rumbo de regreso* = normal, profundo o a flanco.
+- Cada método fija las horas (`hours_mult`, y `dark_mult` de noche o con niebla) y aplica sus efectos (`order`: velocidad, silencio, periscopio, profundidad). Al terminar, el barco recupera su velocidad y silencio previos.
+- Las ventanas de tiempo hacen que lo lento cueste de verdad: la misión moral vence a las 3,0× sus horas, las demás a las 1,8×.
+
+## 17.2 La franja "qué hay que hacer" (`dread/advice.py`, `advice` en `engine.js`)
+Hasta cuatro consejos, en este orden: lo que bloquea el paso, baterías, posición dudosa, casco, aire, provisiones, hombres agotados, fiebre, y el siguiente paso. Solo usan el libro mayor exacto y lo que los hombres dejan ver; cada consejo nombra la orden que lo resuelve, y en pantalla se ejecuta de un toque. Lo último en aparecer es verificar unas órdenes de origen innominado.
+
+## 17.3 Primera partida (`web/ui.js`)
+Una hoja de seis pasos la primera vez (se recuerda cerrada), una hoja "¿Cómo lo harás?" al ordenar un paso, y la franja de consejos siempre visible. En la terminal, cada método es su propia entrada del menú y el HUD muestra "WHAT NEEDS DOING".
+
+## 17.4 Calibración
+Progreso medio sobre 100 patrullas: misión primero 0,92, tripulación primero 0,62, paranoico 0,78; ambigüedad ≥ 83 %. La prueba "lo peor se gana jugando mal" se mantiene (≈ 2,2×, umbral 2×).
