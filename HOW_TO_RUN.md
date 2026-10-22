@@ -426,14 +426,14 @@ A: Type `h` for hotkey help, `crew help` for crew commands, or see guides in GUI
 
 ## Play it in the browser (GitHub Pages) and install it as an app
 
-The touch version is a single static page in `docs/` (with its manifest, icons and a small service worker so it also works offline).
+The touch version is a static page in `docs/` (with its manifest, icons and a small service worker so it also works offline). A GitHub Action (`.github/workflows/pages.yml`) rebuilds it from the sources and publishes it.
 
-1. In the repository: **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
-2. Pick the branch that holds `docs/` (today `design/dread-core`; `main` once it is merged) and the folder **`/docs`** (or **`/ (root)`**: the root `index.html` sends visitors to `docs/`).
-3. After a minute the game is at `https://<user>.github.io/depths-within/` (for this repository: https://matipetersen.github.io/depths-within/).
-4. Open it on a phone or tablet, hold the device sideways and tap **Begin patrol**. To install it: Chrome/Android → menu → *Install app* (or *Add to Home screen*); Safari/iOS → Share → *Add to Home Screen*. The icon is a periscope over a sonar scope.
+1. One time only: **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**.
+2. Run the workflow: it runs by itself on every push to `main` that touches `web/`, `data/`, `docs/` or `tools/build_web.py`, or by hand from **Actions -> Deploy the game to GitHub Pages -> Run workflow** (do this after step 1 the first time).
+3. A minute later the game is at `https://<user>.github.io/depths-within/` (for this repository: https://matipetersen.github.io/depths-within/). The run's summary also shows the address.
+4. Open it on a phone or tablet, hold the device sideways and tap **Begin patrol**. To install it: Chrome/Android -> menu -> *Install app* (or *Add to Home screen*); Safari/iOS -> Share -> *Add to Home Screen*. The icon is a periscope over a sonar scope.
 
-After changing the game, rebuild with `python tools/build_web.py` (writes `web/dread.html` and `docs/index.html`, the manifest and the service worker). The icons come from `python tools/make_icons.py`.
+After changing the game, rebuild locally with `python tools/build_web.py` (writes `web/dread.html` and `docs/index.html`, the manifest and the service worker). The icons come from `python tools/make_icons.py`.
 
 ## Python version
 Use **Python 3.12 or newer**. The JavaScript port (`web/engine.js`) reproduces CPython's random numbers and the compensated float `sum` of 3.12+, and `tests/test_web_parity.py` compares both line by line; on 3.11 one fuzzed patrol can differ in the last digit of a float.
