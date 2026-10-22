@@ -99,3 +99,13 @@ def test_served_over_http_the_game_loads_the_icon_the_manifest_and_starts():
                 b.close()
         finally:
             srv.shutdown()
+
+
+def test_the_pages_workflow_builds_then_deploys_docs():
+    yaml = pytest.importorskip("yaml")
+    wf = yaml.safe_load(open(os.path.join(ROOT, ".github", "workflows", "pages.yml"), encoding="utf-8"))
+    assert wf["permissions"] == {"contents": "read", "pages": "write", "id-token": "write"}
+    steps = " ".join(str(s) for s in wf["jobs"]["build"]["steps"])
+    assert "tools/build_web.py" in steps and "upload-pages-artifact" in steps and "'path': 'docs'" in steps
+    assert wf["jobs"]["deploy"]["needs"] == "build" and wf["jobs"]["deploy"]["environment"]["name"] == "github-pages"
+    assert "actions/deploy-pages" in str(wf["jobs"]["deploy"]["steps"])
