@@ -36,6 +36,42 @@
               },
               "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
+          ],
+          "methods": [
+            {
+              "id": "listen",
+              "label": "Listen: a patient sweep with the headsets",
+              "hint": "slow and quiet; the headsets are all you have",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "periscope",
+              "label": "Sweep the horizon with the periscope",
+              "hint": "faster by day; useless in fog or at night; the sea can see you too",
+              "hours_mult": 0.7,
+              "dark_mult": 1.7,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "raise_periscope",
+                  "arg": null
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Run the grid at flank",
+              "hint": "covers the water quickly; loud, and the batteries go",
+              "hours_mult": 0.55,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
+            }
           ]
         },
         {
@@ -47,6 +83,46 @@
             {
               "op": "flag",
               "name": "m1_close"
+            }
+          ],
+          "methods": [
+            {
+              "id": "standard",
+              "label": "Close at a steady speed",
+              "hint": "no surprises",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "silent",
+              "label": "Creep in on silent running",
+              "hint": "slow; quiet enough that they may never hear you",
+              "hours_mult": 1.2,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "slow"
+                },
+                {
+                  "op": "order",
+                  "name": "silent_running",
+                  "arg": true
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Dash in at flank speed",
+              "hint": "quick; and everyone aboard knows how loud you are",
+              "hours_mult": 0.5,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
             }
           ]
         },
@@ -77,6 +153,28 @@
                 "value": 4.0
               },
               "why": "We cannot fire from a position we cannot name. Take a fix first."
+            }
+          ],
+          "methods": [
+            {
+              "id": "flood",
+              "label": "Order the tubes flooded",
+              "hint": "the usual",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "check",
+              "label": "Flood the tubes and check the solution twice",
+              "hint": "an hour more; the shot is likelier to go where you mean",
+              "hours_mult": 2.0,
+              "effects": [
+                {
+                  "op": "flag",
+                  "name": "double_checked",
+                  "ttl": 30
+                }
+              ]
             }
           ]
         }
@@ -151,6 +249,42 @@
               },
               "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
+          ],
+          "methods": [
+            {
+              "id": "listen",
+              "label": "Listen: a patient sweep with the headsets",
+              "hint": "slow and quiet; the headsets are all you have",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "periscope",
+              "label": "Sweep the horizon with the periscope",
+              "hint": "faster by day; useless in fog or at night; the sea can see you too",
+              "hours_mult": 0.7,
+              "dark_mult": 1.7,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "raise_periscope",
+                  "arg": null
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Run the grid at flank",
+              "hint": "covers the water quickly; loud, and the batteries go",
+              "hours_mult": 0.55,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
+            }
           ]
         },
         {
@@ -175,6 +309,46 @@
                 "value": 4.0
               },
               "why": "You cannot report a position you do not have. Take a fix first."
+            }
+          ],
+          "methods": [
+            {
+              "id": "full",
+              "label": "Send the full report",
+              "hint": "position and composition, as ordered",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "short",
+              "label": "Send a short burst",
+              "hint": "half the time on the air; the staff will have to guess at the rest",
+              "hours_mult": 0.5,
+              "effects": [
+                {
+                  "op": "ship",
+                  "stat": "orders_doubt",
+                  "value": 0.06
+                }
+              ]
+            },
+            {
+              "id": "confirm",
+              "label": "Send it in clear and ask for confirmation",
+              "hint": "longer, loud, and you may learn who is on the other end",
+              "hours_mult": 1.5,
+              "effects": [
+                {
+                  "op": "ship",
+                  "stat": "attention",
+                  "value": 0.05
+                },
+                {
+                  "op": "ship",
+                  "stat": "orders_doubt",
+                  "value": -0.1
+                }
+              ]
             }
           ]
         }
@@ -245,6 +419,42 @@
               },
               "why": "The sonar room has to be listening. You cannot search a sea you have stopped hearing."
             }
+          ],
+          "methods": [
+            {
+              "id": "listen",
+              "label": "Listen: a patient sweep with the headsets",
+              "hint": "slow and quiet; the headsets are all you have",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "periscope",
+              "label": "Sweep the horizon with the periscope",
+              "hint": "faster by day; useless in fog or at night; the sea can see you too",
+              "hours_mult": 0.7,
+              "dark_mult": 1.7,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "raise_periscope",
+                  "arg": null
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Run the grid at flank",
+              "hint": "covers the water quickly; loud, and the batteries go",
+              "hours_mult": 0.55,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
+            }
           ]
         },
         {
@@ -252,7 +462,47 @@
           "label": "Bring the boat to bear",
           "hint": "the steamer is lit; she does not turn",
           "hours": 3,
-          "effects": []
+          "effects": [],
+          "methods": [
+            {
+              "id": "standard",
+              "label": "Close at a steady speed",
+              "hint": "no surprises",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "silent",
+              "label": "Creep in on silent running",
+              "hint": "slow; quiet enough that they may never hear you",
+              "hours_mult": 1.2,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "slow"
+                },
+                {
+                  "op": "order",
+                  "name": "silent_running",
+                  "arg": true
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Dash in at flank speed",
+              "hint": "quick; and everyone aboard knows how loud you are",
+              "hours_mult": 0.5,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "ready",
@@ -281,6 +531,28 @@
                 "value": 4.0
               },
               "why": "We cannot fire from a position we cannot name. Take a fix first."
+            }
+          ],
+          "methods": [
+            {
+              "id": "flood",
+              "label": "Order the tubes flooded",
+              "hint": "the usual",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "check",
+              "label": "Flood the tubes and check the solution twice",
+              "hint": "an hour more; the shot is likelier to go where you mean",
+              "hours_mult": 2.0,
+              "effects": [
+                {
+                  "op": "flag",
+                  "name": "double_checked",
+                  "ttl": 30
+                }
+              ]
             }
           ]
         }
@@ -341,7 +613,42 @@
           "label": "Steer the northern lane",
           "hint": "hours at the wheel, under radio silence",
           "hours": 6,
-          "effects": []
+          "effects": [],
+          "methods": [
+            {
+              "id": "standard",
+              "label": "Hold the lane at a steady speed",
+              "hint": "nothing clever",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "deep",
+              "label": "Run deep along the lane",
+              "hint": "hidden from the surface; and the sea down there listens",
+              "hours_mult": 1.1,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_depth",
+                  "arg": "deep"
+                }
+              ]
+            },
+            {
+              "id": "flank",
+              "label": "Run flat out for home",
+              "hint": "fast; loud; the batteries pay",
+              "hours_mult": 0.55,
+              "effects": [
+                {
+                  "op": "order",
+                  "name": "set_speed",
+                  "arg": "flank"
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "rendezvous",
@@ -365,6 +672,32 @@
                 }
               },
               "why": "There is nobody to handle the lines and make the signals."
+            }
+          ],
+          "methods": [
+            {
+              "id": "book",
+              "label": "Make the rendezvous by the book",
+              "hint": "quietly, as radio silence demands",
+              "hours_mult": 1.0,
+              "effects": []
+            },
+            {
+              "id": "signal",
+              "label": "Signal and make fast",
+              "hint": "quicker; and radio silence is absolute",
+              "hours_mult": 0.7,
+              "effects": [
+                {
+                  "op": "flag",
+                  "name": "silence_broken"
+                },
+                {
+                  "op": "ship",
+                  "stat": "attention",
+                  "value": 0.05
+                }
+              ]
             }
           ]
         }

@@ -4,7 +4,8 @@
   'use strict';
   const SAVE_KEY = 'depths-within:save:v1';
   const app = document.getElementById('app');
-  const state = { game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false, tabL: 'ledger', tabC: 'chart', train: 0 };
+  const TUTORIAL_KEY = 'depths-within:tutorial:v1';
+  const state = { advIdx: 0, game: null, sheet: null, pick: null, sound: false, shownAt: 0, started: false, tabL: 'ledger', tabC: 'chart', train: 0 };
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pct = (x) => Math.round(x * 100);
@@ -60,7 +61,7 @@
 
   // ------------------------------------------------------------------ actions
   function begin(game) {
-    state.game = game; state.sheet = null; state.pick = null; state.started = true;
+    state.game = game; state.sheet = guard(() => localStorage.getItem(TUTORIAL_KEY)) ? null : 'tutorial'; state.pick = null; state.started = true; state.advIdx = 0;
     store.write(game); keepAwake();
     if (state.sound) Sound.start();
     render();
@@ -76,6 +77,11 @@
     if (state.sheet !== 'periscope') state.sheet = null;
     state.pick = null;
     render();
+  }
+  function openWays(v) {
+    const ways = v.orders.filter((o) => o.kind === 'act');
+    if (ways.length > 1 && !(v.mission && v.mission.step.working)) { state.sheet = 'ways'; render(); return; }
+    act('o:act');
   }
   function setSound(on) {
     state.sound = on;
@@ -308,17 +314,32 @@
         <p class="smcaps">Received</p><p>${esc(m.provenance)}</p>
         <p class="note">Where an order comes from is never settled. You see how it reached you, not who sent it.</p>` : '<p>No orders.</p>'}</div></div>`;
   }
-  function sheetHelp() {
-    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="How to play"><header><h2>How to read the boat</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
-      <div class="body"><div class="title-card" style="max-width:none"><div class="rule">
-        <span><b>The ledger is exact.</b> Hull, stores, air and diesel are what they say they are.</span>
-        <span><b>The men are not.</b> Each says how he is; you can also see his symptoms. When the two disagree, believe the symptoms.</span>
-        <span><b>Nothing advances while you wait.</b> The mission is carried out by ordering its steps, one at a time. Each takes hours, and the clock on the orders keeps running.</span>
-        <span><b>Wait 1 h</b> advances an hour. <b>News ▶▶</b> waits until something happens (at most 12 hours).</span>
-        <span><b>Decisions stop the clock.</b> Each option shows what it costs, not what it does.</span>
-        <span><b>Orders are never free.</b> Most of what they cost, you learn later.</span>
-        <span><b>There is no battle.</b> Nothing aboard will ever be confirmed as anything but possible.</span>
-      </div></div></div></div>`;
+  function sheetHelp(first) {
+    const steps = [
+      ['You are the captain.', 'Orders come from a source nobody can name. Tap the orders chip (top left) any time to read them again.'],
+      ['Nothing happens while you wait.', 'The gold <b>step</b> button, bottom right, is your next move. Tap it and choose <b>how</b> to do it: every way has a price (time, noise, batteries, nerves).'],
+      ['Look after the boat.', 'Left: the exact ledger, the hull, the torpedoes. Middle: the chart, the sonar and the men. A strip above the buttons says <b>what needs doing</b>; tap it and the order is given.'],
+      ['The men are not exact.', 'Each says how he is, and you can see his symptoms. When the two disagree, believe the symptoms. What a man reports, an instrument may not show.'],
+      ['Decisions stop the clock.', 'Each option shows what it costs, not what it does. There is no right answer. Wait <b>1 h</b>, or <b>▶▶</b> until something happens.'],
+      ['Nothing is ever confirmed.', 'Whatever strange thing happens aboard has an ordinary explanation, and another.'],
+    ];
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="How to play"><header><h2>${first ? 'Before you take command' : 'How to play'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body"><ol class="tut">${steps.map(([h, t]) => `<li><b>${h}</b><span>${t}</span></li>`).join('')}</ol></div>
+      <footer><button class="btn primary" data-a="close">${first ? 'Take command' : 'Got it'}</button></footer></div>`;
+  }
+  /** How will you do it? The step's ways, each with its hours and what it costs. */
+  function sheetWays(v) {
+    const ways = v.orders.filter((o) => o.kind === 'act');
+    return `<div class="sheet" role="dialog" aria-modal="true" aria-label="How will you do it?"><header><h2>How will you do it?</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
+      <div class="body"><div class="orders-grid">${ways.map((o, i) => `<button class="opt" data-a="order:${esc(o.id)}"><b>${esc(o.label)}${i === 0 ? ' · plain' : ''}</b><span>${esc(o.hint)}</span>${o.why ? `<span class="why">${esc(o.why)}</span>` : ''}</button>`).join('')}</div>
+        <p class="note">None of them is free. The hours are what it would take now: tired men, the dark and a hurt engine make them longer.</p></div></div>`;
+  }
+  /** What needs doing: the top tip, one tap to do it, and a button for the next one. */
+  function adviceRow(v) {
+    if (!v.advice.length || v.pending || v.over) return '';
+    const i = state.advIdx % v.advice.length, t = v.advice[i];
+    return `<div class="adv"><button class="advtxt ${t.order ? 'go' : ''}" data-a="adv:run" aria-label="Do it"><span class="k">${i === 0 ? 'What needs doing' : `Tip ${i + 1}`}</span><span class="t">${esc(t.text)}</span></button>` +
+      (v.advice.length > 1 ? `<button class="advnext" data-a="adv:next" aria-label="Next tip">${i + 1}/${v.advice.length} ›</button>` : '') + '</div>';
   }
   const GROUPS = [
     ['Helm and navigation', /^(speed_|depth_|snorkel_|silent_running|normal_running|surface|dive|raise_periscope|lower_periscope|take_fix|active_ping)/],
@@ -388,7 +409,7 @@
     if (!state.game) { app.innerHTML = `<div class="veil">${titleView()}</div>`; return; }
     const v = state.game.view();
     const sheet = v.over ? sheetEnding(v) : v.pending ? sheetDecision(v)
-      : state.sheet === 'briefing' ? sheetBriefing(v) : state.sheet === 'periscope' ? sheetPeriscope(v) : state.sheet === 'help' ? sheetHelp()
+      : state.sheet === 'briefing' ? sheetBriefing(v) : state.sheet === 'periscope' ? sheetPeriscope(v) : state.sheet === 'help' ? sheetHelp(false) : state.sheet === 'tutorial' ? sheetHelp(true) : state.sheet === 'ways' ? sheetWays(v)
         : state.sheet === 'orders' ? sheetOrders(v) : '';
     const logEl = document.querySelector('.log-scroll');
     const stick = !logEl || logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 60;
@@ -399,6 +420,7 @@
         <section class="col logcol" aria-label="Log"><header><span class="smcaps">Log</span><span class="smcaps">tick ${v.tick}</span></header>
           <div class="scroll log log-scroll">${logView(v)}</div>
           <div class="notice" aria-live="polite">${esc(v.notice || '')}</div>
+          ${adviceRow(v)}
           ${stepView(v)}
           <div class="actions">
             <button class="btn primary" data-a="orders" ${v.pending || v.over ? 'disabled' : ''}>Orders<small>${v.orders.filter((o) => o.kind !== 'act').length} more</small></button>
@@ -430,11 +452,19 @@
     if (a.startsWith('train:')) { state.train = Math.max(-180, Math.min(180, state.train + Number(a.slice(6)))); return render(); }
     if (a.startsWith('tabL:')) { state.tabL = a.slice(5); return render(); }
     if (a.startsWith('tabC:')) { state.tabC = a.slice(5); return render(); }
-    if (a === 'act') return act('o:act');
+    if (a === 'act') return openWays(g.view());
     if (a === 'wait') return act('t');
     if (a === 'news') return act('w');
     if (a === 'orders') { state.sheet = 'orders'; state.pick = null; return render(); }
-    if (a === 'close') { state.sheet = null; state.pick = null; return render(); }
+    if (a === 'close') { if (state.sheet === 'tutorial') guard(() => localStorage.setItem(TUTORIAL_KEY, '1')); state.sheet = null; state.pick = null; return render(); }
+    if (a === 'adv:next') { state.advIdx += 1; return render(); }
+    if (a === 'adv:run') {
+      const v = g.view(), t = v.advice[state.advIdx % Math.max(1, v.advice.length)];
+      if (!t || !t.order) { state.advIdx += 1; return render(); }
+      if (t.order === 'act') return openWays(v);
+      if (!v.orders.some((o) => o.id === t.order)) { state.advIdx += 1; return render(); }
+      return act(`o:${t.order}`);
+    }
     if (a === 'sound') return setSound(!state.sound);
     if (a.startsWith('sheet:')) { state.sheet = a.slice(6); return render(); }
     if (a.startsWith('pick:')) { state.pick = a.slice(5); return render(); }

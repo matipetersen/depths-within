@@ -114,7 +114,16 @@ def _carry_on(policy: str, w: DreadWorld, fatigue: float):
     if policy == "crew_first" and fatigue > 0.65 and not s.stand_down and not w.engagement:
         O.stand_down(w)                                              # a worn crew is let to sleep before it is asked for more
     if ok and not (policy == "crew_first" and fatigue > 0.6):
-        w.do_act()
+        prefs = METHOD_PREFS[policy]                                  # each kind of captain has his own way of doing things
+        ids = [m["id"] for m in a.methods]
+        w.do_act(next((p for p in prefs if p in ids), None))
+
+
+METHOD_PREFS = {
+    "mission_first": ("flank", "signal", "short", "flood", "periscope", "standard"),
+    "crew_first": ("listen", "silent", "check", "short", "standard", "book"),
+    "paranoid": ("periscope", "silent", "check", "confirm", "deep", "book"),
+}
 
 
 def _settle(policy: str, w: DreadWorld):
@@ -239,7 +248,7 @@ def random_orders(w: DreadWorld, prng: random.Random):
     """A captain with no plan: sometimes does something, sometimes not."""
     a, ok, _ = w.act_status()
     if ok and prng.random() < 0.5:
-        w.do_act()
+        w.do_act(prng.choice([m["id"] for m in a.methods]) if a.methods else None)
     if prng.random() > 0.15:
         return
     s, live = w.ship, w.active_crew()

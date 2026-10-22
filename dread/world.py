@@ -507,18 +507,38 @@ class DreadWorld:
             return "The batteries are flat."
         return self._unmet(a)
 
-    def do_act(self) -> str:
-        """Order the next step of the mission. The hours then pass tick by tick."""
+    def method_for(self, a, method_id=None) -> dict:
+        """The way of doing a step: the one asked for, or the first (the plain one)."""
+        if not a.methods:
+            return {"id": "", "label": "", "hours_mult": 1.0, "effects": []}
+        return next((m for m in a.methods if m["id"] == method_id), a.methods[0])
+
+    def method_hours(self, a, m: dict) -> float:
+        """Hours a way of doing it takes now: in the dark or the fog some ways are worse."""
+        mult = m.get("hours_mult", 1.0)
+        if "dark_mult" in m and (sea.night(self) or "fog" in self.ship.flags):
+            mult = m["dark_mult"]
+        return float(a.hours) * mult
+
+    def do_act(self, method_id=None) -> str:
+        """Order the next step of the mission, done one of its ways. The hours then pass tick by tick."""
         a, ok, why = self.act_status()
         if a is None:
             return "There is nothing to order. The rest is waiting."
         if not ok:
             return why
         run = self.run
+        m = self.method_for(a, method_id)
         run.working = run.acts_done
-        run.work_left = float(a.hours)
+        run.work_total = self.method_hours(a, m)
+        run.work_left = run.work_total
+        run.method = m["id"] or None
+        s = self.ship
+        run.prev = (s.speed_order, s.silent_running)
+        apply_effects(m["effects"], self)
         self._set_progress()
-        msg = f"You order it: {a.label}."
+        how = f" ({m['label']})" if m["label"] and a.methods and a.methods[0] is not m else ""
+        msg = f"You order it: {a.label}{how}."
         self.log.append(f"[{self.tick_no:03d}] > {msg}")
         return msg
 
@@ -527,7 +547,7 @@ class DreadWorld:
         n = len(run.mission.acts)
         part = 0.0
         if run.working is not None:
-            part = 1.0 - run.work_left / run.mission.acts[run.working].hours
+            part = 1.0 - run.work_left / run.work_total
         self.ship.progress = clamp((run.acts_done + part) / n)
 
     def _work(self):
@@ -542,6 +562,10 @@ class DreadWorld:
             run.work_left = 0.0
             run.acts_done += 1
             run.working = None
+            if run.prev is not None and (self.ship.speed_order, self.ship.silent_running) != run.prev:
+                self.ship.speed_order, self.ship.silent_running = run.prev     # the way of doing it lapses with the work
+                self.ship.helm_pending = None
+            run.prev = None
             self.log.append(f"[{self.tick_no:03d}] Done: {a.label}.")
             apply_effects(a.effects, self)
         if run.outcome is None and self.run is run:
