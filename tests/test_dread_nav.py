@@ -1,5 +1,7 @@
 """The chart, the instruments and the hull's compartments (DESIGN.md 12.7). Display only, but exact."""
-from dread import hud
+import pytest
+
+from dread import hud, nav
 from dread import orders as O
 from dread.endings import classify_ending
 from dread.nav import COLUMNS, grid_ref, hull_report, navigation, true_xy
@@ -17,30 +19,79 @@ def test_the_station_is_grid_k7_and_the_chart_agrees_with_the_grid():
     assert w.missions[-1].chart["points"][-1][:2] == [104, 66]
 
 
-def test_the_boat_moves_only_as_the_work_is_done():
+def _tick(w):
+    if w.pending is not None:
+        w.choose(w.pending.choices[0].key)
+    w.tick()
+
+
+@pytest.mark.real_nav
+def test_the_boat_goes_nowhere_until_a_course_is_set_and_then_sails_there():
     w = DreadWorld(seed=3)
     n0 = true_xy(w)
     for _ in range(5):
-        w.tick()
+        _tick(w)
     assert true_xy(w) == n0                               # waiting goes nowhere
-    w.do_act()
-    last = true_xy(w)[0]
-    for _ in range(4):
-        w.tick()
-    assert true_xy(w)[0] != last
-    assert navigation(w)["eta_h"] is not None
-
-
-def test_the_boat_reaches_each_waypoint_when_its_step_is_done():
-    w = DreadWorld(seed=3)
-    w.do_act()
-    for _ in range(40):
-        if w.pending is not None or w.run.acts_done >= 1:
-            break
-        w.tick()
-    n = navigation(w)
     x, y, label = w.missions[0].chart["points"][0]
-    assert true_xy(w) == (x, y) and n["next"] == "Contact bearing"
+    assert "Course set for Northern lane" in nav.set_course(w, x, y, label)
+    last = true_xy(w)
+    for _ in range(3):
+        _tick(w)
+    assert true_xy(w) != last and navigation(w)["eta_h"] is not None
+    for _ in range(12):
+        _tick(w)
+    assert w.ship.dest is None and nav.at_site(w)          # she arrived and stopped
+    assert navigation(w)["speed"] == 0.0
+
+
+@pytest.mark.real_nav
+def test_a_step_can_only_be_ordered_at_its_place():
+    w = DreadWorld(seed=3)
+    a, ok, why = w.act_status()
+    assert not ok and "not there yet" in why and "Northern lane" in why
+    assert "not there yet" in w.do_act()
+    st = nav.site(w)
+    w.ship.x, w.ship.y = float(st[0]), float(st[1])
+    assert w.act_status()[1] and w.do_act().startswith("You order it")
+
+
+@pytest.mark.real_nav
+def test_a_wrong_reckoning_puts_the_boat_off_its_mark_until_a_fix():
+    w = DreadWorld(seed=3)
+    w.ship.dr_error = 6.0
+    st = nav.site(w)
+    nav.set_course(w, st[0], st[1], st[2])
+    for _ in range(12):
+        _tick(w)
+        if w.ship.dest is None:
+            break
+    assert abs(w.ship.x - st[0]) + abs(w.ship.y - st[1]) > 2.0   # the chart said she was there; she was not
+
+
+@pytest.mark.real_nav
+def test_the_speed_ordered_is_the_speed_made_good():
+    a, b = DreadWorld(seed=3), DreadWorld(seed=3)
+    O.set_speed(b, "flank")
+    for w in (a, b):
+        nav.set_course(w, 40.0, 40.0, "somewhere")
+        for _ in range(2):
+            _tick(w)
+    assert b.ship.x < a.ship.x < 100.0
+
+
+@pytest.mark.real_nav
+def test_the_station_must_be_reached_before_the_vigil_begins():
+    w = DreadWorld(seed=3)
+    w._start_mission(4)
+    assert not w.on_station and nav.site(w)[2] == "Grid K-7"
+    nav.set_course(w, 104.0, 66.0, "Grid K-7")
+    for _ in range(14):
+        if w.pending is not None:
+            w.choose(w.pending.choices[0].key)
+        w.tick()
+        if w.on_station:
+            break
+    assert w.on_station and "on_station_reached" in w.ship.flags
 
 
 def test_speed_and_depth_follow_what_the_boat_is_doing():
@@ -52,19 +103,19 @@ def test_speed_and_depth_follow_what_the_boat_is_doing():
     assert navigation(w)["depth"] == 0
 
 
-def test_on_station_the_boat_is_at_k7_and_going_home_it_moves_toward_base():
+@pytest.mark.real_nav
+def test_going_home_it_sails_toward_the_base_and_arrives():
     w = DreadWorld(seed=3)
     w._start_mission(4)
+    w.ship.x, w.ship.y = 104.0, 66.0
     assert navigation(w)["grid"] == "K-7"
     w.ship.fuel = 1.0
     w.leave_station()
-    for _ in range(9):
-        if w.pending is not None:
-            w.choose(w.pending.choices[0].key)
-        w.tick()
-    n = navigation(w)
-    tx, ty = true_xy(w)
-    assert n["next"] == "Base" and 100 - 1 <= tx <= 104 and ty < 66
+    ys = []
+    for _ in range(7):
+        _tick(w)
+        ys.append(w.ship.y)
+    assert ys[0] < 66 and ys[0] > ys[5] and navigation(w)["next"] in ("Base", "")
 
 
 def test_damage_is_booked_to_a_compartment_and_repair_heals_the_worst_first():
@@ -131,6 +182,7 @@ def _near_the_target(seed=3):
     w.run.working = 1
     w.run.work_left = 1.0           # nearly there: the target is inside 30 nm
     w._set_progress()
+    w.ship.x, w.ship.y = 50.0, 36.0
     return w
 
 
@@ -189,9 +241,7 @@ def test_with_the_sonar_off_the_scope_is_dark_but_the_radar_works_on_the_surface
 
 def _offshore(w):
     """Put the boat in deep water: at the pier there is hardly any (DESIGN.md 16.1)."""
-    ch = w.run.mission.chart
-    ch["from"] = [40, 50, "offshore"]
-    ch["points"] = [[41, 50, "offshore"]] * len(ch["points"])
+    w.ship.x, w.ship.y = 41.0, 50.0
     w.run.acts_done = 1
     return w
 
@@ -202,6 +252,7 @@ def _at_the_firing_point(seed=3):
     w.run.working = 2
     w.run.work_left = 0.5
     w._set_progress()
+    w.ship.x, w.ship.y = 48.0, 38.0
     return w
 
 

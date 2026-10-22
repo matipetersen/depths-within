@@ -14,7 +14,6 @@ from .state import COMPARTMENTS
 BASE = (100.0, 12.0, "Base")
 COLUMNS = "ABCDEFGHIJK"
 WIDTH, HEIGHT = 110, 80
-RETURN_TICKS = 18          # must equal the passage length in DreadWorld.leave_station
 
 
 def grid_ref(x: float, y: float) -> str:
@@ -36,34 +35,144 @@ def _bearing(a, b) -> int:
     return int(round(math.degrees(math.atan2(b[0] - a[0], a[1] - b[1])))) % 360
 
 
+NM_PER_UNIT = 0.9          # one chart unit in nautical miles
+SITE_R = 8.0               # a step is done "at" its site when the boat is this close (units)
+ARRIVE_R = 1.0
+
+
+def places(w) -> List[Dict]:
+    """The names on the chart the captain can set course for: the base and the points of the orders in hand."""
+    out = [{"id": "base", "label": BASE[2], "x": BASE[0], "y": BASE[1]}]
+    run = w.run
+    if run is not None and run.outcome is None and run.mission.chart:
+        for i, p in enumerate(run.mission.chart["points"]):
+            out.append({"id": f"p{i}", "label": p[2], "x": float(p[0]), "y": float(p[1])})
+    return out
+
+
+def site(w):
+    """[x, y, label] where the next step of the mission has to be done, or None."""
+    run = w.run
+    if run is None or run.outcome is not None or not run.mission.chart:
+        return None
+    pts = run.mission.chart["points"]
+    if run.mission.kind == "hold":
+        return list(pts[-1])                                 # the station itself
+    if run.acts_done >= len(run.mission.acts):
+        return None
+    return list(pts[run.acts_done]) if run.acts_done < len(pts) else None
+
+
+def dist2(ax: float, ay: float, bx: float, by: float) -> float:
+    return math.sqrt((ax - bx) ** 2 + (ay - by) ** 2)
+
+
+def dist_to(w, x: float, y: float) -> float:
+    """True distance in chart units from the boat to a point."""
+    s = w.ship
+    return dist2(x, y, s.x, s.y)
+
+
+def at_site(w) -> bool:
+    st = site(w)
+    return st is None or dist_to(w, st[0], st[1]) <= SITE_R
+
+
+def estimate(w, pos):
+    """Where the captain believes the boat is: the truth, plus the dead-reckoning error in a slowly drifting direction."""
+    s = w.ship
+    off = s.dr_error / NM_PER_UNIT
+    d = DIRS[((w.tick_no // 12) * 5 + 3) % 8]
+    return (max(0.0, min(109.9, pos[0] + d[0] * off)), max(0.0, min(79.9, pos[1] + d[1] * off)))
+
+
+def speed_kn(w) -> float:
+    """The speed the hull makes good now (0 when it cannot move)."""
+    s = w.ship
+    if "adrift" in s.flags:
+        return 0.0
+    if s.surfaced:
+        return 11.0 * {"ok": 1.0, "damaged": 0.6, "dead": 0.3}[systems.system_state(w, "engine room")]
+    if s.battery <= 0:
+        return 0.0
+    kn = systems.SPEEDS[s.speed_order][1] * min(1.0, s.readiness) * {"ok": 1.0, "damaged": 0.6, "dead": 0.3}[systems.system_state(w, "engine room")]
+    if s.silent_running:
+        kn = min(kn, 3.0)
+    return kn
+
+
+def set_course(w, x: float, y: float, label: str = "") -> str:
+    s = w.ship
+    x, y = max(0.0, min(109.9, float(x))), max(0.0, min(79.9, float(y)))
+    s.dest = [x, y, label or grid_ref(x, y)]
+    est = estimate(w, (s.x, s.y))
+    nm = math.sqrt((x - est[0]) ** 2 + (y - est[1]) ** 2) * NM_PER_UNIT
+    kn = max(speed_kn(w), 0.1)
+    msg = f"Course set for {s.dest[2]}: {nm:.0f} nm, about {max(1, math.ceil(nm / kn))} h at this speed."
+    if w.working is not None:
+        msg += " The work in hand comes first; she turns when it is done."
+    return msg
+
+
+def course_head(w, k: int) -> str:
+    est = estimate(w, (w.ship.x, w.ship.y))
+    d = DIRS[k % 8]
+    return set_course(w, est[0] + d[0] * 18.0, est[1] + d[1] * 18.0, "")
+
+
+def all_stop(w) -> str:
+    w.ship.dest = None
+    return "All stop. We hold our place."
+
+
+def step(w):
+    """One hour under way: the boat sails towards the course set, steering by where the captain believes it is."""
+    s = w.ship
+    s.under_way = False
+    d = s.dest
+    if d is None or w.engagement is not None or w.working is not None:
+        return
+    kn = speed_kn(w)
+    if kn <= 0.0:
+        return
+    est = estimate(w, (s.x, s.y))
+    vx, vy = d[0] - est[0], d[1] - est[1]
+    dist = math.sqrt(vx * vx + vy * vy)
+    if dist <= ARRIVE_R:
+        s.dest = None
+        return
+    run_u = kn / NM_PER_UNIT
+    k = min(dist, run_u) / dist
+    s.x = max(0.0, min(109.9, s.x + vx * k))
+    s.y = max(0.0, min(79.9, s.y + vy * k))
+    s.heading = _bearing(est, d)
+    s.under_way = True
+    if dist <= run_u:
+        s.dest = None
+        w.log.append(f"[{w.tick_no:03d}] We have reached {d[2]}.")
+
+
+def displace(w, hours: float):
+    """A reckoning gone wrong: push the boat along the line to the base by so many hours of passage (+ away, - nearer)."""
+    s = w.ship
+    vx, vy = BASE[0] - s.x, BASE[1] - s.y
+    dist = math.sqrt(vx * vx + vy * vy)
+    if dist < 1e-9:
+        return
+    u = hours * 8.0 / NM_PER_UNIT
+    s.x = max(0.0, min(109.9, s.x - vx / dist * u))
+    s.y = max(0.0, min(79.9, s.y - vy / dist * u))
+
+
 def _where(w):
-    """Where the boat truly is: (position, heading, next waypoint name, range to it in nm)."""
-    s, run = w.ship, w.run
-    pts = _points(run) if run is not None else []
-    station = None
-    if not pts:
-        pos, heading, nxt, rng_nm = (BASE[0], BASE[1]), 0, "", 0.0
-    elif run.mission.kind == "hold":
-        station = pts[-1]
-        pos, nxt, heading = (station[0], station[1]), "", 0
-        if s.returning:
-            t = 1.0 - w.travel_left / RETURN_TICKS
-            pos = _lerp(station, BASE, max(0.0, min(1.0, t)))
-            heading, nxt = _bearing(station, BASE), "Base"
-        rng_nm = math.hypot(BASE[0] - pos[0], BASE[1] - pos[1]) * 0.9 if s.returning else 0.0
-    else:
-        n = len(pts) - 1
-        i = min(run.acts_done, n - 1)
-        t = 0.0
-        if run.working is not None:
-            t = 1.0 - run.work_left / run.work_total
-        if run.acts_done >= n:
-            i, t = n - 1, 1.0
-        pos = _lerp(pts[i], pts[i + 1], t)
-        heading = _bearing(pts[i], pts[i + 1])
-        nxt = pts[i + 1][2]
-        rng_nm = math.hypot(pts[i + 1][0] - pos[0], pts[i + 1][1] - pos[1]) * 0.9
-    return pos, heading, nxt, rng_nm
+    """Where the boat truly is: (position, heading, name of the place it is bound for, range to it in nm)."""
+    s = w.ship
+    pos = (s.x, s.y)
+    tgt = s.dest or site(w)
+    if tgt is None:
+        return pos, s.heading, "", 0.0
+    rng_nm = math.sqrt((tgt[0] - pos[0]) ** 2 + (tgt[1] - pos[1]) ** 2) * NM_PER_UNIT
+    return pos, s.heading, tgt[2], rng_nm
 
 
 # eight unit-ish directions with no trigonometry in them, so Python and JavaScript agree to the last digit
@@ -71,36 +180,31 @@ DIRS = ((1.0, 0.0), (0.7, 0.7), (0.0, 1.0), (-0.7, 0.7), (-1.0, 0.0), (-0.7, -0.
 
 
 def true_xy(w):
-    pos = _where(w)[0]
-    return (round(pos[0], 1), round(pos[1], 1))
+    s = w.ship
+    return (round(s.x, 1), round(s.y, 1))
 
 
 def navigation(w) -> Dict:
     """What the instruments say: the position we believe we are at, heading, speed, depth and range."""
     s, run = w.ship, w.run
     pos, heading, nxt, rng_nm = _where(w)
-    off = s.dr_error / 0.9                                   # the error in chart units, in a direction that drifts slowly
-    d = DIRS[((w.tick_no // 12) * 5 + 3) % 8]
-    est = (max(0.0, min(109.9, pos[0] + d[0] * off)), max(0.0, min(79.9, pos[1] + d[1] * off)))
-    moving = s.returning or (w.working is not None and not w.work_blocked)
-    if s.surfaced:
-        speed = 11.0 if moving else 4.0
-    elif s.returning:
-        speed = 9.0
-    elif moving:
-        speed = systems.SPEEDS[s.speed_order][1] * min(1.0, s.readiness) * {"ok": 1.0, "damaged": 0.6, "dead": 0.3}[systems.system_state(w, "engine room")]
-    else:
-        speed = 2.5
-    if s.battery <= 0 and not s.surfaced:
-        speed = 0.0
+    est = estimate(w, pos)
+    speed = speed_kn(w) if s.under_way else 0.0
+    if not s.under_way and not s.surfaced:
+        speed = 2.5 if (w.working is not None and not w.work_blocked) else 0.0
     if s.silent_running and not s.surfaced:
         speed = min(speed, 3.0)
     depth = systems.depth_m(w)
+    eta = None
+    if s.under_way and s.dest is not None:
+        eta = max(1, math.ceil(dist2(s.dest[0], s.dest[1], est[0], est[1]) * NM_PER_UNIT / max(speed, 0.1)))
+    elif run is not None and run.working is not None:
+        eta = max(1, int(-(-run.work_left // 1)))
     return {
         "x": round(est[0], 1), "y": round(est[1], 1), "grid": grid_ref(*est), "heading": heading, "err_nm": round(s.dr_error, 1),
-        "speed": round(speed, 1), "depth": depth, "range_nm": round(rng_nm), "next": nxt,
-        "eta_h": (max(1, int(-(-run.work_left // 1))) if run is not None and run.working is not None else None),
-        "noise": s.noise, "keel": systems.under_keel(w),
+        "speed": round(speed, 1), "depth": depth, "range_nm": round(rng_nm), "next": nxt, "eta_h": eta,
+        "noise": s.noise, "keel": systems.under_keel(w), "dest": ([s.dest[0], s.dest[1], s.dest[2]] if s.dest else None),
+        "at_site": at_site(w),
     }
 
 

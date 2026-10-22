@@ -1,3 +1,4 @@
+from dread import nav
 """The navigator's uncertainty, the hours of the day, fog and the traffic that is none of our business (DESIGN.md 15.3)."""
 from dread import hud
 from dread import orders as O
@@ -16,8 +17,10 @@ def _w(seed=3):
 def test_the_position_we_believe_drifts_from_the_true_one_and_a_fix_pulls_it_back():
     w = _w()
     assert navigation(w)["err_nm"] == 0.0
-    w.do_act()
+    nav.set_course(w, 5.0, 75.0, "somewhere")
     for _ in range(12):
+        if w.pending is not None:
+            w.choose(w.pending.choices[0].key)
         w.tick()
     assert w.ship.dr_error > 1.0
     n = navigation(w)

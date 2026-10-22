@@ -264,3 +264,12 @@ button.step:disabled { opacity: .4; }
 }
 @media (max-width: 560px) { .eyegrid { grid-template-columns: 1fr; } .decision .grid { grid-template-columns: 1fr; } .orders-grid { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* sailing: the chart takes taps; the course is drawn on it */
+.chart { cursor: crosshair; touch-action: manipulation; }
+.chart .pl { fill: none; stroke: var(--dim, #7a8a96); stroke-width: .35; }
+.chart .dline { stroke: var(--brass); stroke-width: .5; stroke-dasharray: 1.6 1.2; fill: none; }
+.chart .dflag { fill: var(--brass); stroke: var(--brass); stroke-width: .4; }
+.chart .dl { fill: var(--brass); }
+.hint { margin: 6px 0; font-size: 12px; opacity: .75; }
+.btn.sm { min-height: 36px; padding: 4px 12px; margin: 0 0 8px; }

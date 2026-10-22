@@ -59,7 +59,7 @@ def under_keel(w):
 
 
 def moving(w) -> bool:
-    return w.ship.returning or (w.working is not None and not w.work_blocked)
+    return w.ship.under_way or (w.working is not None and not w.work_blocked)
 
 
 def pace(w) -> float:

@@ -20,7 +20,7 @@
           "id": "search",
           "label": "Search the northern lane",
           "hint": "hours at the headsets; the boat must be listening",
-          "hours": 8,
+          "hours": 5.5,
           "effects": [
             {
               "op": "flag",
@@ -78,7 +78,7 @@
           "id": "close",
           "label": "Close with her",
           "hint": "hours of careful running, and every man knows why",
-          "hours": 5,
+          "hours": 3.5,
           "effects": [
             {
               "op": "flag",
@@ -233,7 +233,7 @@
           "id": "search",
           "label": "Search the grid for smoke",
           "hint": "hours at the headsets; the boat must be listening",
-          "hours": 10,
+          "hours": 7.0,
           "effects": [
             {
               "op": "flag",
@@ -291,7 +291,7 @@
           "id": "transmit",
           "label": "Transmit at the relay window",
           "hint": "say what you saw; or something else",
-          "hours": 2,
+          "hours": 1.5,
           "effects": [],
           "needs": [
             {
@@ -403,7 +403,7 @@
           "id": "find",
           "label": "Search for the steamer",
           "hint": "hours at the headsets; the boat must be listening",
-          "hours": 6,
+          "hours": 4.0,
           "effects": [
             {
               "op": "flag",
@@ -461,7 +461,7 @@
           "id": "approach",
           "label": "Bring the boat to bear",
           "hint": "the steamer is lit; she does not turn",
-          "hours": 3,
+          "hours": 2.0,
           "effects": [],
           "methods": [
             {
@@ -612,7 +612,7 @@
           "id": "steer",
           "label": "Steer the northern lane",
           "hint": "hours at the wheel, under radio silence",
-          "hours": 6,
+          "hours": 4.0,
           "effects": [],
           "methods": [
             {
@@ -654,7 +654,7 @@
           "id": "rendezvous",
           "label": "Make the rendezvous",
           "hint": "the boat will be expected, or it will not",
-          "hours": 4,
+          "hours": 3.0,
           "effects": [],
           "needs": [
             {

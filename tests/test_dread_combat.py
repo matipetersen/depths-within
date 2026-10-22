@@ -5,9 +5,7 @@ from dread.world import DreadWorld
 
 def _offshore(w):
     """Put the boat in deep water: at the pier there is hardly any (DESIGN.md 16.1)."""
-    ch = w.run.mission.chart
-    ch["from"] = [40, 50, "offshore"]
-    ch["points"] = [[41, 50, "offshore"]] * len(ch["points"])
+    w.ship.x, w.ship.y = 41.0, 50.0
     w.run.acts_done = 1
     return w
 

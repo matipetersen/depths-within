@@ -26,6 +26,9 @@ function fuzz(seed, maxSteps) {
       continue;
     }
     if (nxt() % 3 === 0) { const act = w.next_act(); const k = nxt(); w.do_act(act && act.methods.length ? act.methods[k % act.methods.length].id : undefined); }
+    if (nxt() % 4 === 0) { const st = Dread.site(w); if (st !== null && !Dread.atSite(w) && !w.ship.returning) Dread.setCourse(w, st[0], st[1], st[2]); }
+    if (nxt() % 29 === 0) { const cx = nxt() % 100, cy = nxt() % 70; Dread.setCourse(w, cx, cy, ''); }
+    if (nxt() % 17 === 0) Dread.allStop(w);
     if (nxt() % 11 === 0) Dread.orders.load_torpedoes(w, ['steam', 'electric', 'acoustic'][nxt() % 3]);
     if (nxt() % 7 === 0) Dread.orders.set_depth(w, ['shallow', 'deep', 'test'][nxt() % 3]);
     if (nxt() % 13 === 0) { if (w.ship.surfaced) Dread.orders.dive(w); else Dread.orders.surface(w); }
@@ -50,7 +53,7 @@ function fuzz(seed, maxSteps) {
       digest.push([w.tick_no, w.ship.hull, w.ship.food, w.ship.water, w.ship.fuel, w.ship.co2, w.ship.attention,
         w.ship.cohesion, w.dread(), live.length ? Dread.fsum(live.map((c) => c.fear)) / live.length : 0]);
       const nv = Dread.navigation(w);
-      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm, w.ship.battery, w.ship.spares, nv.err_nm, w.traffic.length, w.traffic.map((o) => [o.kind, o.flag, Math.round(o.x * 10), Math.round(o.y * 10)]), nv.keel, w.ship.torpedo_type + ':' + JSON.stringify(w.ship.types) + ':' + w.ship.depth_extra]);
+      nav.push([nv.x, nv.y, nv.heading, nv.speed, nv.depth, nv.range_nm, w.ship.battery, w.ship.spares, nv.err_nm, w.traffic.length, w.traffic.map((o) => [o.kind, o.flag, Math.round(o.x * 10), Math.round(o.y * 10)]), nv.keel, w.ship.torpedo_type + ':' + JSON.stringify(w.ship.types) + ':' + w.ship.depth_extra, nv.eta_h, nv.at_site, nv.dest]);
       dmg.push(Dread.hullReport(w).map((h) => h.integrity));
     }
   }

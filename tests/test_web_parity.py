@@ -12,6 +12,7 @@ import subprocess
 
 import pytest
 
+from dread import nav as N
 from dread import orders as O
 from dread.endings import classify_ending
 from dread.nav import contacts, hull_report, lookout, navigation, periscope, weapons
@@ -21,7 +22,7 @@ from dread.world import DreadWorld
 from dread.state import clamp  # noqa: F401
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+pytestmark = [pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed"), pytest.mark.real_nav]
 
 SEEDS = list(range(0, 24)) + [101, 777, 2024, 31337]
 
@@ -45,6 +46,15 @@ def fuzz(seed, max_steps=2500):
             act = w.next_act()
             k = nxt()
             w.do_act(act.methods[k % len(act.methods)]["id"] if act is not None and act.methods else None)
+        if nxt() % 4 == 0:
+            st = N.site(w)
+            if st is not None and not N.at_site(w) and not w.ship.returning:
+                N.set_course(w, st[0], st[1], st[2])
+        if nxt() % 29 == 0:
+            cx, cy = nxt() % 100, nxt() % 70
+            N.set_course(w, cx, cy, "")
+        if nxt() % 17 == 0:
+            N.all_stop(w)
         if nxt() % 11 == 0:
             O.load_torpedoes(w, ["steam", "electric", "acoustic"][nxt() % 3])
         if nxt() % 7 == 0:
@@ -80,7 +90,7 @@ def fuzz(seed, max_steps=2500):
                            w.ship.attention, w.ship.cohesion, w.dread(),
                            sum(c.fear for c in live) / len(live) if live else 0])
             n = navigation(w)
-            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"], w.ship.battery, w.ship.spares, n["err_nm"], len(w.traffic), [[o["kind"], o["flag"], int(round(o["x"] * 10)), int(round(o["y"] * 10))] for o in w.traffic], n["keel"], f'{w.ship.torpedo_type}:{json.dumps(w.ship.types, separators=(",", ":"))}:{w.ship.depth_extra}'])
+            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"], w.ship.battery, w.ship.spares, n["err_nm"], len(w.traffic), [[o["kind"], o["flag"], int(round(o["x"] * 10)), int(round(o["y"] * 10))] for o in w.traffic], n["keel"], f'{w.ship.torpedo_type}:{json.dumps(w.ship.types, separators=(",", ":"))}:{w.ship.depth_extra}', n["eta_h"], n["at_site"], n["dest"]])
             dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
             "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts, "eye": eye}

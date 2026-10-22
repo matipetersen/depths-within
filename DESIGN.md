@@ -810,3 +810,31 @@ Una hoja de seis pasos la primera vez (se recuerda cerrada), una hoja "¿Cómo l
 
 ## 17.4 Calibración
 Progreso medio sobre 100 patrullas: misión primero 0,92, tripulación primero 0,62, paranoico 0,78; ambigüedad ≥ 83 %. La prueba "lo peor se gana jugando mal" se mantiene (≈ 2,2×, umbral 2×).
+
+## 18. Navegación libre, por turnos de una hora
+
+La queja: "todo lineal, no entiendo si es un sim o por turnos". Respuesta: **es por turnos de una hora, y el barco navega de verdad.**
+
+## 18.1 El barco tiene posición propia (`dread/nav.py`)
+- `ship.x, ship.y` es la posición verdadera sobre la carta (110 × 80, una unidad = 0,9 nm); el barco ya no va sobre rieles pegado al avance de la misión. Al empezar está en el muelle.
+- El capitán fija un **destino** (`set_course`: un lugar nombrado, un punto tocado en la carta o un rumbo de 8 vientos) y la velocidad y profundidad. Nada se mueve hasta que pasan las horas: cada hora (`nav.step`) el casco recorre `nudos / 0,9` unidades hacia el destino.
+- **Gobierna por donde cree estar.** El rumbo se calcula desde la posición estimada (verdadera + error de estima), así que con mucho error el barco llega "a donde dice la carta" y no a donde debía: hay que tomar una posición (fix) para corregir. Sin trigonometría en la posición, para que Python y JS coincidan al último dígito.
+- Velocidad: en superficie 11 nudos, sumergido según la orden (lento 4 / normal 8 / flanco 13), con averías, baterías, silencio y motor muerto.
+- Se detiene en combate y mientras se trabaja un paso (el barco se queda donde está).
+
+## 18.2 Cada paso se hace en su sitio
+- El acto *i* de una misión se hace en el punto *i* de su carta (`site`): hay que estar a menos de 8 unidades. Si no, el paso dice "todavía no estamos allí" y el menú ofrece **Poner rumbo a X**. Si la estima dice que ya se está pero el error es grande: "tome una posición".
+- La estación (K-7) también hay que alcanzarla: la guardia solo empieza al llegar (`on_station_reached`).
+- El regreso a base es una travesía real hasta el muelle; `travel_left` es solo la estimación de horas. El evento de rumbo equivocado desplaza el barco por la línea a la base.
+- La ventana de cada misión suma el tiempo de navegar (`travel_allowance`: trayecto a 5 nudos). Las horas de trabajo de cada paso se redujeron ×0,7 porque antes incluían la travesía.
+
+## 18.3 La interfaz
+- Botones de tiempo: **1 h** (un turno) y **▶▶** (hasta que pase algo; sirve para travesías largas).
+- La carta se toca: un lugar nombrado o un punto cualquiera fija el rumbo (`g:x:y`); se dibuja la línea al destino con su banderín; "All stop" detiene.
+- El botón dorado dice primero "navegue a X" y, ya allí, se vuelve el paso. La franja de consejos dice lo mismo.
+- Tutorial: "se juega hora a hora", "tú gobiernas", "cada paso en su sitio".
+
+## 18.4 Pruebas y política de simulación
+- `tests/conftest.py`: salvo marca `real_nav`, el barco cuenta como estando en el sitio de cada paso (los tests de efectos no navegan). Los tests de navegación y de paridad Python↔JS usan la marca; la paridad juega patrullas con rumbos fuzzeados.
+- Las políticas navegan solas (`_carry_on`): rumbo al sitio, a flanco / normal; las cautas toman posición si el error pasa de 3 nm. La política al azar vaga por la carta.
+- Calibración (100 patrullas): progreso 0,91 / 0,65 / 0,78 (misión primero / tripulación primero / paranoico).

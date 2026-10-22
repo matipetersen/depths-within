@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .conditions import evaluate, resolve_path
+from . import nav
 from .state import Rumor, clamp
 
 DEFAULT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "events.json")
@@ -304,7 +305,7 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "summon_notice":
             world.notice_at_override = world.vigil_ticks + 6
         elif op == "travel_delay":
-            world.travel_left = max(1, world.travel_left + fx["value"])
+            nav.displace(world, fx["value"])
         elif op == "set":
             setattr(ship, fx["stat"], fx["value"])
         elif op == "time":

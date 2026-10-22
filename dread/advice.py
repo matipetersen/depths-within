@@ -12,7 +12,10 @@ def advice(w) -> List[Dict]:
     add = lambda text, order=None: tips.append({"text": text, "order": order})
 
     a, ok, why = w.act_status()
+    from . import nav
     blocked = w.work_blocked if w.working is not None else ("" if ok else why)
+    if w.working is None and not nav.at_site(w):
+        blocked = ""                                         # the sailing has its own tip, below
     if blocked:
         order = ("take_fix" if "Take a fix" in blocked else "restore_sonar" if "listening" in blocked
                  else "dive" if "surface" in blocked.lower() else "snorkel_on" if "batteries are flat" in blocked.lower() else None)
@@ -34,7 +37,17 @@ def advice(w) -> List[Dict]:
         add("The men look worn out. Let them sleep, or have them eat together.", "stand_down")
     if any("feverish" in r["symptoms"] for r in rows):
         add("A man is feverish. Hold a sick call.", "sick_call")
-    if ok and a is not None and w.working is None:
+    st = nav.site(w)
+    if st is not None and w.working is None and not nav.at_site(w) and not s.returning:
+        est = nav.estimate(w, (s.x, s.y))
+        nm = nav.dist2(st[0], st[1], est[0], est[1]) * nav.NM_PER_UNIT
+        if nm / nav.NM_PER_UNIT <= nav.SITE_R:
+            add(f"By the reckoning we are at {st[2]}, but we cannot be sure of it. Take a fix.", "take_fix")
+        elif s.dest is not None and s.dest[2] == st[2]:
+            add(f"Under way for {st[2]}, {nm:.0f} nm. Let the hours pass.", None)
+        else:
+            add(f"Next step: be at {st[2]} ({nm:.0f} nm). Set course for it.", "course_site")
+    elif ok and a is not None and w.working is None:
         add(f"Next step: {a.label}. Pick how to do it.", "act")
     elif w.working is not None and not blocked:
         add(f"Under way: {w.working.label}. Let the hours pass; watch the men.", None)

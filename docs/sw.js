@@ -1,5 +1,5 @@
 /* Keeps the game playable with no signal: the page and its icons are cached the first time. */
-const CACHE = 'depths-within-ec4f23424a';
+const CACHE = 'depths-within-7a7433f864';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

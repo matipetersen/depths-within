@@ -132,6 +132,11 @@ class Ship:
     helm_lag: int = 0
     decoys: int = 4
     dr_error: float = 0.0              # nm between where we are and where we believe we are
+    x: float = 100.0                   # where the boat truly is on the chart (the pier)
+    y: float = 12.0
+    dest: object = None                # [x, y, label] the captain has set course for, or None (all stop)
+    heading: int = 0
+    under_way: bool = False            # the hull moved this hour
     last_fix: int = 0
     last_log: int = -99
     log_true: int = 0

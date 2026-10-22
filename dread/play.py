@@ -12,7 +12,7 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, List, Optional
 
-from . import hud
+from . import hud, nav
 from . import orders as O
 from .endings import classify_ending
 from .sim import PRIORITY, issue_orders, pick_choice
@@ -23,7 +23,8 @@ HELP = """\
   enter   wait one hour           w   wait until something happens (or 12 hours)
   1..N    give that order         o   show the orders again
   l       the whole log           q   quit
-  The first order is always the mission's next step: nothing advances by waiting.
+  It is played hour by hour: set course, speed and depth, then let the hours pass (enter, or w).
+  Each step of the mission is done at its place on the chart: first sail there, then order the step.
   Decisions stop the clock: answer them with their number.
   Nothing is explained to you. Watch the men, trust the ledger."""
 
@@ -51,7 +52,13 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
     s = w.ship
     items: List[Item] = []
     a, ok, why = w.act_status()
-    if w.working is not None:
+    st = nav.site(w)
+    if st is not None and not nav.at_site(w) and w.working is None:
+        est = nav.estimate(w, (s.x, s.y))
+        nm = nav.dist2(st[0], st[1], est[0], est[1]) * nav.NM_PER_UNIT
+        items.append(Item(f"Set course for {st[2]}", f"{nm:.0f} nm; the next step is done there",
+                          (lambda st=st: nav.set_course(w, st[0], st[1], st[2])), why="" if not s.returning else "We are on the passage home."))
+    elif w.working is not None:
         left = max(1, int(-(-w.run.work_left // 1)))
         items.append(Item(f"Under way: {w.working.label}", f"about {left} h more", lambda: "", why=w.work_blocked or "The hours must pass."))
     elif a is not None and a.methods:
@@ -93,6 +100,16 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
         if lv != s.speed_order:
             items.append(Item(f"Ahead {lv}", {"slow": "quiet and sparing; the work crawls", "standard": "",
                                               "flank": "fast; loud, and the batteries go"}[lv], (lambda lv=lv: O.set_speed(w, lv))))
+    for pl in nav.places(w):
+        if st is not None and pl["label"] == st[2] and not nav.at_site(w):
+            continue
+        est = nav.estimate(w, (s.x, s.y))
+        nm = nav.dist2(pl["x"], pl["y"], est[0], est[1]) * nav.NM_PER_UNIT
+        if nm >= 3 and not (s.dest and s.dest[2] == pl["label"]):
+            items.append(Item(f"Set course for {pl['label']}", f"{nm:.0f} nm", (lambda pl=pl: nav.set_course(w, pl["x"], pl["y"], pl["label"])),
+                              why="We are on the passage home." if s.returning else ""))
+    if s.dest is not None and not s.returning:
+        items.append(Item("All stop", f"hold our place instead of going on to {s.dest[2]}", lambda: nav.all_stop(w)))
     if not s.surfaced:
         for lv, m in (("shallow", 60), ("deep", 120), ("test", 180)):
             if lv != s.depth_order:

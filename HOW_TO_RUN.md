@@ -435,5 +435,8 @@ The touch version is a static page in `docs/` (with its manifest, icons and a sm
 
 After changing the game, rebuild locally with `python tools/build_web.py` (writes `web/dread.html` and `docs/index.html`, the manifest and the service worker). The icons come from `python tools/make_icons.py`.
 
+## How it is played
+Hour by hour. You set a destination (tap the chart, or a named place), speed and depth; the boat only moves while the hours pass (**1 h**, or **>>** until something happens). Each step of the orders is done at its place on the chart: sail there first, then order the step and choose how to do it.
+
 ## Python version
 Use **Python 3.12 or newer**. The JavaScript port (`web/engine.js`) reproduces CPython's random numbers and the compensated float `sum` of 3.12+, and `tests/test_web_parity.py` compares both line by line; on 3.11 one fuzzed patrol can differ in the last digit of a float.
