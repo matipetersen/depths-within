@@ -12,6 +12,7 @@ def _station(seed=1, **ship):
     """A world already on station (mission 5)."""
     w = DreadWorld(seed=seed)
     w._start_mission(4)
+    w.ship.x, w.ship.y = 104.0, 66.0
     for k, v in ship.items():
         setattr(w.ship, k, v)
     return w
@@ -157,7 +158,7 @@ def test_a_longer_debt_makes_the_roll_less_likely_to_add_up():
             w = _station(seed=seed, fuel=1.0)
             w.ship.owed = owed
             w.ship.flags.add("notice_received")
-            w.travel_left = 1
+            w.ship.x, w.ship.y = 99.0, 13.0                     # in sight of the pier
             w.ship.returning = True
             w._voyage()
             n += "home_unaccounted" in w.ship.flags

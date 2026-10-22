@@ -52,10 +52,12 @@ def open_page(browser, page_file, size=(844, 390), touch=True, tutorial=False):
     return page
 
 
-def begin(page):
+def begin(page, at_site=True):
     btn = page.locator("[data-a=new]")
     btn.tap() if page.evaluate("'ontouchstart' in window") else btn.click()
     page.wait_for_selector(".cols")
+    if at_site:                            # most tests are about what a step does, not the sailing to it
+        page.evaluate("() => { const w = dreadDebug.state.game.w, st = dreadDebug.Dread.site(w); w.ship.x = st[0]; w.ship.y = st[1]; dreadDebug.render(); }")
 
 
 def to_decision(page, limit=60):
@@ -80,7 +82,7 @@ def test_title_then_the_bridge_without_errors(browser, page_file):
     assert "Depths Within" in page.inner_text(".sheet")
     begin(page)
     text = page.inner_text("#app").lower()          # the labels are set in small caps by CSS
-    for part in ("ledger", "the men", "log", "orders", "wait 1h", "100%", "sink the battleship"):
+    for part in ("ledger", "the men", "log", "orders", "1 h", "100%", "sink the battleship"):
         assert part in text, part
     assert page.errors == []
 
@@ -309,7 +311,7 @@ def test_a_ship_in_the_periscope_and_what_the_tired_eye_adds(browser, page_file)
     page = open_page(browser, page_file)
     begin(page)
     page.evaluate("""() => { const w = dreadDebug.state.game.w; w.run.acts_done = 2; w.run.working = 2; w.run.work_left = 0.5;
-      w._set_progress(); w.ship.scope_up = true; w.ship.moral_debt = 0.9; w.ship.attention = 0.7;
+      w._set_progress(); w.ship.x = 48; w.ship.y = 38; w.ship.scope_up = true; w.ship.moral_debt = 0.9; w.ship.attention = 0.7;
       for (const c of w.crew) { c.fear = 0.8; c.fatigue = 0.7; }
       const sh = dreadDebug.Dread.periscope(w, 0).ship; dreadDebug.state.train = Math.round(sh.rel);
       dreadDebug.state.sheet = 'periscope'; dreadDebug.render(); }""")
@@ -397,7 +399,7 @@ def test_first_time_the_tutorial_opens_and_is_remembered(browser, page_file):
     page = open_page(browser, page_file, tutorial=True)
     begin(page)
     text = page.inner_text(".sheet").lower()
-    assert "before you take command" in text and "nothing happens while you wait" in text and page.locator(".tut li").count() == 6
+    assert "before you take command" in text and "played hour by hour" in text and page.locator(".tut li").count() == 6
     page.locator("footer [data-a=close]").tap()
     assert page.locator(".sheet").count() == 0
     page.evaluate("dreadDebug.state.game = null; dreadDebug.render()")
@@ -431,3 +433,40 @@ def test_what_needs_doing_is_always_on_screen_and_one_tap_does_it(browser, page_
     assert "batteries" in page.inner_text(".adv").lower() or "where we are" in page.inner_text(".adv").lower()
     box = page.locator(".advtxt").bounding_box()
     assert box["height"] >= 40 and page.locator(".advnext").bounding_box()["width"] >= 40
+
+
+def test_the_boat_is_steered_from_the_chart_and_the_hours_move_it(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page, at_site=False)
+    assert "first, sail" in page.inner_text("button.step").lower() and "northern lane" in page.inner_text("button.step").lower()
+    assert "tap the chart" in page.inner_text("#app").lower()
+    x0 = page.evaluate("dreadDebug.state.game.w.ship.x")
+    page.locator("button.step").tap()                                   # set course for the place the step is done at
+    assert page.evaluate("dreadDebug.state.game.w.ship.dest[2]") == "Northern lane"
+    assert page.locator("svg.chart .dline").count() == 1
+    assert page.evaluate("dreadDebug.state.game.w.ship.x") == x0       # setting a course moves nothing: only the hours do
+    page.locator("[data-a=news]").tap()
+    assert page.evaluate("dreadDebug.state.game.w.ship.x") < x0
+    assert page.evaluate("dreadDebug.state.game.w.tick_no") >= 1
+
+
+def test_a_tap_on_the_chart_sets_the_course_for_that_point(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page, at_site=False)
+    box = page.locator("svg.chart").bounding_box()
+    k = min(box["width"] / 110, box["height"] / 80)
+    ox, oy = box["x"] + (box["width"] - 110 * k) / 2, box["y"] + (box["height"] - 80 * k) / 2
+    page.mouse.click(ox + 20 * k, oy + 60 * k)
+    d = page.evaluate("dreadDebug.state.game.w.ship.dest")
+    assert abs(d[0] - 20) < 2 and abs(d[1] - 60) < 2
+    assert page.evaluate("dreadDebug.state.game.inputs.at(-1)").startswith("g:")
+    page.locator("[data-a='order:all_stop']").tap()
+    assert page.evaluate("dreadDebug.state.game.w.ship.dest") is None
+
+
+def test_the_step_is_only_offered_at_its_place_and_the_advice_says_to_sail(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page, at_site=False)
+    assert "set course" in page.inner_text(".adv").lower()
+    page.evaluate("() => { const w = dreadDebug.state.game.w, st = dreadDebug.Dread.site(w); w.ship.x = st[0]; w.ship.y = st[1]; dreadDebug.render(); }")
+    assert "step 1 of 3" in page.inner_text("button.step").lower() and "first, sail" not in page.inner_text("button.step").lower()

@@ -212,6 +212,7 @@
         dr_error: 0.0, last_fix: 0, last_log: -99, log_true: 0, log_soft: 0, log_blank: 0,
         speed_order: 'standard', depth_order: 'shallow', depth_extra: 0, dive_lag: 0, torpedo_type: 'steam', shot_type: 'steam', battery: 1.0, snorkel: false, spares: 1.0, dc_active: false,
         helm_pending: null, helm_lag: 0,
+        x: 100.0, y: 12.0, dest: null, heading: 0, under_way: false,
       });
       this.tubes = ['loaded', 'loaded', 'loaded', 'loaded', 'loaded', 'loaded'];
       this.types = { steam: 6, electric: 4, acoustic: 2 };
@@ -557,7 +558,7 @@
       } else if (op === 'summon_notice') {
         world.notice_at_override = world.vigil_ticks + 6;
       } else if (op === 'travel_delay') {
-        world.travel_left = Math.max(1, world.travel_left + fx.value);
+        displace(world, fx.value);
       } else if (op === 'set') {
         ship[fx.stat] = fx.value;
       } else if (op === 'time') {
@@ -732,7 +733,7 @@
     return Math.min(DEPTHS[s.depth_order] + s.depth_extra, Math.max(14, seabedHere(w) - KEEL_MARGIN));
   }
   const underKeel = (w) => (w.ship.surfaced || w.ship.flags.has('bottomless') ? null : Math.max(0, seabedHere(w) - depthM(w)));
-  const movingNow = (w) => w.ship.returning || (w.working !== null && !w.work_blocked);
+  const movingNow = (w) => w.ship.under_way || (w.working !== null && !w.work_blocked);
   function pace(w) {
     const s = w.ship;
     if (s.battery <= 0 && !s.surfaced) return 0.0;
@@ -1038,7 +1039,6 @@
       this.truth = { war_over: warOver, notice_at: warOver ? null : trng.randint(50, 150) };
       this.notice_at_override = null;
       this.vigil_ticks = 0;
-      this.travel_left = 0;
       this.check_until = -1;
       this.starving = 0;
       if (this.missions.length) this._start_mission(0);
@@ -1048,7 +1048,14 @@
     dread() { return dreadIndex(this.ship, this.crew); }
     get sonar_off_ticks() { return this.deck.sonar_off_ticks; }
     get names_known() { return this.deck.names_learned.size; }
-    get on_station() { return this.run !== null && this.run.mission.kind === 'hold'; }
+    get travel_left() {
+      if (!this.ship.returning) return 0;
+      const d = distTo(this, BASE[0], BASE[1]);
+      return Math.ceil(d / (Math.max(speedKn(this), 3.0) / NM_PER_UNIT));
+    }
+    get on_station() {
+      return this.run !== null && this.run.mission.kind === 'hold' && (this.ship.flags.has('on_station_reached') || atSite(this));
+    }
     get notice_ready() {
       if (!this.on_station || this.ship.flags.has('notice_received')) return 0.0;
       const due = this.notice_at_override !== null ? this.notice_at_override : this.truth.notice_at;
@@ -1108,6 +1115,7 @@
         if (this.tick_no >= until) { s.flags.delete(name); this.flag_expiry.delete(name); }
       }
       if (!s.surfaced) s.hours_submerged += 1;
+      navStep(this);
       this._physics();
       this._resources();
       systemsTick(this);
@@ -1250,7 +1258,7 @@
       if (s.returning) return 'We are already under way.';
       if (s.fuel < 0.25 || s.flags.has('adrift')) return 'Not enough diesel for the passage. We would drift. Surface and charge first.';
       s.returning = true;
-      this.travel_left = 18;
+      s.dest = [BASE[0], BASE[1], BASE[2]];
       s.flags.add('left_station');
       const lawful = s.flags.has('notice_received') || s.flags.has('peace_known');
       if (!lawful) s.flags.add('orders_defied');
@@ -1276,13 +1284,15 @@
     _voyage() {
       const s = this.ship;
       if (!s.returning) return;
-      s.fuel = clamp(s.fuel - 0.012);
-      this.travel_left -= 1;
+      s.dest = [BASE[0], BASE[1], BASE[2]];
+      if (s.under_way) s.fuel = clamp(s.fuel - 0.03);
       if (s.fuel <= 0) {
         s.returning = false;
+        s.dest = null;
         s.flags.add('adrift');
         this.log.push(`${tag(this.tick_no)} The engines die. We are adrift.`);
-      } else if (this.travel_left <= 0) {
+      } else if (distTo(this, BASE[0], BASE[1]) <= SITE_R) {
+        s.dest = null;
         this._arrive();
       }
     }
@@ -1360,10 +1370,14 @@
       if (run === null || run.outcome !== null) return;
       const m = run.mission;
       if (m.kind === 'hold') {
+        if (!this.ship.flags.has('on_station_reached') && atSite(this)) {
+          this.ship.flags.add('on_station_reached');
+          this.log.push(`${tag(this.tick_no)} We are on station. There is nothing to do but hold it.`);
+        }
         if (this.vigil_ticks > 480) { this.ship.flags.add('derelict'); this.resolve_mission('failed'); }
         return;
       }
-      if (this.tick_no > run.start_tick + m.ticks * m.window - run.lost) {
+      if (this.tick_no > run.start_tick + m.ticks * m.window + travelAllowance(m) - run.lost) {
         this.log.push(`${tag(this.tick_no)} The window for '${m.title}' has closed.`);
         this.resolve_mission('failed');
       } else if (this.ship.progress >= 1.0) {
@@ -1409,6 +1423,12 @@
       if (a === null) return { act: null, ok: false, why: '' };
       if (this.run.working !== null) return { act: a, ok: false, why: 'Already under way.' };
       if (this.ship.surfaced) return { act: a, ok: false, why: 'We are on the surface. Dive first.' };
+      if (!atSite(this)) {
+        const st = site(this), est = estimate(this, [this.ship.x, this.ship.y]);
+        const nm = dist2(st[0], st[1], est[0], est[1]) * NM_PER_UNIT;
+        if (nm / NM_PER_UNIT <= SITE_R) return { act: a, ok: false, why: `By the reckoning we are at ${st[2]}, but we cannot be sure of it. Take a fix.` };
+        return { act: a, ok: false, why: `We are not there yet. ${st[2]} is ${nm.toFixed(0)} nm off. Set course for it.` };
+      }
       const why = this._unmet(a);
       if (why) return { act: a, ok: false, why };
       return { act: a, ok: true, why: '' };
@@ -1800,59 +1820,117 @@
   }
 
   // ---------------------------------------------------------------- navigation and instruments (dread/nav.py)
-  const COLUMNS = 'ABCDEFGHIJK', BASE = [100.0, 12.0, 'Base'], RETURN_TICKS = 18;
+  const COLUMNS = 'ABCDEFGHIJK', BASE = [100.0, 12.0, 'Base'];
+  const NM_PER_UNIT = 0.9, SITE_R = 8.0, ARRIVE_R = 1.0;
   const gridRef = (x, y) => `${COLUMNS[Math.max(0, Math.min(10, Math.floor(x / 10)))]}-${Math.max(1, Math.min(8, Math.floor(y / 10) + 1))}`;
-  const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   const bearing = (a, b) => ((Math.round(Math.atan2(b[0] - a[0], a[1] - b[1]) * 180 / Math.PI) % 360) + 360) % 360;
   const ceilDiv = (x) => Math.max(1, Math.ceil(x));
-
-  function where(w) {
-    const s = w.ship, run = w.run;
-    const ch = run !== null ? run.mission.chart : null;
-    const pts = ch ? [ch.from].concat(ch.points) : [];
-    let pos, heading = 0, nxt = '', rng = 0.0;
-    if (!pts.length) {
-      pos = [BASE[0], BASE[1]];
-    } else if (run.mission.kind === 'hold') {
-      const st = pts[pts.length - 1];
-      pos = [st[0], st[1]];
-      if (s.returning) {
-        const t = 1.0 - w.travel_left / RETURN_TICKS;
-        pos = lerp2(st, BASE, Math.max(0.0, Math.min(1.0, t)));
-        heading = bearing(st, BASE); nxt = 'Base';
-        rng = Math.hypot(BASE[0] - pos[0], BASE[1] - pos[1]) * 0.9;
-      }
-    } else {
-      const n = pts.length - 1;
-      let i = Math.min(run.acts_done, n - 1), t = 0.0;
-      if (run.working !== null) t = 1.0 - run.work_left / run.work_total;
-      if (run.acts_done >= n) { i = n - 1; t = 1.0; }
-      pos = lerp2(pts[i], pts[i + 1], t);
-      heading = bearing(pts[i], pts[i + 1]);
-      nxt = pts[i + 1][2];
-      rng = Math.hypot(pts[i + 1][0] - pos[0], pts[i + 1][1] - pos[1]) * 0.9;
-    }
-    return { pos, heading, nxt, rng };
-  }
+  const dist2 = (ax, ay, bx, by) => Math.sqrt((ax - bx) * (ax - bx) + (ay - by) * (ay - by));
   const DIRS = [[1.0, 0.0], [0.7, 0.7], [0.0, 1.0], [-0.7, 0.7], [-1.0, 0.0], [-0.7, -0.7], [0.0, -1.0], [0.7, -0.7]];
-  const trueXY = (w) => { const p = where(w).pos; return [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]; };
+
+  function travelAllowance(m) {
+    if (!m.chart || !m.chart.from) return 0.0;
+    const pts = [m.chart.from].concat(m.chart.points);
+    let total = 0.0;
+    for (let i = 0; i + 1 < pts.length; i++) total += Math.sqrt((pts[i + 1][0] - pts[i][0]) * (pts[i + 1][0] - pts[i][0]) + (pts[i + 1][1] - pts[i][1]) * (pts[i + 1][1] - pts[i][1]));
+    return total / 6.0;
+  }
+  function places(w) {
+    const out = [{ id: 'base', label: BASE[2], x: BASE[0], y: BASE[1] }];
+    const run = w.run;
+    if (run !== null && run.outcome === null && run.mission.chart && run.mission.chart.points) {
+      run.mission.chart.points.forEach((p, i) => out.push({ id: `p${i}`, label: p[2], x: p[0], y: p[1] }));
+    }
+    return out;
+  }
+  function site(w) {
+    const run = w.run;
+    if (run === null || run.outcome !== null || !run.mission.chart || !run.mission.chart.points) return null;
+    const pts = run.mission.chart.points;
+    if (run.mission.kind === 'hold') return pts[pts.length - 1].slice();
+    if (run.acts_done >= run.mission.acts.length) return null;
+    return run.acts_done < pts.length ? pts[run.acts_done].slice() : null;
+  }
+  const distTo = (w, x, y) => dist2(x, y, w.ship.x, w.ship.y);
+  function atSite(w) { const st = site(w); return st === null || distTo(w, st[0], st[1]) <= SITE_R; }
+  function estimate(w, pos) {
+    const off = w.ship.dr_error / NM_PER_UNIT, d = DIRS[(Math.floor(w.tick_no / 12) * 5 + 3) % 8];
+    return [Math.max(0.0, Math.min(109.9, pos[0] + d[0] * off)), Math.max(0.0, Math.min(79.9, pos[1] + d[1] * off))];
+  }
+  function speedKn(w) {
+    const s = w.ship;
+    if (s.flags.has('adrift')) return 0.0;
+    if (s.surfaced) return 11.0 * ENGINE_FACTOR[systemState(w, 'engine room')];
+    if (s.battery <= 0) return 0.0;
+    let kn = SPEEDS[s.speed_order][1] * Math.min(1.0, s.readiness) * ENGINE_FACTOR[systemState(w, 'engine room')];
+    if (s.silent_running) kn = Math.min(kn, 3.0);
+    return kn;
+  }
+  function setCourse(w, x, y, label) {
+    const s = w.ship;
+    x = Math.max(0.0, Math.min(109.9, Number(x))); y = Math.max(0.0, Math.min(79.9, Number(y)));
+    s.dest = [x, y, label || gridRef(x, y)];
+    const est = estimate(w, [s.x, s.y]);
+    const nm = dist2(x, y, est[0], est[1]) * NM_PER_UNIT;
+    const kn = Math.max(speedKn(w), 0.1);
+    let msg = `Course set for ${s.dest[2]}: ${nm.toFixed(0)} nm, about ${Math.max(1, Math.ceil(nm / kn))} h at this speed.`;
+    if (w.working !== null) msg += ' The work in hand comes first; she turns when it is done.';
+    return msg;
+  }
+  function courseHead(w, k) {
+    const est = estimate(w, [w.ship.x, w.ship.y]), d = DIRS[((k % 8) + 8) % 8];
+    return setCourse(w, est[0] + d[0] * 18.0, est[1] + d[1] * 18.0, '');
+  }
+  function allStop(w) { w.ship.dest = null; return 'All stop. We hold our place.'; }
+  function navStep(w) {
+    const s = w.ship;
+    s.under_way = false;
+    const d = s.dest;
+    if (d === null || w.engagement !== null || w.working !== null) return;
+    const kn = speedKn(w);
+    if (kn <= 0.0) return;
+    const est = estimate(w, [s.x, s.y]);
+    const vx = d[0] - est[0], vy = d[1] - est[1];
+    const dist = Math.sqrt(vx * vx + vy * vy);
+    if (dist <= ARRIVE_R) { s.dest = null; return; }
+    const runU = kn / NM_PER_UNIT;
+    const k = Math.min(dist, runU) / dist;
+    s.x = Math.max(0.0, Math.min(109.9, s.x + vx * k));
+    s.y = Math.max(0.0, Math.min(79.9, s.y + vy * k));
+    s.heading = bearing(est, d);
+    s.under_way = true;
+    if (dist <= runU) {
+      s.dest = null;
+      w.log.push(`${tag(w.tick_no)} We have reached ${d[2]}.`);
+    }
+  }
+  function displace(w, hours) {
+    const s = w.ship, vx = BASE[0] - s.x, vy = BASE[1] - s.y, dist = Math.sqrt(vx * vx + vy * vy);
+    if (dist < 1e-9) return;
+    const u = hours * 8.0 / NM_PER_UNIT;
+    s.x = Math.max(0.0, Math.min(109.9, s.x - vx / dist * u));
+    s.y = Math.max(0.0, Math.min(79.9, s.y - vy / dist * u));
+  }
+  function where(w) {
+    const s = w.ship, pos = [s.x, s.y], tgt = s.dest || site(w);
+    if (tgt === null) return { pos, heading: s.heading, nxt: '', rng: 0.0 };
+    return { pos, heading: s.heading, nxt: tgt[2], rng: dist2(tgt[0], tgt[1], pos[0], pos[1]) * NM_PER_UNIT };
+  }
+  const trueXY = (w) => [Math.round(w.ship.x * 10) / 10, Math.round(w.ship.y * 10) / 10];
   function navigation(w) {
     const s = w.ship, run = w.run;
     const { pos, heading, nxt, rng } = where(w);
-    const off = s.dr_error / 0.9, d = DIRS[(Math.floor(w.tick_no / 12) * 5 + 3) % 8];
-    const est = [Math.max(0.0, Math.min(109.9, pos[0] + d[0] * off)), Math.max(0.0, Math.min(79.9, pos[1] + d[1] * off))];
-    const moving = s.returning || (w.working !== null && !w.work_blocked);
-    let speed;
-    if (s.surfaced) speed = moving ? 11.0 : 4.0;
-    else if (s.returning) speed = 9.0;
-    else if (moving) speed = SPEEDS[s.speed_order][1] * Math.min(1.0, s.readiness) * ENGINE_FACTOR[systemState(w, 'engine room')];
-    else speed = 2.5;
-    if (s.battery <= 0 && !s.surfaced) speed = 0.0;
+    const est = estimate(w, pos);
+    let speed = s.under_way ? speedKn(w) : 0.0;
+    if (!s.under_way && !s.surfaced) speed = (w.working !== null && !w.work_blocked) ? 2.5 : 0.0;
     if (s.silent_running && !s.surfaced) speed = Math.min(speed, 3.0);
+    let eta = null;
+    if (s.under_way && s.dest !== null) eta = Math.max(1, Math.ceil(dist2(s.dest[0], s.dest[1], est[0], est[1]) * NM_PER_UNIT / Math.max(speed, 0.1)));
+    else if (run !== null && run.working !== null) eta = ceilDiv(run.work_left);
     return {
       x: Math.round(est[0] * 10) / 10, y: Math.round(est[1] * 10) / 10, grid: gridRef(est[0], est[1]), heading, err_nm: Math.round(s.dr_error * 10) / 10,
       speed: Math.round(speed * 10) / 10, depth: depthM(w), keel: underKeel(w), range_nm: Math.round(rng), next: nxt,
-      eta_h: run !== null && run.working !== null ? ceilDiv(run.work_left) : null, noise: s.noise,
+      eta_h: eta, noise: s.noise, dest: s.dest ? [s.dest[0], s.dest[1], s.dest[2]] : null, at_site: atSite(w),
     };
   }
   function hullReport(w) {
@@ -2002,7 +2080,8 @@
     const s = w.ship, run = w.run, tips = [];
     const add = (text, order) => tips.push({ text, order: order || null });
     const st = w.act_status();
-    const blocked = w.working !== null ? w.work_blocked : (st.ok ? '' : st.why);
+    let blocked = w.working !== null ? w.work_blocked : (st.ok ? '' : st.why);
+    if (w.working === null && !atSite(w)) blocked = '';
     if (blocked) {
       const lower = blocked.toLowerCase();
       add(blocked, blocked.includes('Take a fix') ? 'take_fix' : blocked.includes('listening') ? 'restore_sonar' : lower.includes('surface') ? 'dive' : lower.includes('batteries are flat') ? 'snorkel_on' : null);
@@ -2016,7 +2095,14 @@
     const worn = rows.filter((r) => r.says >= 0.45 || r.symptoms.includes('errors at station') || r.symptoms.includes('microsleeps')).length;
     if (worn >= 3 && !s.stand_down) add('The men look worn out. Let them sleep, or have them eat together.', 'stand_down');
     if (rows.some((r) => r.symptoms.includes('feverish'))) add('A man is feverish. Hold a sick call.', 'sick_call');
-    if (st.ok && st.act !== null && w.working === null) add(`Next step: ${st.act.label}. Pick how to do it.`, 'act');
+    const stp = site(w);
+    if (stp !== null && w.working === null && !atSite(w) && !s.returning) {
+      const est = estimate(w, [s.x, s.y]);
+      const nm = dist2(stp[0], stp[1], est[0], est[1]) * NM_PER_UNIT;
+      if (nm / NM_PER_UNIT <= SITE_R) add(`By the reckoning we are at ${stp[2]}, but we cannot be sure of it. Take a fix.`, 'take_fix');
+      else if (s.dest !== null && s.dest[2] === stp[2]) add(`Under way for ${stp[2]}, ${nm.toFixed(0)} nm. Let the hours pass.`, null);
+      else add(`Next step: be at ${stp[2]} (${nm.toFixed(0)} nm). Set course for it.`, 'course_site');
+    } else if (st.ok && st.act !== null && w.working === null) add(`Next step: ${st.act.label}. Pick how to do it.`, 'act');
     else if (w.working !== null && !blocked) add(`Under way: ${w.working.label}. Let the hours pass; watch the men.`, null);
     else if (w.on_station) add('Hold position. Nothing is asked of you but to stay; watch the men, the stores and the sea.', null);
     if (run !== null && run.acts_done === 0 && run.working === null && !run.phase_fired.has('verified') && run.mission.kind !== 'hold') add('New orders, from a source you cannot name. You may ask for confirmation; it costs time, and an answer is not a source.', 'verify_orders');
@@ -2031,7 +2117,12 @@
     const s = w.ship, items = [];
     const add = (id, label, hint, run, needsCrew, kind, why) => items.push({ id, label, hint, run, needsCrew: !!needsCrew, kind: kind || 'order', why: why || '' });
     const st = w.act_status();
-    if (w.working !== null) {
+    const stp = site(w);
+    if (stp !== null && !atSite(w) && w.working === null) {
+      const est = estimate(w, [s.x, s.y]);
+      const nm = dist2(stp[0], stp[1], est[0], est[1]) * NM_PER_UNIT;
+      add('course_site', `Set course for ${stp[2]}`, `${nm.toFixed(0)} nm; the next step is done there`, () => setCourse(w, stp[0], stp[1], stp[2]), false, 'order', s.returning ? 'We are on the passage home.' : '');
+    } else if (w.working !== null) {
       const left = Math.max(1, Math.ceil(w.run.work_left));
       add('act', `Under way: ${w.working.label}`, `about ${left} h more`, () => '', false, 'act', w.work_blocked || 'The hours must pass.');
     } else if (st.act !== null) {
@@ -2057,6 +2148,15 @@
     for (const lv of ['slow', 'standard', 'flank']) {
       if (lv !== s.speed_order) add(`speed_${lv}`, `Ahead ${lv}`, { slow: 'quiet and sparing; the work crawls', standard: '', flank: 'fast; loud, and the batteries go' }[lv], () => orders.set_speed(w, lv));
     }
+    for (const pl of places(w)) {
+      if (stp !== null && pl.label === stp[2] && !atSite(w)) continue;
+      const est = estimate(w, [s.x, s.y]);
+      const nm = dist2(pl.x, pl.y, est[0], est[1]) * NM_PER_UNIT;
+      if (nm >= 3 && !(s.dest && s.dest[2] === pl.label)) {
+        add(`course:${pl.id}`, `Set course for ${pl.label}`, `${nm.toFixed(0)} nm`, () => setCourse(w, pl.x, pl.y, pl.label), false, 'order', s.returning ? 'We are on the passage home.' : '');
+      }
+    }
+    if (s.dest !== null && !s.returning) add('all_stop', 'All stop', `hold our place instead of going on to ${s.dest[2]}`, () => allStop(w));
     if (!s.surfaced) {
       for (const [lv, m] of [['shallow', 60], ['deep', 120], ['test', 180]]) {
         if (lv !== s.depth_order) add(`depth_${lv}`, `Go to ${m} metres`, { shallow: '', deep: 'hidden; the hull speaks', test: 'as deep as she is built for' }[lv], () => orders.set_depth(w, lv));
@@ -2137,12 +2237,17 @@
         this._advance(1, false);
       } else if (kind === 'w') {
         this._advance(WAIT_LIMIT, true);
+      } else if (kind === 'h') {
+        this._advance(Math.max(1, Math.min(WAIT_LIMIT, Number(a) || 1)), true);
       } else if (kind === 'o') {
-        const id = a === 'act' && b !== undefined ? `act:${b}` : a;               // 'o:act:flank' is the act, done the flank way
+        const compound = (a === 'act' || a === 'course') && b !== undefined;
+        const id = compound ? `${a}:${b}` : a;               // 'o:act:flank' is the act, done the flank way; 'o:course:p1' a place on the chart
         const item = availableOrders(w).find((i) => i.id === id);
         if (!item) return;
         if (item.why) { this.notice = item.why; return; }
-        this.notice = String(item.run(a !== 'act' && b !== undefined ? Number(b) : undefined) || '');
+        this.notice = String(item.run(!compound && b !== undefined ? Number(b) : undefined) || '');
+      } else if (kind === 'g') {                      // 'g:x:y': a point tapped on the chart
+        if (w.ship.returning) { this.notice = 'We are on the passage home.'; } else this.notice = setCourse(w, Number(a), Number(b), '');
       } else {
         return;
       }
@@ -2161,7 +2266,8 @@
       if (!acts.length) return { text: 'Station: nothing is asked of you but to stay.', n: 0, of: 0, working: false };
       if (run.acts_done >= acts.length) return { text: 'Every step ordered. What remains is not up to the sea.', n: acts.length, of: acts.length, working: false };
       const a = acts[run.acts_done];
-      const state = run.working !== null ? `under way, ${Math.max(1, Math.ceil(run.work_left))} h more` : 'waiting for your order';
+      let state = run.working !== null ? `under way, ${Math.max(1, Math.ceil(run.work_left))} h more` : 'waiting for your order';
+      if (run.working === null && !atSite(w)) state = `first sail to ${site(w)[2]}`;
       return { text: `Step ${run.acts_done + 1} of ${acts.length}: ${a.label} (${state})`, n: run.acts_done, of: acts.length, working: run.working !== null };
     }
 
@@ -2210,7 +2316,7 @@
         men, sonar: { on: s.sonar_on, reports: s.sonar_on ? reports.slice(0, 3) : [] },
         surfaced: s.surfaced, on_station: w.on_station,
         helm: { speed: s.speed_order, depth: s.depth_order, snorkel: s.snorkel, dc: s.dc_active, lag: s.helm_pending !== null },
-        advice: advice(w), lookout: lookout(w), nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] },
+        advice: advice(w), lookout: lookout(w), nav: navigation(w), hull: hullReport(w), contacts: contacts(w), weapons: weapons(w), tracks: chartTracks(w), base: { x: BASE[0], y: BASE[1] }, places: places(w).map((p) => ({ id: p.id, label: p.label, x: p.x, y: p.y })), site: site(w),
         log: w.log.filter((l) => l.trim()),
         pending,
         orders: pending || this.over ? [] : availableOrders(w).map((i) => ({ id: i.id, label: i.label, hint: i.hint, needsCrew: i.needsCrew, kind: i.kind, why: i.why })),
@@ -2230,7 +2336,7 @@
   }
 
   const api = {
-    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, visibility, lookout, seabedAt, crushDepth, advice, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
+    PyRandom, World, Game, setData, navigation, hullReport, contacts, weapons, periscope, visibility, lookout, seabedAt, crushDepth, advice, setCourse, allStop, courseHead, places, site, atSite, classifyEnding, availableOrders, orders, fsum, debriefDocuments,
     get DATA() { return DATA; },
   };
   return api;

@@ -11,6 +11,7 @@ import random
 from collections import Counter
 from typing import Dict, List
 
+from . import nav
 from . import orders as O
 from .endings import classify_ending  # noqa: F401  (re-exported)
 from .world import DreadWorld
@@ -102,6 +103,19 @@ def _carry_on(policy: str, w: DreadWorld, fatigue: float):
     if w.working is not None and "Take a fix" in w.work_blocked:       # the work stopped for want of a position
         _fix(w)
     a, ok, why = w.act_status()
+    if policy != "mission_first" and s.dr_error > 3.0 and w.working is None and w.engagement is None and w.tick_no - s.last_fix > 6:
+        _fix(w)                                              # the wary captains want to know where they are
+    st = nav.site(w)
+    if st is not None and w.working is None and not nav.at_site(w) and not s.returning and w.engagement is None:
+        est = nav.estimate(w, (s.x, s.y))
+        if nav.dist2(st[0], st[1], est[0], est[1]) <= nav.SITE_R and s.dr_error > 1.0:
+            _fix(w)                                          # the reckoning says we are there; the sea may not agree
+        if s.dest is None or s.dest[2] != st[2]:
+            lv = TRANSIT_SPEED[policy]
+            if s.speed_order != lv:
+                O.set_speed(w, lv)
+            nav.set_course(w, st[0], st[1], st[2])
+        return
     if a is None:
         return
     if not ok and not s.sonar_on and "sonar_on" in str(a.needs):
@@ -118,6 +132,8 @@ def _carry_on(policy: str, w: DreadWorld, fatigue: float):
         ids = [m["id"] for m in a.methods]
         w.do_act(next((p for p in prefs if p in ids), None))
 
+
+TRANSIT_SPEED = {"mission_first": "flank", "crew_first": "standard", "paranoid": "standard"}
 
 METHOD_PREFS = {
     "mission_first": ("flank", "signal", "short", "flood", "periscope", "standard"),
@@ -247,6 +263,13 @@ def issue_orders(policy: str, w: DreadWorld, prng=None):
 def random_orders(w: DreadWorld, prng: random.Random):
     """A captain with no plan: sometimes does something, sometimes not."""
     a, ok, _ = w.act_status()
+    st = nav.site(w)
+    if st is not None and not nav.at_site(w) and w.working is None and not w.ship.returning and prng.random() < 0.5:
+        nav.set_course(w, st[0], st[1], st[2])
+    if w.ship.dest is None and not w.ship.returning and w.working is None and prng.random() < 0.15:
+        nav.set_course(w, prng.random() * 105, prng.random() * 75, "")      # a captain with no plan wanders
+    if prng.random() < 0.12 and not w.ship.surfaced:
+        O.set_depth(w, prng.choice(["shallow", "deep", "test"]))
     if ok and prng.random() < 0.5:
         w.do_act(prng.choice([m["id"] for m in a.methods]) if a.methods else None)
     if prng.random() > 0.15:
@@ -342,6 +365,7 @@ def run_station(strategy: str, seed: int, max_ticks: int = 700) -> Dict:
     w._start_mission(4)
     w.tick_no = 100
     s = w.ship
+    s.x, s.y = 104.0, 66.0                                    # on the station
     s.hull, s.food, s.water, s.fuel, s.scrubber = 0.7, 0.62, 0.6, 0.8, 0.5
     s.owed, s.moral_debt, s.co2 = 0.1, 0.1, 0.012
     for c in w.crew:

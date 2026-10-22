@@ -1,4 +1,5 @@
 """DreadWorld: the per-tick simulation that ties state, phantoms and events together."""
+import math
 import random
 from typing import List, Optional
 
@@ -6,7 +7,7 @@ from .conditions import evaluate
 from .events import EventEngine, FiredEvent, Pending, apply_effects, load_events
 from .missions import MissionRun, load_missions, provenance_line
 from .phantom import SonarDeck
-from . import combat, people, sea, systems
+from . import combat, nav, people, sea, systems
 from .state import COMPARTMENTS, Crew, ROLES, Ship, clamp, dread_index, lerp, stage_for
 
 DEFAULT_NAMES = ("Brandt", "Keller", "Vogel", "Hahn", "Lenz", "Ostrow",
@@ -61,7 +62,6 @@ class DreadWorld:
         self.truth = {"war_over": war_over, "notice_at": None if war_over else trng.randint(50, 150)}
         self.notice_at_override = None
         self.vigil_ticks = 0
-        self.travel_left = 0
         self.check_until = -1
         self.starving = 0
         if self.missions:
@@ -89,8 +89,18 @@ class DreadWorld:
         return len(self.deck.names_learned)
 
     @property
+    def travel_left(self) -> int:
+        """Hours of passage still to run to the base (0 when not on the way home)."""
+        s = self.ship
+        if not s.returning:
+            return 0
+        d = nav.dist_to(self, nav.BASE[0], nav.BASE[1])
+        return math.ceil(d / (max(nav.speed_kn(self), 3.0) / nav.NM_PER_UNIT))
+
+    @property
     def on_station(self) -> bool:
-        return self.run is not None and self.run.mission.kind == "hold"
+        return (self.run is not None and self.run.mission.kind == "hold"
+                and ("on_station_reached" in self.ship.flags or nav.at_site(self)))
 
     @property
     def ill_count(self) -> float:
@@ -182,6 +192,7 @@ class DreadWorld:
                 del self.flag_expiry[name]
         if not s.surfaced:
             s.hours_submerged += 1
+        nav.step(self)
         self._physics()
         self._resources()
         systems.tick(self)
@@ -354,7 +365,7 @@ class DreadWorld:
         if s.fuel < 0.25 or "adrift" in s.flags:
             return "Not enough diesel for the passage. We would drift. Surface and charge first."
         s.returning = True
-        self.travel_left = 18
+        s.dest = [nav.BASE[0], nav.BASE[1], nav.BASE[2]]
         s.flags.add("left_station")
         lawful = "notice_received" in s.flags or "peace_known" in s.flags
         if not lawful:
@@ -382,13 +393,16 @@ class DreadWorld:
         s = self.ship
         if not s.returning:
             return
-        s.fuel = clamp(s.fuel - 0.012)
-        self.travel_left -= 1
+        s.dest = [nav.BASE[0], nav.BASE[1], nav.BASE[2]]       # the passage home cannot be cancelled from the chart
+        if s.under_way:
+            s.fuel = clamp(s.fuel - 0.03)
         if s.fuel <= 0:
             s.returning = False
+            s.dest = None
             s.flags.add("adrift")
             self.log.append(f"[{self.tick_no:03d}] The engines die. We are adrift.")
-        elif self.travel_left <= 0:
+        elif nav.dist_to(self, nav.BASE[0], nav.BASE[1]) <= nav.SITE_R:
+            s.dest = None
             self._arrive()
 
     def _arrive(self):
@@ -471,6 +485,13 @@ class DreadWorld:
             return a, False, "Already under way."
         if self.ship.surfaced:
             return a, False, "We are on the surface. Dive first."
+        if not nav.at_site(self):
+            st = nav.site(self)
+            est = nav.estimate(self, (self.ship.x, self.ship.y))
+            nm = nav.dist2(st[0], st[1], est[0], est[1]) * nav.NM_PER_UNIT
+            if nm / nav.NM_PER_UNIT <= nav.SITE_R:
+                return a, False, f"By the reckoning we are at {st[2]}, but we cannot be sure of it. Take a fix."
+            return a, False, f"We are not there yet. {st[2]} is {nm:.0f} nm off. Set course for it."
         why = self._unmet(a)
         if why:
             return a, False, why
@@ -592,6 +613,9 @@ class DreadWorld:
             return
         m = run.mission
         if m.kind == "hold":
+            if "on_station_reached" not in self.ship.flags and nav.at_site(self):
+                self.ship.flags.add("on_station_reached")
+                self.log.append(f"[{self.tick_no:03d}] We are on station. There is nothing to do but hold it.")
             if self.vigil_ticks > 480:                       # nothing ever ends a vigil by itself
                 self.ship.flags.add("derelict")
                 self.resolve_mission("failed")

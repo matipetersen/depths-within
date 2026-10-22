@@ -15,9 +15,7 @@ def _w(seed=3):
 
 def _at(w, x, y):
     """Put the boat at a chart position by making the mission's route pass through it."""
-    ch = w.run.mission.chart
-    ch["from"] = [x, y, "here"]
-    ch["points"] = [[x + 1, y, "there"]] * len(ch["points"])
+    w.ship.x, w.ship.y = x + 1.0, float(y)
 
 
 # ---- the sea floor ---------------------------------------------------------------------------------------

@@ -27,7 +27,7 @@ def test_every_step_but_the_station_offers_at_least_two_ways():
 
 def test_the_way_you_choose_sets_the_hours_and_is_in_the_log():
     h = {m: _hours(_w(), m) for m in ("listen", "periscope", "flank")}
-    assert h["flank"] < h["periscope"] < h["listen"] and h["listen"] == 8.0
+    assert h["flank"] < h["periscope"] < h["listen"] and h["listen"] == 5.5
     w = _w()
     w.do_act("flank")
     assert "(Run the grid at flank)" in w.log[-1]
@@ -36,7 +36,7 @@ def test_the_way_you_choose_sets_the_hours_and_is_in_the_log():
     assert "(" not in w.log[-1].split("order it:")[1]            # the plain way is not remarked on
     w = _w()
     w.do_act("no-such-way")
-    assert w.run.work_total == 8.0                                # an unknown way is the plain one
+    assert w.run.work_total == 5.5                                # an unknown way is the plain one
 
 
 def test_the_ways_do_what_they_say_and_lapse_when_the_work_is_done():
@@ -71,7 +71,7 @@ def test_the_periscope_way_is_worse_in_the_dark_and_in_fog():
         w.do_act("periscope")
         return w.run.work_total
     day, night, fog = hours(2, False), hours(16, False), hours(2, True)
-    assert day == 8 * 0.7 and night == fog == 8 * 1.7
+    assert day == 5.5 * 0.7 and night == fog == 5.5 * 1.7
 
 
 def test_checking_the_solution_twice_costs_an_hour_and_makes_the_shot_truer():
@@ -94,7 +94,7 @@ def test_the_report_can_be_short_or_in_clear_with_their_own_costs():
     w.ship.dr_error = 0.0
     d0 = w.ship.orders_doubt
     w.do_act("short")
-    assert w.run.work_total == 1.0 and w.ship.orders_doubt > d0
+    assert w.run.work_total == 0.75 and w.ship.orders_doubt > d0
     w2 = _w()
     w2._start_mission(1)
     w2.run.acts_done = 1
@@ -102,7 +102,7 @@ def test_the_report_can_be_short_or_in_clear_with_their_own_costs():
     w2.ship.orders_doubt = 0.5
     a0 = w2.ship.attention
     w2.do_act("confirm")
-    assert w2.run.work_total == 3.0 and w2.ship.orders_doubt < 0.5 and w2.ship.attention > a0
+    assert w2.run.work_total == 2.25 and w2.ship.orders_doubt < 0.5 and w2.ship.attention > a0
 
 
 def test_the_menu_offers_every_way_as_an_order():
@@ -110,7 +110,7 @@ def test_the_menu_offers_every_way_as_an_order():
     assert "Listen: a patient sweep with the headsets" in labels
     assert "Sweep the horizon with the periscope" in labels and "Run the grid at flank" in labels
     first = available_orders(_w())[0]
-    assert "8.0 h" in first.hint
+    assert "5.5 h" in first.hint
     w = _w()
     available_orders(w)[2].run()                                  # the third way
     assert w.run.method == "flank"

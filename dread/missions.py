@@ -7,6 +7,7 @@ order really came from is never settled: each mission carries a
 ``mundane_origin`` and an ``uncanny_origin`` that only the debrief reveals.
 """
 import json
+import math
 import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -45,6 +46,16 @@ class Mission:
     acts: List[Act] = field(default_factory=list)
     chart: dict = field(default_factory=dict)    # {'from': [x, y, label], 'points': [[x, y, label], ...]}
 
+    def travel_allowance(self) -> float:
+        """Hours the window allows for sailing between the points: the path at a modest 5 knots."""
+        if not self.chart:
+            return 0.0
+        pts = [self.chart["from"]] + list(self.chart["points"])
+        total = 0.0
+        for a, b in zip(pts, pts[1:]):
+            total += math.sqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2)
+        return total / 6.0
+
 
 @dataclass
 class MissionRun:
@@ -63,7 +74,7 @@ class MissionRun:
 
     @property
     def deadline(self) -> float:
-        return self.start_tick + self.mission.ticks * self.mission.window - self.lost
+        return self.start_tick + self.mission.ticks * self.mission.window + self.mission.travel_allowance() - self.lost
 
 
 def load_missions(path: str = DEFAULT_PATH) -> List[Mission]:

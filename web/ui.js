@@ -83,6 +83,18 @@
     if (ways.length > 1 && !(v.mission && v.mission.step.working)) { state.sheet = 'ways'; render(); return; }
     act('o:act');
   }
+  /** A tap on the chart sets the course: on a named place it goes there, anywhere else to that point. */
+  function tapChart(e, svg, g) {
+    const r = svg.getBoundingClientRect();
+    const k = Math.min(r.width / 110, r.height / 80);
+    const x = (e.clientX - r.left - (r.width - 110 * k) / 2) / k, y = (e.clientY - r.top - (r.height - 80 * k) / 2) / k;
+    if (!(x >= 0 && y >= 0 && x <= 110 && y <= 80)) return;
+    const v = g.view();
+    const pl = (v.places || []).find((p) => Math.hypot(p.x - x, p.y - y) < 5);
+    if (pl && v.orders.some((o) => o.id === `course:${pl.id}`)) return act(`o:course:${pl.id}`);
+    if (pl && v.site && v.site[2] === pl.label && v.orders.some((o) => o.id === 'course_site')) return act('o:course_site');
+    return act(`g:${x.toFixed(1)}:${y.toFixed(1)}`);
+  }
   function setSound(on) {
     state.sound = on;
     if (on) Sound.start(); else Sound.mute();
@@ -131,11 +143,14 @@
         if (next || (tr.state === 'current' && reached && i === tr.reached)) t += `<text class="wl" x="${p[0]}" y="${p[1] + (p[1] > 66 ? -3.4 : 5)}" text-anchor="${p[0] > 85 ? 'end' : 'middle'}">${esc(p[2])}</text>`;
       });
     });
+    let here = '';
+    (v.places || []).forEach((p) => { if (p.id !== 'base') here += `<circle class="pl" cx="${p.x}" cy="${p.y}" r="1.1"/>`; });
+    if (N.dest) here += `<line class="dline" x1="${N.x}" y1="${N.y}" x2="${N.dest[0]}" y2="${N.dest[1]}"/><path class="dflag" d="M${N.dest[0]} ${N.dest[1]} l0 -4.2 l3 1.3 l-3 1.3"/><text class="wl dl" x="${N.dest[0] + 1.6}" y="${N.dest[1] + 3.6}">${esc(N.dest[2])}</text>`;
     const err = `<circle class="errc" cx="${N.x}" cy="${N.y}" r="${Math.max(1.2, N.err_nm / 0.9).toFixed(1)}"/>`;
     const boat = `<g class="boat ${v.surfaced ? 'up' : ''}" transform="translate(${N.x} ${N.y}) rotate(${N.heading})"><circle class="halo" r="4.2"/><path d="M0 -4.6 L2.4 3.4 L0 2.2 L-2.4 3.4 Z"/></g>`;
-    return `<svg class="chart" viewBox="0 0 110 80" role="img" aria-label="Chart: ${esc(N.grid)}, heading ${N.heading}">
+    return `<svg class="chart" data-a="chart" viewBox="0 0 110 80" role="button" aria-label="Chart: ${esc(N.grid)}, heading ${N.heading}. Tap a point to set course for it.">
       <rect class="sea" width="110" height="80"/>${g}
-      <path class="land" d="M90 0 L110 0 L110 21 L101 19 L95 9 Z"/><text class="wl" x="108" y="26" text-anchor="end">Base</text>${t}${err}${boat}</svg>`;
+      <path class="land" d="M90 0 L110 0 L110 21 L101 19 L95 9 Z"/><text class="wl" x="108" y="26" text-anchor="end">Base</text>${t}${here}${err}${boat}</svg>`;
   }
   function gauge(k, val, unit, extra) {
     return `<div class="gg"><span class="gk">${k}</span><span class="gv">${val}<small>${unit || ''}</small></span>${extra || ''}</div>`;
@@ -143,7 +158,8 @@
   function chartView(v) {
     const N = v.nav;
     const nxt = N.next ? `${esc(N.next)} · ${N.range_nm} nm${N.eta_h ? ` · ${N.eta_h} h` : ''}` : 'On station';
-    return `${chartSvg(v)}<div class="gauges">
+    const stop = N.dest && !v.orders.every((o) => o.id !== 'all_stop') ? '<button class="btn sm" data-a="order:all_stop">All stop</button>' : '';
+    return `${chartSvg(v)}<p class="hint">Tap the chart to set course. The boat sails only when the hours pass.</p>${stop}<div class="gauges">
       ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn', `<span class="gk">ordered ${v.helm.speed}${v.helm.lag ? ' …' : ''}</span>`)}
       ${gauge('Depth', N.depth, ' m', `<span class="gk">${N.keel === null ? (v.surfaced ? 'on the surface' : 'no return from the sounder') : N.keel + ' m under the keel'}</span>`)}${gauge('Grid', N.grid, '', `<span class="gk">within ${N.err_nm.toFixed(1)} nm</span>`)}
       ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
@@ -220,6 +236,12 @@
     const m = v.mission;
     if (!m) return '';
     const st = m.step, o = v.orders.find((x) => x.kind === 'act');
+    const N = v.nav, go = v.orders.find((x) => x.id === 'course_site');
+    if (v.site && !N.at_site && !v.over) {
+      const sailing = N.dest && N.dest[2] === v.site[2];
+            if (sailing) return `<div class="step going"><span class="k">Sailing</span><span class="t">To ${esc(v.site[2])}</span><span class="s">${N.range_nm} nm${N.eta_h ? ` · about ${N.eta_h} h` : ''} · let the hours pass</span></div>`;
+      return `<button class="step ready" data-a="order:course_site" ${v.pending || !go || go.why ? 'disabled' : ''}><span class="k">First, sail</span><span class="t">${esc(v.site[2])}</span><span class="s">${go ? esc(go.hint) : ''}${go && go.why ? ' · ' + esc(go.why) : ''}</span></button>`;
+    }
     if (!st.of) return `<div class="step hold"><span class="k">Station</span><span class="t">Hold position. Nothing is asked of you but to stay.</span></div>`;
     const off = v.pending || v.over;
     if (!o) return `<div class="step done"><span class="k">${st.of} of ${st.of}</span><span class="t">Every step ordered. What comes now is not up to the sea.</span></div>`;
@@ -316,11 +338,11 @@
   }
   function sheetHelp(first) {
     const steps = [
-      ['You are the captain.', 'Orders come from a source nobody can name. Tap the orders chip (top left) any time to read them again.'],
-      ['Nothing happens while you wait.', 'The gold <b>step</b> button, bottom right, is your next move. Tap it and choose <b>how</b> to do it: every way has a price (time, noise, batteries, nerves).'],
-      ['Look after the boat.', 'Left: the exact ledger, the hull, the torpedoes. Middle: the chart, the sonar and the men. A strip above the buttons says <b>what needs doing</b>; tap it and the order is given.'],
-      ['The men are not exact.', 'Each says how he is, and you can see his symptoms. When the two disagree, believe the symptoms. What a man reports, an instrument may not show.'],
-      ['Decisions stop the clock.', 'Each option shows what it costs, not what it does. There is no right answer. Wait <b>1 h</b>, or <b>▶▶</b> until something happens.'],
+      ['You are the captain, and it is played hour by hour.', 'Nothing moves until you let time pass: <b>1 h</b> for one turn, or <b>▶▶</b> to go on until something happens (a long passage, say). In between you give orders; time is what they cost.'],
+      ['You steer.', 'Tap the <b>chart</b> to set a course, or tap a named place. The boat sails there, at the speed and depth you have ordered, as the hours pass. The circle around it is how sure you are of where you are; a <b>fix</b> shrinks it.'],
+      ['Each step of the orders is done at its place.', 'The gold button, bottom right, says where to go first. When you are there it becomes the step itself: tap it and choose <b>how</b> to do it. Every way has a price (time, noise, batteries, nerves).'],
+      ['Look after the boat and the men.', 'Left: the exact ledger, the hull, the torpedoes. Middle: the chart, the sonar and the men. A strip above the buttons says <b>what needs doing</b>; tap it and the order is given.'],
+      ['The men are not exact.', 'Each says how he is, and you can see his symptoms. When the two disagree, believe the symptoms. Decisions stop the clock; each option shows what it costs, not what it does.'],
       ['Nothing is ever confirmed.', 'Whatever strange thing happens aboard has an ordinary explanation, and another.'],
     ];
     return `<div class="sheet" role="dialog" aria-modal="true" aria-label="How to play"><header><h2>${first ? 'Before you take command' : 'How to play'}</h2><button class="icon-btn" data-a="close" aria-label="Close">✕</button></header>
@@ -342,7 +364,7 @@
       (v.advice.length > 1 ? `<button class="advnext" data-a="adv:next" aria-label="Next tip">${i + 1}/${v.advice.length} ›</button>` : '') + '</div>';
   }
   const GROUPS = [
-    ['Helm and navigation', /^(speed_|depth_|snorkel_|silent_running|normal_running|surface|dive|raise_periscope|lower_periscope|take_fix|active_ping)/],
+    ['Helm and navigation', /^(course|all_stop|speed_|depth_|snorkel_|silent_running|normal_running|surface|dive|raise_periscope|lower_periscope|take_fix|active_ping)/],
     ['Torpedoes', /^load_/],
     ['Sensors and radio', /^(silence_sonar|restore_sonar|listen_radio|verify_orders)/],
     ['The boat', /^(damage_control|scrub_air|force_compartment)/],
@@ -424,8 +446,8 @@
           ${stepView(v)}
           <div class="actions">
             <button class="btn primary" data-a="orders" ${v.pending || v.over ? 'disabled' : ''}>Orders<small>${v.orders.filter((o) => o.kind !== 'act').length} more</small></button>
-            <button class="btn" data-a="wait" ${v.pending || v.over ? 'disabled' : ''}>Wait 1h</button>
-            <button class="btn" data-a="news" ${v.pending || v.over ? 'disabled' : ''}>News ▶▶<small class="wide">until something happens</small></button>
+            <button class="btn" data-a="wait" ${v.pending || v.over ? 'disabled' : ''}>1 h<small class="wide">one turn</small></button>
+            <button class="btn" data-a="news" ${v.pending || v.over ? 'disabled' : ''}>▶▶<small class="wide">until something happens</small></button>
           </div></section>
       </div>
       ${sheet ? `<div class="veil" data-veil="1">${sheet}</div>` : ''}`;
@@ -454,6 +476,8 @@
     if (a.startsWith('tabC:')) { state.tabC = a.slice(5); return render(); }
     if (a === 'act') return openWays(g.view());
     if (a === 'wait') return act('t');
+    if (a === 'h4') return act('h:4');
+    if (a === 'chart') return tapChart(e, t, g);
     if (a === 'news') return act('w');
     if (a === 'orders') { state.sheet = 'orders'; state.pick = null; return render(); }
     if (a === 'close') { if (state.sheet === 'tutorial') guard(() => localStorage.setItem(TUTORIAL_KEY, '1')); state.sheet = null; state.pick = null; return render(); }

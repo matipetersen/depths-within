@@ -60,7 +60,11 @@ def step_line(w) -> str:
     if run.acts_done >= len(acts):
         return "Every step ordered. What remains is not up to the sea."
     a = acts[run.acts_done]
+    from . import nav
     state = f"under way, {max(1, int(-(-run.work_left // 1)))} h more" if run.working is not None else "waiting for your order"
+    if run.working is None and not nav.at_site(w):
+        st = nav.site(w)
+        state = f"first sail to {st[2]}"
     return f"Step {run.acts_done + 1} of {len(acts)}: {a.label} ({state})"
 
 
