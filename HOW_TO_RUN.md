@@ -434,3 +434,6 @@ The touch version is a static page in `docs/` (with its manifest, icons and a sm
 4. Open it on a phone or tablet, hold the device sideways and tap **Begin patrol**. To install it: Chrome/Android -> menu -> *Install app* (or *Add to Home screen*); Safari/iOS -> Share -> *Add to Home Screen*. The icon is a periscope over a sonar scope.
 
 After changing the game, rebuild locally with `python tools/build_web.py` (writes `web/dread.html` and `docs/index.html`, the manifest and the service worker). The icons come from `python tools/make_icons.py`.
+
+## Python version
+Use **Python 3.12 or newer**. The JavaScript port (`web/engine.js`) reproduces CPython's random numbers and the compensated float `sum` of 3.12+, and `tests/test_web_parity.py` compares both line by line; on 3.11 one fuzzed patrol can differ in the last digit of a float.

@@ -75,7 +75,7 @@ def main():
         console = tcod.console.Console(SCREEN_W, SCREEN_H, order="F")
         last = time.time()
         running = True
-            show_compartments = False
+        show_compartments = False
         while running:
             now = time.time()
             # update contacts at ~4 Hz

@@ -104,7 +104,8 @@ def traffic_act(w, action: str):
         w.lose_hours(3.0)
         s.attention = clamp(s.attention + 0.02)
         seen = o["flag"] if not _eye_lies(w, o) else ("enemy" if o["flag"] == "neutral" else "neutral")
-        w.log.append(f"[{w.tick_no:03d}] Three hours on her quarter. She wears {'a neutral\'s stripes' if seen == 'neutral' else 'an enemy ensign'}.")
+        flag = "a neutral's stripes" if seen == "neutral" else "an enemy ensign"
+        w.log.append(f"[{w.tick_no:03d}] Three hours on her quarter. She wears {flag}.")
     elif action == "sink":
         n = min(2, s.torpedoes)
         if n == 0:
