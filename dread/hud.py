@@ -103,10 +103,12 @@ def instruments(w) -> List[str]:
     tubes = "  ".join(f"{i + 1}:{t}" for i, t in enumerate(wp["tubes"]))
     cells = "  ".join(f"{h['name'].replace(' torpedo room', ' tubes').replace(' quarters', ' berths')} {h['integrity'] * 100:.0f}%"
                       + ("!" if h["state"] != "sound" else "") for h in hull)
+    keel = n["keel"]
+    below = "no return from the sounder" if keel is None and not s.surfaced else f"{keel} m under the keel" if keel is not None else "on the surface"
     fixed = f"last fix {w.tick_no - s.last_fix} h ago" if s.last_fix else "no fix since the pier"
-    return ["INSTRUMENTS", f"  Position: within {n['err_nm']:.1f} nm of where we think ({fixed}).", "  " + where + f"  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
+    return ["INSTRUMENTS", f"  Position: within {n['err_nm']:.1f} nm of where we think ({fixed}).", "  " + where + f"  ({below})  Signature [{bar(n['noise'])}] {n['noise'] * 100:.0f}%", rng,
             "  Hull by compartment: " + cells,
-            f"  Torpedoes aboard {wp['stock']}.  Tubes {tubes}", "  " + eye]
+            f"  Torpedoes aboard {wp['stock']} ({', '.join(f'{k} {v}' for k, v in wp['types'].items())}); tubes hold {wp['loaded']}.  Tubes {tubes}", "  " + eye]
 
 
 _SAYS = ((0.25, "says he is fine"), (0.45, "says he is tired"), (0.65, "says it has been hard"),
@@ -148,6 +150,9 @@ def sonar(w) -> List[str]:
     cs = contacts(w)
     if s.sonar_on and not reports and not cs:
         out.append("  The sonar room has nothing to report.")
+    from .nav import lookout
+    for line in lookout(w):
+        out.append("  " + line)
     for c in cs:
         out.append(f"  {c['tag']}  bearing {c['bearing']:03d}  {c['range_nm']:.1f} nm  {c['label']}")
     return out

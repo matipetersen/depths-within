@@ -52,8 +52,9 @@ def honest_advice(w, title: str) -> str:
     fatigue = sum(c.fatigue for c in live) / n
     fear = sum(c.fear for c in live) / n
     if title == "chief engineer":
+        from .bathy import crush_depth
         if s.hull < 0.7:
-            return "She is hurt, sir. I would not ask more of her."
+            return f"She is hurt, sir. At this state I would not take her below {crush_depth(s.hull) - 30} metres."
         if s.battery < 0.3:
             return "We have to charge, sir, and soon."
         if s.spares < 0.3:

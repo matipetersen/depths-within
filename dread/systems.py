@@ -32,9 +32,30 @@ def role_error(w, role: str) -> float:
     return max(0.0, min(0.6, 1.2 * strain - 0.2))
 
 
+def seabed_here(w) -> int:
+    from .nav import true_xy
+    from .bathy import seabed
+    x, y = true_xy(w)
+    return seabed(x, y)
+
+
 def depth_m(w) -> int:
+    """How deep the boat really is: what was ordered, what it has slipped past, and never below the bottom."""
+    from .bathy import KEEL_MARGIN
     s = w.ship
-    return 0 if s.surfaced else DEPTHS[s.depth_order]
+    if s.surfaced:
+        return 0
+    if s.scope_up:
+        return 14
+    return min(DEPTHS[s.depth_order] + s.depth_extra, max(14, seabed_here(w) - KEEL_MARGIN))
+
+
+def under_keel(w):
+    """Metres of water below the keel, or None where the sounder returns nothing."""
+    s = w.ship
+    if s.surfaced or "bottomless" in s.flags:
+        return None
+    return max(0, seabed_here(w) - depth_m(w))
 
 
 def moving(w) -> bool:
@@ -95,6 +116,12 @@ def set_depth(w, level: str) -> str:
         return f"We are already at {DEPTHS[level]} metres."
     if system_state(w, "control room") == "dead":
         return "The planes are jammed. We stay where we are."
+    from .bathy import KEEL_MARGIN, crush_depth
+    sb = seabed_here(w)
+    if DEPTHS[level] > sb - KEEL_MARGIN - 6:
+        return f"There is not the water for it: the chart gives {sb} metres here."
+    if DEPTHS[level] >= crush_depth(s.hull):
+        return "She would not survive it. The hull is not what it was."
     s.scope_up = False if level != "shallow" else s.scope_up
     return _helm_order(w, "depth", level, f"Going to {DEPTHS[level]} metres.")
 
@@ -121,6 +148,11 @@ def damage_control(w, on: bool) -> str:
 def tick(w):
     s, live = w.ship, w.active_crew()
     t = w.tick_no
+    if s.dive_lag > 0 and s.surfaced:
+        s.dive_lag -= 1
+        if s.dive_lag == 0:
+            s.surfaced = False
+            w.log.append(f"[{t:03d}] The hatch is dogged at last. Diving.")
     if s.helm_pending is not None:
         s.helm_lag -= 1
         if s.helm_lag <= 0:
@@ -158,6 +190,28 @@ def tick(w):
         s.attention = clamp(s.attention + 0.003)
     # depth: pressure on the hull and on the men
     if not s.surfaced:
+        from .bathy import KEEL_MARGIN, crush_depth
+        sb = seabed_here(w)
+        if "sinking" in s.flags:
+            s.depth_extra = min(150, s.depth_extra + 15)             # the gauge keeps counting
+        elif s.depth_extra:
+            s.depth_extra = max(0, s.depth_extra - 10)
+        d = depth_m(w)
+        if s.depth_extra and DEPTHS[s.depth_order] + s.depth_extra > sb - KEEL_MARGIN and not s.scope_up:
+            s.hull = clamp(s.hull - 0.01)                           # the keel finds the bottom
+            s.noise = clamp(s.noise + 0.1)
+            if "grounded" not in s.flags:
+                s.flags.add("grounded")
+                w.log.append(f"[{t:03d}] The keel scrapes. There is a bottom after all, and we are on it.")
+        else:
+            s.flags.discard("grounded")
+        crush = crush_depth(s.hull)
+        if d >= crush:
+            s.hull = 0.0
+            w.log.append(f"[{t:03d}] The pressure hull gives at {d} metres. It is very quick, and nobody is left to be surprised.")
+        elif d > crush - 30 and w.rng.random() < 0.1:
+            s.hull = clamp(s.hull - 0.05)
+            w.log.append(f"[{t:03d}] A frame buckles with a sound like a gun. The hull is nearer its limit than the gauge says.")
         if s.depth_order == "deep":
             for c in live:
                 c.fear = clamp(c.fear + 0.0015)
@@ -180,3 +234,77 @@ def tick(w):
             s.spares = clamp(s.spares - 0.012)
             for c in live:
                 c.fatigue = clamp(c.fatigue + 0.003)
+
+
+# -- torpedoes: three kinds, each with a habit (DESIGN.md 16.2) ------------------------------------------
+TYPE_KN = {"steam": 44.0, "electric": 30.0, "acoustic": 24.0}        # run speed
+TYPE_BONUS = {"steam": 0.0, "electric": -0.05, "acoustic": 0.15}    # to the chance of hitting
+TYPE_TEXT = {"steam": "fast, and it leaves a wake the escorts can follow", "electric": "slow, quiet, and no wake",
+             "acoustic": "homes on noise; and not always on the right noise"}
+
+
+def spend_one(w) -> str:
+    """Take one fish out of the stock: the kind loaded, or the one most plentiful if it has run out."""
+    s = w.ship
+    t = s.torpedo_type
+    if s.types[t] <= 0:
+        t = max(s.types, key=lambda k: s.types[k])
+        w.log.append(f"[{w.tick_no:03d}] No more {s.torpedo_type} fish; the room loads {t}.")
+        s.torpedo_type = t
+    s.types[t] -= 1
+    s.torpedoes -= 1
+    return t
+
+
+def load_type(w, kind: str) -> str:
+    s = w.ship
+    if w.engagement is not None:
+        return "Not now. The room has no time to change fish."
+    if kind == s.torpedo_type:
+        return f"The tubes already hold {kind} torpedoes."
+    if s.types[kind] <= 0:
+        return f"There are no {kind} torpedoes aboard."
+    w.lose_hours(1.0)
+    s.torpedo_type = kind
+    s.tubes = ["loaded" if i < s.torpedoes else "empty" for i in range(6)]
+    return f"The torpedo room reloads the tubes with {kind} fish."
+
+
+def type_bonus(w) -> float:
+    return TYPE_BONUS[w.ship.shot_type]
+
+
+def fire_torpedoes(w, n: int):
+    """Fire from the bow tubes that are ready. Whatever the room is, whatever the fish is, has a price."""
+    from .nav import _rows
+    s = w.ship
+    room = role_error(w, "torpedo") if any(c.role == "torpedo" for c in w.active_crew()) else 0.6
+    kind = s.shot_type = s.torpedo_type
+    fired = 0
+    for i in range(usable_bow_tubes(w)):                  # a hurt bow room gives fewer tubes, a drowned one none
+        if fired < n and s.tubes[i] in ("open", "flooded") and s.torpedoes > 0:
+            if room > 0 and w.rng.random() < 0.5 * room:       # the tube does not answer
+                w.log.append(f"[{w.tick_no:03d}] Tube {i + 1} does not answer.")
+                s.flags.add("tube_fail")
+                w.flag_expiry["tube_fail"] = w.tick_no + 2
+                continue
+            s.tubes[i] = "empty"
+            spend_one(w)
+            fired += 1
+    if not fired:
+        return
+    if kind == "steam" and w.engagement is None and w.rng.random() < 0.35:
+        w.log.append(f"[{w.tick_no:03d}] The wakes run straight back to us. Her escorts have seen them.")
+        w.combat(0.4)
+    elif kind == "acoustic":
+        if any(not r[3] for r in _rows(w)) and w.rng.random() < 0.5:     # it listens, and something is making a sound that is not a ship
+            s.flags.add("torp_ghost")
+            w.flag_expiry["torp_ghost"] = w.tick_no + 2
+            w.log.append(f"[{w.tick_no:03d}] The torpedo turns from the target toward a sound nobody else can find.")
+        if w.rng.random() < 0.04 + 0.5 * max(0.0, s.noise - 0.12):
+            s.hull = clamp(s.hull - 0.12)
+            s.flags.add("torp_circular")
+            w.flag_expiry["torp_circular"] = w.tick_no + 2
+            for c in w.active_crew():
+                c.fear = clamp(c.fear + 0.08)
+            w.log.append(f"[{w.tick_no:03d}] A circular run. The fish comes round for the loudest thing it knows, which is us.")

@@ -23,6 +23,8 @@ def visibility(w) -> float:
         v *= 0.4
     if "fog" in w.ship.flags:
         v *= 0.25
+    if w.ship.surfaced:                                  # on the bridge, the lookouts' eyes are the boat's
+        v *= 1.2 - 0.6 * systems.role_error(w, "deck")
     return v
 
 
@@ -108,7 +110,8 @@ def traffic_act(w, action: str):
         if n == 0:
             w.log.append(f"[{w.tick_no:03d}] There is nothing left to fire.")
             return
-        s.torpedoes -= n
+        for _ in range(n):
+            systems.spend_one(w)
         s.noise = clamp(s.noise + 0.2)
         w.traffic.remove(o)
         if o["flag"] == "neutral" or o["kind"] == "fishing":

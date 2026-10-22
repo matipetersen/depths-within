@@ -153,6 +153,10 @@ def write_log(world):
     return people.write_log(world)
 
 
+def load_torpedoes(world, kind):
+    return _sys.load_type(world, kind)
+
+
 def take_fix(world):
     from . import sea
     return sea.take_fix(world)
@@ -170,7 +174,14 @@ def surface(world):
 
 
 def dive(world):
-    world.ship.surfaced = False
+    s = world.ship
+    if not s.surfaced:
+        return "We are not on the surface."
+    err = _sys.role_error(world, "deck")             # the deck gang dogs the hatch and clears the bridge
+    if err > 0 and world.rng.random() < err * 0.8:
+        s.dive_lag = 2
+        return "The hatch will not dog. We stay on the surface a while longer."
+    s.surfaced = False
     return "Diving."
 
 
@@ -235,5 +246,5 @@ ORDERS = {
     "grant_rest": grant_rest, "ration": ration, "hold_ritual": hold_ritual,
     "address_crew": address_crew, "scrub_air": scrub_air, "surface": surface, "dive": dive,
     "listen_radio": listen_radio, "call_council": call_council, "sick_call": sick_call, "write_log": write_log,
-    "take_fix": take_fix, "raise_periscope": raise_periscope, "lower_periscope": lower_periscope, "active_ping": active_ping, "silent_running": silent_running,
+    "load_torpedoes": load_torpedoes, "take_fix": take_fix, "raise_periscope": raise_periscope, "lower_periscope": lower_periscope, "active_ping": active_ping, "silent_running": silent_running,
 }

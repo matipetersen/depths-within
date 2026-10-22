@@ -369,3 +369,22 @@ def test_the_periscope_shows_fog_and_other_hulls_and_says_how_far_it_sees(browse
     assert page.locator("svg.eye .mist").count() == 1
     shown = page.inner_text("#app").lower()
     assert "neutral" not in shown and "enemy" not in shown       # nobody tells you her flag
+
+
+def test_the_keel_the_kinds_of_torpedo_and_the_lookout_are_on_screen(browser, page_file):
+    page = open_page(browser, page_file)
+    begin(page)
+    assert "under the keel" in page.inner_text(".gauges").lower()
+    page.locator("[data-a='tabL:tubes']").tap()
+    assert "loaded: steam" in page.inner_text(".wpn").lower() and "acoustic 2" in page.inner_text(".wpn").lower()
+    page.locator("[data-a=orders]").tap()
+    assert "load electric torpedoes" in page.inner_text(".sheet .body").lower()
+    page.locator("[data-a=close]").tap()
+    page.evaluate("""() => { const w = dreadDebug.state.game.w; w.tick_no = 2; w.ship.surfaced = true; w.ship.cohesion = 1;
+      for (const c of w.crew) if (c.role === 'deck') { c.candor = 1; c.trust = 1; }
+      const n = dreadDebug.Dread.navigation(w);
+      w.traffic.push({ id: 1, kind: 'merchant', flag: 'enemy', x: n.x + 5, y: n.y + 1, vx: 0, vy: 0, age: 0, life: 20 });
+      dreadDebug.state.tabC = 'men'; dreadDebug.render(); }""")
+    text = page.inner_text(".sonar:last-of-type").lower() + page.inner_text(".cols").lower()
+    assert "lookout" in text
+    assert "enemy" not in page.inner_text("#app").lower()

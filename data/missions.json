@@ -357,6 +357,14 @@
                 "value": 4.0
               },
               "why": "We are not where we think we are, and the rendezvous will not wait. Take a fix first."
+            },
+            {
+              "requires": {
+                "crew_where": {
+                  "role": "deck"
+                }
+              },
+              "why": "There is nobody to handle the lines and make the signals."
             }
           ]
         }

@@ -107,7 +107,7 @@ def _resolve(w):
                 s.hull = clamp(s.hull - 0.04)
                 w.log.append(f"[{w.tick_no:03d}] {man.name} opens the wrong valve. Water, cold, and a smell of the sea at the bottom of it.")
             elif kind == 1 and s.torpedoes > 0:
-                s.torpedoes -= 1
+                systems.spend_one(w)
                 s.noise = clamp(s.noise + 0.15)
                 p_hit = clamp(p_hit + 0.1, 0.0, 0.9)
                 w.log.append(f"[{w.tick_no:03d}] {man.name} fires a tube without orders. The whole boat hears it go.")

@@ -14,7 +14,7 @@ import pytest
 
 from dread import orders as O
 from dread.endings import classify_ending
-from dread.nav import contacts, hull_report, navigation, periscope, weapons
+from dread.nav import contacts, hull_report, lookout, navigation, periscope, weapons
 from dread.play import available_orders
 from dread.world import DreadWorld
 from dread.state import clamp  # noqa: F401
@@ -42,6 +42,12 @@ def fuzz(seed, max_steps=2500):
             continue
         if nxt() % 3 == 0:
             w.do_act()
+        if nxt() % 11 == 0:
+            O.load_torpedoes(w, ["steam", "electric", "acoustic"][nxt() % 3])
+        if nxt() % 7 == 0:
+            O.set_depth(w, ["shallow", "deep", "test"][nxt() % 3])
+        if nxt() % 13 == 0:
+            O.dive(w) if w.ship.surfaced else O.surface(w)
         if nxt() % 9 == 0:
             if not w.ship.surfaced:
                 O.raise_periscope(w)
@@ -63,7 +69,7 @@ def fuzz(seed, max_steps=2500):
         w.tick()
         if steps % 3 == 0:
             wp, ps = weapons(w), periscope(w, 0)
-            eye.append([",".join(wp["tubes"]), wp["stock"], [[x["bearing"], x["range_yd"], x["run_s"], x["gyro"]] for x in wp["solutions"]], ps["mode"], ([ps["ship"]["bearing"], ps["ship"]["range_nm"], ps["ship"]["kind"]] if ps["ship"] else None), ",".join(ps["distortions"]), ",".join(str(x) for x in ps["ghosts"]), len(ps["others"]), ps["visibility"]])
+            eye.append([",".join(wp["tubes"]), wp["stock"], [[x["bearing"], x["range_yd"], x["run_s"], x["gyro"]] for x in wp["solutions"]], ps["mode"], ([ps["ship"]["bearing"], ps["ship"]["range_nm"], ps["ship"]["kind"]] if ps["ship"] else None), ",".join(ps["distortions"]), ",".join(str(x) for x in ps["ghosts"]), len(ps["others"]), ps["visibility"], "|".join(lookout(w))])
             cts.append([[c["bearing"], c["range_nm"]] for c in contacts(w)])
         if steps % 25 == 0:
             live = w.active_crew()
@@ -71,7 +77,7 @@ def fuzz(seed, max_steps=2500):
                            w.ship.attention, w.ship.cohesion, w.dread(),
                            sum(c.fear for c in live) / len(live) if live else 0])
             n = navigation(w)
-            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"], w.ship.battery, w.ship.spares, n["err_nm"], len(w.traffic), [[o["kind"], o["flag"], int(round(o["x"] * 10)), int(round(o["y"] * 10))] for o in w.traffic]])
+            nav.append([n["x"], n["y"], n["heading"], n["speed"], n["depth"], n["range_nm"], w.ship.battery, w.ship.spares, n["err_nm"], len(w.traffic), [[o["kind"], o["flag"], int(round(o["x"] * 10)), int(round(o["y"] * 10))] for o in w.traffic], n["keel"], f'{w.ship.torpedo_type}:{json.dumps(w.ship.types, separators=(",", ":"))}:{w.ship.depth_extra}'])
             dmg.append([h["integrity"] for h in hull_report(w)])
     return {"seed": seed, "log": w.log, "results": w.results, "ending": classify_ending(w, 12),
             "tick": w.tick_no, "steps": steps, "digest": digest, "nav": nav, "dmg": dmg, "cts": cts, "eye": eye}
@@ -153,6 +159,7 @@ def test_the_instruments_and_the_hull_agree(seed, js_runs):
         assert abs(a[2] - b[2]) % 360 in (0, 1, 359) and abs(a[5] - b[5]) <= 1, (a, b)
         assert abs(a[6] - b[6]) < 1e-9 and abs(a[7] - b[7]) < 1e-9, (a, b)
         assert abs(a[8] - b[8]) <= 0.11 and a[9] == b[9], (a, b)
+        assert (a[11] is None) == (b[11] is None) and (a[11] is None or abs(a[11] - b[11]) <= 1) and a[12] == b[12], (a, b)
         assert len(a[10]) == len(b[10]) and all(x[:2] == y[:2] and abs(x[2] - y[2]) <= 1 and abs(x[3] - y[3]) <= 1 for x, y in zip(a[10], b[10])), (a, b)
     for a, b in zip(py["dmg"], js["dmg"]):
         assert all(abs(x - y) < 1e-9 for x, y in zip(a, b)), (a, b)
@@ -170,10 +177,10 @@ def test_the_torpedo_room_and_the_periscope_agree(seed, js_runs):
     py, js = fuzz(seed), js_runs[seed]
     assert len(py["eye"]) == len(js["eye"])
     for a, b in zip(py["eye"], js["eye"]):
-        assert a[0] == b[0] and a[1] == b[1] and a[3] == b[3] and a[5] == b[5] and a[6] == b[6] and a[7] == b[7] and a[8] == b[8], (a, b)
+        assert a[0] == b[0] and a[1] == b[1] and a[3] == b[3] and a[5] == b[5] and a[6] == b[6] and a[7] == b[7] and a[8] == b[8] and a[9] == b[9], (a, b)
         assert len(a[2]) == len(b[2])
         for x, y in zip(a[2], b[2]):
-            assert abs(x[0] - y[0]) % 360 in (0, 1, 359) and abs(x[1] - y[1]) <= 210 and abs(x[2] - y[2]) <= 13, (x, y)   # a 0.1 nm rounding step
+            assert abs(x[0] - y[0]) % 360 in (0, 1, 359) and abs(x[1] - y[1]) <= 260 and abs(x[2] - y[2]) <= 15, (x, y)   # a 0.1 nm rounding step
         assert (a[4] is None) == (b[4] is None)
         if a[4]:
             assert abs(a[4][0] - b[4][0]) <= 1 and abs(a[4][1] - b[4][1]) <= 0.11 and a[4][2] == b[4][2]

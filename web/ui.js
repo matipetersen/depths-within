@@ -139,7 +139,7 @@
     const nxt = N.next ? `${esc(N.next)} · ${N.range_nm} nm${N.eta_h ? ` · ${N.eta_h} h` : ''}` : 'On station';
     return `${chartSvg(v)}<div class="gauges">
       ${gauge('Heading', String(N.heading).padStart(3, '0'), '°')}${gauge('Speed', N.speed.toFixed(1), ' kn', `<span class="gk">ordered ${v.helm.speed}${v.helm.lag ? ' …' : ''}</span>`)}
-      ${gauge('Depth', N.depth, ' m')}${gauge('Grid', N.grid, '', `<span class="gk">within ${N.err_nm.toFixed(1)} nm</span>`)}
+      ${gauge('Depth', N.depth, ' m', `<span class="gk">${N.keel === null ? (v.surfaced ? 'on the surface' : 'no return from the sounder') : N.keel + ' m under the keel'}</span>`)}${gauge('Grid', N.grid, '', `<span class="gk">within ${N.err_nm.toFixed(1)} nm</span>`)}
       ${gauge('Signature', pct(N.noise), '%', `<span class="bar sm"><i style="width:${pct(N.noise)}%"></i></span>`)}
       <div class="gg wide"><span class="gk">Next</span><span class="gv sm">${nxt}</span></div></div>`;
   }
@@ -173,7 +173,7 @@
       : W.solutions.length ? `<table class="sol"><tr><th></th><th>Brg</th><th>Range</th><th>Run</th><th>Gyro</th></tr>${W.solutions.map((x) =>
         `<tr><td><b>${x.tag}</b></td><td>${String(x.bearing).padStart(3, '0')}°</td><td>${x.range_yd} yd</td><td>${mmss(x.run_s)}</td><td>${x.gyro > 0 ? '+' : ''}${x.gyro}°</td></tr>`).join('')}</table>`
         : '<p class="dim">No solution. Nothing on the scope.</p>';
-    return `<div class="wpn"><div class="gg wide"><span class="gk">Torpedoes aboard</span><span class="gv">${W.stock}<small> exact</small></span></div>
+    return `<div class="wpn"><div class="gg wide"><span class="gk">Torpedoes aboard</span><span class="gv">${W.stock}<small> exact · loaded: ${esc(W.loaded)}</small></span><span class="gk">${Object.entries(W.types).map(([k, n]) => `${k} ${n}`).join(' · ')}</span></div>
       <p class="smcaps">Tubes · as reported</p><div class="tubes">${tubes}</div>
       <p class="smcaps">Fire solutions · one per contact</p>${sols}
       <p class="note">The room reports what it sees. The stock is the ledger's.</p></div>`;
@@ -196,8 +196,9 @@
         `<span class="says">${esc(SAID[m.says] || m.says)}</span>${seen}</li>`;
     }).join('');
     const rep = v.sonar.reports.map((r) => `<p>${esc(r)}</p>`).join('') || (v.sonar.on ? '<p class="dim">The sonar room has nothing to report.</p>' : '');
+    const look = v.lookout.length ? `<div class="sonar"><b>LOOKOUT</b>${v.lookout.map((r) => `<p>${esc(r)}</p>`).join('')}</div>` : '';
     return `<ul class="men">${rows}</ul>
-      <div class="sonar ${v.sonar.on ? '' : 'off'}"><b>SONAR ${v.sonar.on ? 'ON' : 'OFF'}</b>${rep}</div>`;
+      <div class="sonar ${v.sonar.on ? '' : 'off'}"><b>SONAR ${v.sonar.on ? 'ON' : 'OFF'}</b>${rep}</div>${look}`;
   }
   const tabBtn = (key, id, label, cur) => `<button class="tab ${cur === id ? 'on' : ''}" data-a="${key}:${id}" aria-pressed="${cur === id}">${label}</button>`;
   function logView(v) {
@@ -321,6 +322,7 @@
   }
   const GROUPS = [
     ['Helm and navigation', /^(speed_|depth_|snorkel_|silent_running|normal_running|surface|dive|raise_periscope|lower_periscope|take_fix|active_ping)/],
+    ['Torpedoes', /^load_/],
     ['Sensors and radio', /^(silence_sonar|restore_sonar|listen_radio|verify_orders)/],
     ['The boat', /^(damage_control|scrub_air|force_compartment)/],
     ['The men', /^(cancel_rest|grant_rest|stand_down|hold_ritual|address_crew|rations|isolate|release|sick_call|call_council|write_log)/],

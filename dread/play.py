@@ -42,6 +42,10 @@ def _game_depth(game, meters: int, text: str) -> str:
     return text
 
 
+_TYPE_HINT = {"steam": "fast, and it leaves a wake the escorts can follow", "electric": "slow, quiet, no wake",
+              "acoustic": "homes on noise; and not always on the right noise"}
+
+
 def available_orders(w: DreadWorld, game=None) -> List[Item]:
     """``game``: when the HUD runs inside the real game, depth is the game's, not the story's."""
     s = w.ship
@@ -101,6 +105,9 @@ def available_orders(w: DreadWorld, game=None) -> List[Item]:
     items.append(Item("Call the officers", "an hour; they say what they say", lambda: O.call_council(w)))
     items.append(Item("Sick call", "the medic goes berth by berth", lambda: O.sick_call(w)))
     items.append(Item("Write the day's entry", "what you leave out, someone will read", lambda: O.write_log(w)))
+    for kind in ("steam", "electric", "acoustic"):
+        if kind != s.torpedo_type and s.types[kind] > 0 and not w.engagement:
+            items.append(Item(f"Load {kind} torpedoes ({s.types[kind]} aboard)", _TYPE_HINT[kind], (lambda kind=kind: O.load_torpedoes(w, kind))))
     items.append(Item("Take a fix", "periscope, stars or radio bearings; an hour", lambda: O.take_fix(w)))
     if w.run is not None and "verified" not in w.run.phase_fired:
         items.append(Item("Ask headquarters to confirm the orders", "an answer is not the same as a source",

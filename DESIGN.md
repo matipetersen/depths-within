@@ -760,3 +760,26 @@ La ambigüedad de los eventos tempranos se mantiene ≥ 85 % en las tres políti
 
 ## 15.6 Lo que queda
 El oficio de cubierta (`deck`) sigue sin efecto propio; el tiempo atmosférico se reduce a niebla y noche; no hay minas, cañón de cubierta ni tipos de torpedo. Todo lo demás de la auditoría §14 está construido.
+
+# 16. Profundidad, torpedos y cubierta
+
+## 16.1 El fondo y lo que aguanta el casco (`dread/bathy.py`, `dread/systems.py`)
+El descenso **no es infinito**, y antes tampoco lo era por poco: había tres niveles (60/120/180 m) pero ni fondo ni límite del casco. Ahora:
+- **Fondo marino.** Cada punto de la carta tiene una profundidad de agua (`seabed`): una plataforma de unos 65 m junto al puerto que cae hasta 300 m o más mar adentro. La profundidad real del barco es `min(ordenada + deriva, fondo − 8 m)`: nunca atraviesa el fondo. Una orden de profundidad que el agua no permite se rechaza ("no hay agua para eso: la carta da N metros"). En las aguas bajas del inicio solo se puede navegar a poca profundidad.
+- **Profundidad de colapso.** Depende del estado del casco: 300 m intacto, 100 m casi destruido (`crush_depth`). No se acepta una orden por debajo de ese límite ("no sobreviviría"); a menos de 30 m del límite los cuadernas crujen y se rompen (cada hora, probabilidad 10 %, −5 % de casco, lo que baja el límite); al alcanzarlo, el casco cede y es el final "perdidos con toda la dotación". Un golpe que daña el casco estando profundo acerca el límite de golpe. El jefe de máquinas lo dice con honestidad ("a este estado no la bajaría de N metros").
+- **El instrumento "bajo la quilla"** (sonda de eco) muestra los metros de agua que quedan; en superficie dice que no.
+- **Lo inquietante: la sonda que no devuelve nada** (`no_bottom`). A 120 m o más y con la presencia atenta, la sonda no responde y el medidor de profundidad sube solo (`sinking`: +15 m por hora hasta 150). Tres salidas: soplar todo y emerger (casco −4 %, miedo), revisar la sonda y mantener (horas, y sigue hundiéndose unas horas) o confiar en el medidor (sigue hundiéndose). Si el hundimiento lleva la quilla al fondo, raspa (daño y ruido); si lleva el casco a su límite, se aplasta. Mundano: una capa térmica y un medidor que se pega; inquietante: *aquí no hay fondo y la carta es una cortesía*.
+
+## 16.2 Tres clases de torpedo (`dread/systems.py`)
+Existencias por clase (vapor 6, eléctrico 4, acústico 2; el total sigue siendo el del ledger). Cargar otra clase en los tubos cuesta una hora de la ventana. Cada una tiene su hábito:
+- **Vapor:** rápido (44 nudos de carrera) y deja estela; con 35 % de probabilidad los escoltas la siguen y se abre un ataque (gravedad 0,4).
+- **Eléctrico:** lento (30 nudos), silencioso, sin estela; resta 0,05 a la probabilidad de acierto.
+- **Acústico:** busca el ruido (24 nudos, +0,15 al acierto). **Si hay ecos falsos reportados puede ir tras uno que no existe** (50 %; acierto −0,6) y **si el barco es ruidoso puede volver contra nosotros** (4 % + 50 % del ruido por encima de 0,12; −12 % de casco, miedo; acierto −0,3).
+- La clase que *empezó* la salva decide el bono aunque se acabe a medio disparo (el cuarto de torpedos carga entonces la más abundante).
+- La solución de tiro, la carrera y la carga actual se ven en la pestaña de torpedos; las existencias por clase son del ledger (exactas).
+
+## 16.3 El oficio de cubierta (`dread/nav.py`, `dread/orders.py`)
+- **Vigía.** En superficie, el hombre de cubierta informa lo que ve (buque, pesquero, humo de convoy) con rumbo en palabras y millas aproximadas, filtrado por candor y confianza. Un vigía asustado **también ve lo que no hay** ("una vela por la aleta"); si nadie está de guardia, el puente queda sin informe.
+- **Visibilidad desde el puente:** los vigías descansados la amplían (×1,2) y los agotados la reducen (hasta ×0,84).
+- **Escotilla.** Zambullirse lo hace la dotación de cubierta; asustada, agotada o inexistente, la escotilla no cierra y el barco se queda dos horas más en superficie.
+- **Encuentro.** El paso "hacer el encuentro" de la misión 4 exige un hombre de cubierta para las amarras y las señales.

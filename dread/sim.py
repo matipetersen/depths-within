@@ -150,6 +150,11 @@ def _machinery(policy: str, w: DreadWorld, fatigue: float):
         if not up:
             O.lower_periscope(w)
         _settle(policy, w)
+    run = w.run
+    if run is not None and run.mission.kind == "destroy" and run.acts_done == 0 and run.working is None and not w.engagement:
+        want = {"mission_first": "acoustic", "crew_first": "electric", "paranoid": "steam"}.get(policy)
+        if want and s.torpedo_type != want and s.types[want] > 0:        # each captain trusts a different fish
+            O.load_torpedoes(w, want)
     if s.hull < 0.7 and s.spares > 0.2 and not s.dc_active:
         O.damage_control(w, True)
     want = {"mission_first": "flank" if s.battery > 0.5 and fatigue < 0.7 else "standard",

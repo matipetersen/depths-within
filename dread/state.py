@@ -115,10 +115,15 @@ class Ship:
     stand_down: bool = False   # all hands but a skeleton watch rest; the presence is fed by sleepers
     hours_submerged: int = 0
     torpedoes: int = 12       # aboard, tubes included (exact)
+    types: Dict[str, int] = field(default_factory=lambda: {"steam": 6, "electric": 4, "acoustic": 2})
+    torpedo_type: str = "steam"   # what the tubes are loaded with
+    shot_type: str = "steam"      # what the last salvo began with (the room may have run out partway)
     tubes: List[str] = field(default_factory=lambda: ["loaded"] * 6)   # 1-4 bow, 5-6 stern: empty|loaded|flooded|open
     scope_up: bool = False
     speed_order: str = "standard"      # slow | standard | flank
     depth_order: str = "shallow"       # shallow 60 m | deep 120 m | test 180 m
+    dive_lag: int = 0                  # hours the hatch takes to dog before she can dive
+    depth_extra: int = 0               # metres the boat has gone beyond what was ordered (a sounder that returns nothing)
     battery: float = 1.0
     snorkel: bool = False
     spares: float = 1.0                # what damage control mends with

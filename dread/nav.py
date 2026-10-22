@@ -95,12 +95,12 @@ def navigation(w) -> Dict:
         speed = 0.0
     if s.silent_running and not s.surfaced:
         speed = min(speed, 3.0)
-    depth = 0 if s.surfaced else 14 if s.scope_up else systems.DEPTHS[s.depth_order]
+    depth = systems.depth_m(w)
     return {
         "x": round(est[0], 1), "y": round(est[1], 1), "grid": grid_ref(*est), "heading": heading, "err_nm": round(s.dr_error, 1),
         "speed": round(speed, 1), "depth": depth, "range_nm": round(rng_nm), "next": nxt,
         "eta_h": (max(1, int(-(-run.work_left // 1))) if run is not None and run.working is not None else None),
-        "noise": s.noise,
+        "noise": s.noise, "keel": systems.under_keel(w),
     }
 
 
@@ -221,7 +221,7 @@ def weapons(w) -> Dict:
     crew = _torpedo_room(w)
     stock = s.torpedoes
     if not crew:
-        return {"stock": stock, "manned": False, "tubes": ["no report"] * 6, "solutions": []}
+        return {"stock": stock, "manned": False, "tubes": ["no report"] * 6, "solutions": [], "types": dict(s.types), "loaded": s.torpedo_type}
     p = _room_error(crew)
     look = random.Random(w.tick_no * 2711 + 3)
     tubes = []
@@ -237,9 +237,9 @@ def weapons(w) -> Dict:
         brg = int(round(c["bearing"] + (jb - 0.5) * 2 * p * 20)) % 360
         rng_nm = c["range_nm"] * (1 + (jr - 0.5) * p * 0.6)
         sols.append({"tag": c["tag"], "bearing": brg, "range_yd": int(round(rng_nm * YARDS_PER_NM, -1)),
-                     "run_s": int(round(rng_nm / TORPEDO_KNOTS * 3600)),
+                     "run_s": int(round(rng_nm / systems.TYPE_KN[s.torpedo_type] * 3600)),
                      "gyro": ((brg - nv["heading"] + 540) % 360) - 180})
-    return {"stock": stock, "manned": True, "tubes": tubes, "solutions": sols}
+    return {"stock": stock, "manned": True, "tubes": tubes, "solutions": sols, "types": dict(s.types), "loaded": s.torpedo_type}
 
 
 def periscope(w, train: int = 0) -> Dict:
@@ -295,3 +295,50 @@ def periscope(w, train: int = 0) -> Dict:
                            "in_field": abs(rel) <= FIELD_DEG // 2})
     return {"mode": mode, "train": train, "centre": centre, "ship": ship, "distortions": kinds, "ghosts": ghosts,
             "others": others, "visibility": vis}
+
+
+# -- the lookout (DESIGN.md 16.3) ------------------------------------------------------------------------
+def lookout(w) -> List[str]:
+    """What the deck men report from the bridge. A rested man sees what is there; a frightened one also sees what is not."""
+    from . import sea
+    s = w.ship
+    if not s.surfaced:
+        return []
+    deck = [c for c in w.active_crew() if c.role == "deck"]
+    if not deck:
+        return ["Nobody is posted on the bridge."]
+    man = deck[0]
+    look = random.Random(w.tick_no * 5233 + 19)
+    candor = max(0.0, min(1.0, man.candor * man.trust * (0.6 + 0.4 * s.cohesion)))
+    heading = _where(w)[1]
+    me = true_xy(w)
+    vis = sea.visibility(w)
+    seen = []
+    run = w.run
+    tgt = run.mission.chart.get("target") if run is not None and run.outcome is None else None
+    if tgt and run.acts_done >= 1:
+        dist = math.hypot(tgt[0] - me[0], tgt[1] - me[1]) * 0.9
+        if dist <= vis:
+            kind = {"capital": "warship", "convoy": "smudge of smoke, several ships", "steamer": "steamer"}.get(run.mission.chart.get("sight", {}).get("kind"), "steamer")
+            seen.append((_bearing(me, tgt), dist, kind))
+    for o in w.traffic:
+        dist = math.hypot(o["x"] - me[0], o["y"] - me[1]) * 0.9
+        if dist <= vis:
+            seen.append((_bearing(me, (o["x"], o["y"])), dist, "steamer" if o["kind"] == "merchant" else "fishing boat"))
+    lines = []
+    for brg, dist, kind in seen:
+        if look.random() < candor:
+            lines.append(_sighting(man.name, kind, ((brg - heading + 540) % 360) - 180, dist))
+    if look.random() < systems.role_error(w, "deck") * 0.6:                  # he sees what is not there
+        brg = int(look.random() * 360)
+        lines.append(_sighting(man.name, "sail", ((brg - heading + 540) % 360) - 180, 4 + (brg % 5)))
+    return lines
+
+
+def _sighting(name: str, kind: str, rel: int, dist: float) -> str:
+    a = abs(rel)
+    where = "dead ahead" if a < 20 else ("on the starboard bow" if rel > 0 else "on the port bow") if a < 60 \
+        else ("on the starboard beam" if rel > 0 else "on the port beam") if a < 120 \
+        else ("on the starboard quarter" if rel > 0 else "on the port quarter") if a < 160 else "astern"
+    n = max(1, int(round(dist)))
+    return f'{name}, lookout: a {kind} {where}, about {n} mile{"s" if n > 1 else ""}.'

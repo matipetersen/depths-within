@@ -101,6 +101,10 @@ class DreadWorld:
         return float(sea.traffic_near(self))
 
     @property
+    def type_bonus(self) -> float:
+        return systems.type_bonus(self)
+
+    @property
     def depth_m(self) -> int:
         return systems.depth_m(self)
 

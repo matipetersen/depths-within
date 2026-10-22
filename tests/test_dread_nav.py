@@ -44,7 +44,7 @@ def test_the_boat_reaches_each_waypoint_when_its_step_is_done():
 
 
 def test_speed_and_depth_follow_what_the_boat_is_doing():
-    w = DreadWorld(seed=3)
+    w = _offshore(DreadWorld(seed=3))
     assert navigation(w)["speed"] < 3.0 and navigation(w)["depth"] == 60
     O.set_depth(w, "deep")
     assert navigation(w)["depth"] == 120
@@ -187,6 +187,15 @@ def test_with_the_sonar_off_the_scope_is_dark_but_the_radar_works_on_the_surface
 
 # ---- torpedoes and the periscope ---------------------------------------------------------------------
 
+def _offshore(w):
+    """Put the boat in deep water: at the pier there is hardly any (DESIGN.md 16.1)."""
+    ch = w.run.mission.chart
+    ch["from"] = [40, 50, "offshore"]
+    ch["points"] = [[41, 50, "offshore"]] * len(ch["points"])
+    w.run.acts_done = 1
+    return w
+
+
 def _at_the_firing_point(seed=3):
     w = DreadWorld(seed=seed)
     w.run.acts_done = 2
@@ -276,7 +285,7 @@ def test_every_contact_gets_a_solution_the_false_ones_too():
 
 def test_the_periscope_is_housed_until_raised_and_raising_it_has_a_price():
     from dread.nav import periscope
-    w = DreadWorld(seed=3)
+    w = _offshore(DreadWorld(seed=3))
     assert periscope(w)["mode"] == "down" and navigation(w)["depth"] == 60
     before = w.ship.attention
     O.raise_periscope(w)

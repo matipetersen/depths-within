@@ -262,24 +262,22 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "engage_order":
             from . import combat
             combat.order(world, fx["order"])
+        elif op == "emergency_surface":
+            ship.surfaced = True
+            ship.scope_up = False
+            ship.depth_extra = 0
+            ship.flags.discard("sinking")
+            ship.hull = clamp(ship.hull - 0.04)
+            for c in world.active_crew():
+                c.fear = clamp(c.fear + 0.06)
+            world.log.append(f"[{world.tick_no:03d}] Everything blown. The boat climbs like something thrown, and breaks the surface in a wash of white.")
         elif op == "tubes":
             for i in range(4):                                   # the bow tubes: state changes only where a fish is loaded
                 if ship.tubes[i] != "empty":
                     ship.tubes[i] = fx["state"]
         elif op == "fire":
-            room = _room_p(world)
-            n = 0
-            from .systems import usable_bow_tubes
-            for i in range(usable_bow_tubes(world)):                 # a hurt bow room gives fewer tubes, a drowned one none
-                if n < fx["n"] and ship.tubes[i] in ("open", "flooded") and ship.torpedoes > 0:
-                    if room > 0 and world.rng.random() < 0.5 * room:      # the tube does not answer
-                        world.log.append(f"[{world.tick_no:03d}] Tube {i + 1} does not answer.")
-                        ship.flags.add("tube_fail")
-                        world.flag_expiry["tube_fail"] = world.tick_no + 2
-                        continue
-                    ship.tubes[i] = "empty"
-                    ship.torpedoes -= 1
-                    n += 1
+            from .systems import fire_torpedoes
+            fire_torpedoes(world, fx["n"])
         elif op == "log_entry":
             k = fx["kind"]
             setattr(ship, f"log_{k}", getattr(ship, f"log_{k}") + 1)

@@ -7,6 +7,15 @@ from dread.state import COMPARTMENTS
 from dread.world import DreadWorld
 
 
+def _offshore(w):
+    """Put the boat in deep water: at the pier there is hardly any (DESIGN.md 16.1)."""
+    ch = w.run.mission.chart
+    ch["from"] = [40, 50, "offshore"]
+    ch["points"] = [[41, 50, "offshore"]] * len(ch["points"])
+    w.run.acts_done = 1
+    return w
+
+
 def _w(seed=3):
     w = DreadWorld(seed=seed)
     for c in w.crew:
@@ -100,7 +109,7 @@ def test_flat_batteries_stop_the_boat_and_the_dark_frightens_the_men():
 
 
 def test_depth_hides_the_boat_but_the_hull_and_the_men_pay():
-    w = _w()
+    w = _offshore(_w())
     f = sum(c.fear for c in w.crew)
     O.set_depth(w, "test")
     w.tick()

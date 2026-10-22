@@ -2261,7 +2261,9 @@
                 "m1_patient": 0.15,
                 "m1_rush": -0.05,
                 "m1_lost_target": -0.45,
-                "tube_fail": -0.15
+                "tube_fail": -0.15,
+                "torp_ghost": -0.6,
+                "torp_circular": -0.3
               },
               "then": [
                 {
@@ -2309,6 +2311,11 @@
                 {
                   "path": "world.solution_error",
                   "k": -0.6,
+                  "ref": 0.0
+                },
+                {
+                  "path": "world.type_bonus",
+                  "k": 1.0,
                   "ref": 0.0
                 }
               ]
@@ -5474,6 +5481,112 @@
           "text": "The meat went off in an hour.",
           "intensity": 0.5,
           "seed": "all"
+        }
+      ]
+    },
+    {
+      "id": "no_bottom",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.35
+          }
+        ]
+      },
+      "text": "The echo sounder returns nothing. Not a weak echo: nothing. The chart says two hundred metres of water. The gauge, which you ordered to hold, says a little more at every glance.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "A sounder fouled by a thermal layer, and a depth gauge that sticks and slips.",
+      "uncanny_cause": "There is no bottom here. There never was; the chart is a courtesy.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "bottomless",
+          "ttl": 14
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.06
+        }
+      ],
+      "choices": [
+        {
+          "key": "blow",
+          "text": "Blow everything. Surface now.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "The hull takes a blow, and so do the men's nerves.",
+          "effects": [
+            {
+              "op": "emergency_surface"
+            }
+          ]
+        },
+        {
+          "key": "check",
+          "text": "Have the sounder stripped and checked, and hold what you have.",
+          "tags": [
+            "verify",
+            "paranoid"
+          ],
+          "cost": "Hours, and the gauge keeps counting.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "flag",
+              "name": "sinking",
+              "ttl": 3
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "hold",
+          "text": "Hold depth. Trust the gauge, not the sounder.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "She goes on sinking, and you will not know why until she stops.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "sinking",
+              "ttl": 6
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
         }
       ]
     }
