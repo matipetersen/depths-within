@@ -9,6 +9,16 @@ python main.py
 
 The game will start with the hotkey system enabled. You'll see the quick reference automatically.
 
+## The Captain's Bridge (the horror/story layer)
+
+Inside the window press **TAB** for the captain's bridge: an exact ledger, the men (what they
+say vs. what you can see), the sonar room, the log and the orders menu. Type an order number and
+press **ENTER**; **ENTER/SPACE** waits an hour, **W** waits for news. Decisions stop the clock:
+answer with their number. See `DESIGN.md` section 12.5.
+
+Without a window: `python tools/dread_preview.py out_dir` saves PNG screenshots of a scripted patrol,
+and `python -m dread.play` plays the same layer in a plain terminal.
+
 ## First Time Playing
 
 ### Basic Commands
@@ -413,3 +423,14 @@ A: Type `h` for hotkey help, `crew help` for crew commands, or see guides in GUI
 **Happy hunting! Command your submarine wisely.**
 
 *For detailed information about specific systems, see the comprehensive guides in the project directory.*
+
+## Play it in the browser (GitHub Pages) and install it as an app
+
+The touch version is a single static page in `docs/` (with its manifest, icons and a small service worker so it also works offline).
+
+1. In the repository: **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
+2. Pick the branch that holds `docs/` (today `design/dread-core`; `main` once it is merged) and the folder **`/docs`** (or **`/ (root)`**: the root `index.html` sends visitors to `docs/`).
+3. After a minute the game is at `https://<user>.github.io/depths-within/` (for this repository: https://matipetersen.github.io/depths-within/).
+4. Open it on a phone or tablet, hold the device sideways and tap **Begin patrol**. To install it: Chrome/Android → menu → *Install app* (or *Add to Home screen*); Safari/iOS → Share → *Add to Home Screen*. The icon is a periscope over a sonar scope.
+
+After changing the game, rebuild with `python tools/build_web.py` (writes `web/dread.html` and `docs/index.html`, the manifest and the service worker). The icons come from `python tools/make_icons.py`.

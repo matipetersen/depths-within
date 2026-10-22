@@ -51,10 +51,13 @@ class TestTilesheetManager:
         
         # Test known tiles
         if manager.atlas:
-            # These are defined in our new atlas.json
-            assert manager.get_tile_code('sonar_ping') == 0
-            assert manager.get_tile_code('sub_silhouette') == 1
-            assert manager.get_tile_code('ship_silhouette') == 2
+            # Codes come from atlas.json; assert the lookup agrees with the atlas
+            # instead of hardcoding numbers that change whenever tiles are added.
+            mapping = manager.atlas['map']
+            for name in ('sonar_ping', 'sonar_active', 'sonar_passive'):
+                assert name in mapping
+                assert manager.get_tile_code(name) == mapping[name]
+            assert manager.get_tile_code('no_such_tile') is None
     
     def test_list_tiles_by_prefix(self):
         manager = TilesheetManager()

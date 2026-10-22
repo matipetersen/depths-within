@@ -40,6 +40,9 @@ class Decision:
     description: str
     options: List[DecisionOption]
     source: str = "event"  # 'event', 'crew', 'mission'
+    # Called with the chosen option key once resolved (used by dread/bridge.py
+    # so a choice actually changes the simulation state).
+    on_resolve: Optional[Callable[[str], None]] = None
 
 class DecisionManager:
     """Manages the generation and resolution of decisions."""
@@ -168,6 +171,8 @@ class DecisionManager:
             result_msg = option.failure_message
             # Apply failure effects (could be double stress, damage, etc)
             
+        if decision.on_resolve is not None:
+            decision.on_resolve(option_key)
         self.pending_decision = None
         return result_msg
 

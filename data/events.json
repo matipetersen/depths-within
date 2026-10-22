@@ -1,0 +1,5774 @@
+{
+  "_comment": "Event table. Schema and rules: DESIGN.md section 6. Every event MUST carry mundane_cause and uncanny_cause. Players never see either; the debrief and simulator do.",
+  "events": [
+    {
+      "id": "destroyer_run_1",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "schedule": [
+        14
+      ],
+      "text": "Screws overhead. A destroyer is working the sector.",
+      "mundane_when": {},
+      "mundane_cause": "A real escort sweeping the lane.",
+      "uncanny_cause": "None needed. The war is the clock.",
+      "effects": [
+        {
+          "op": "combat",
+          "severity": 0.35
+        }
+      ]
+    },
+    {
+      "id": "destroyer_run_2",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "schedule": [
+        38
+      ],
+      "text": "Pings on the hull. Then the first charges, far off, then not far.",
+      "mundane_when": {},
+      "mundane_cause": "A real hunter-killer group.",
+      "uncanny_cause": "None needed.",
+      "effects": [
+        {
+          "op": "combat",
+          "severity": 0.45
+        }
+      ]
+    },
+    {
+      "id": "destroyer_run_3",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "schedule": [
+        60
+      ],
+      "text": "Two escorts, crossing and recrossing. The hull screams at every pattern.",
+      "mundane_when": {},
+      "mundane_cause": "A real escort screen over the convoy route.",
+      "uncanny_cause": "None needed.",
+      "effects": [
+        {
+          "op": "combat",
+          "severity": 0.55
+        }
+      ]
+    },
+    {
+      "id": "hull_groans",
+      "acts": [
+        1,
+        2
+      ],
+      "weight": 1.5,
+      "cooldown": 10,
+      "requires": {
+        "path": "ship.hours_submerged",
+        "op": ">=",
+        "value": 6
+      },
+      "text": "The hull groans, long and low, like something shifting its weight.",
+      "mundane_when": {},
+      "mundane_cause": "Thermal contraction and pressure on the frames.",
+      "uncanny_cause": "Something is leaning on the boat.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        }
+      ]
+    },
+    {
+      "id": "food_spoils",
+      "acts": [
+        1,
+        2
+      ],
+      "cooldown": 20,
+      "requires": {
+        "path": "ship.hours_submerged",
+        "op": ">=",
+        "value": 18
+      },
+      "text": "The cook condemns a crate of bread. Green fur, and a smell that gets in the clothes.",
+      "mundane_when": {},
+      "mundane_cause": "Humidity. It happens on every long patrol.",
+      "uncanny_cause": "It rotted too fast to be only humidity.",
+      "effects": [
+        {
+          "op": "routine",
+          "item": "meals",
+          "value": -0.15
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.01
+        }
+      ]
+    },
+    {
+      "id": "clock_slow",
+      "acts": [
+        1,
+        2
+      ],
+      "once": true,
+      "requires": {
+        "path": "ship.hours_submerged",
+        "op": ">=",
+        "value": 12
+      },
+      "text": "The control room clock is eleven minutes behind the chronometer. Nobody touched either.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.2
+      },
+      "mundane_cause": "A tired watch misread or mis-set it. Sleep-deprived people lose minutes.",
+      "uncanny_cause": "Time is thinning around the boat.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        },
+        {
+          "op": "flag",
+          "name": "clock_drift"
+        }
+      ],
+      "choices": [
+        {
+          "key": "reset",
+          "text": "Reset it and log the discrepancy.",
+          "tags": [
+            "care",
+            "mission"
+          ],
+          "cost": "A little time and attention.",
+          "effects": [
+            {
+              "op": "routine",
+              "item": "watches",
+              "value": 0.1
+            },
+            {
+              "op": "time",
+              "value": 0.01
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Say nothing; the chronometer is what counts.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "The crew notices the captain noticing nothing.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.01
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "echo_follows",
+      "acts": [
+        1,
+        2
+      ],
+      "cooldown": 18,
+      "requires": {
+        "crew_where": {
+          "role": "sonar",
+          "stat": "fatigue",
+          "op": ">=",
+          "value": 0.2
+        }
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fatigue",
+        "role": "sonar"
+      },
+      "text": "{target} swears the hydrophone has an echo that keeps pace with us, then slows. Nobody else hears it.",
+      "mundane_when": {
+        "path": "ship.noise",
+        "op": ">=",
+        "value": 0.08
+      },
+      "mundane_cause": "Our own screws echoing off a thermocline layer.",
+      "uncanny_cause": "Something is matching our speed against the current.",
+      "effects": [
+        {
+          "op": "phantom",
+          "kind": "echo",
+          "audible": "target",
+          "intensity": 0.35
+        }
+      ],
+      "choices": [
+        {
+          "key": "listen",
+          "text": "Keep him on the headphones and report every change.",
+          "tags": [
+            "mission",
+            "listen"
+          ],
+          "cost": "He tires, and listening feeds whatever is there.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fatigue",
+              "value": 0.06
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "relieve",
+          "text": "Relieve him and put a fresh man on the set.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Time, and a less skilled ear.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fatigue",
+              "value": -0.12
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "time",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "silence",
+          "text": "Cut the hydrophones. We run deaf for a while.",
+          "tags": [
+            "silence"
+          ],
+          "cost": "A real contact could walk up on us.",
+          "effects": [
+            {
+              "op": "set",
+              "stat": "sonar_on",
+              "value": false
+            },
+            {
+              "op": "mute_phantoms"
+            },
+            {
+              "op": "flag",
+              "name": "phantom_dismissed"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "voice_names_you",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 14,
+      "requires": {
+        "all": [
+          {
+            "phantom": "echo"
+          },
+          {
+            "crew_where": {
+              "role": "sonar",
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.2
+            }
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fear",
+        "role": "sonar"
+      },
+      "text": "Through the headphones, a voice. {target} takes them off, white-faced. It said his name, and it used his mother's accent.",
+      "mundane_when": {
+        "crew_where": {
+          "role": "sonar",
+          "stat": "fatigue",
+          "op": ">=",
+          "value": 0.4
+        }
+      },
+      "mundane_cause": "Auditory pareidolia in a sleepless operator; distant radio bleed.",
+      "uncanny_cause": "It has learned his name.",
+      "effects": [
+        {
+          "op": "phantom",
+          "kind": "voice",
+          "audible": "target",
+          "intensity": 0.5
+        },
+        {
+          "op": "crew",
+          "who": "target",
+          "stat": "fear",
+          "value": 0.15
+        }
+      ],
+      "choices": [
+        {
+          "key": "log",
+          "text": "Order him to write down every word it says.",
+          "tags": [
+            "mission",
+            "listen"
+          ],
+          "cost": "He keeps listening. So does it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            },
+            {
+              "op": "rumor",
+              "id": "voices",
+              "text": "The sonar is talking to people.",
+              "intensity": 0.5,
+              "seed": "target",
+              "drift": {
+                "trust": -0.001
+              }
+            }
+          ]
+        },
+        {
+          "key": "pull",
+          "text": "Pull him off the set and put him to bed.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Time lost; a rumor starts anyway.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fatigue",
+              "value": -0.1
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": 0.04
+            },
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "rumor",
+              "id": "voices",
+              "text": "The sonar is talking to people.",
+              "intensity": 0.3,
+              "seed": "target"
+            }
+          ]
+        },
+        {
+          "key": "silence",
+          "text": "Silence the sonar room.",
+          "tags": [
+            "silence"
+          ],
+          "cost": "Deaf to a real contact; the crew knows you hid it.",
+          "effects": [
+            {
+              "op": "set",
+              "stat": "sonar_on",
+              "value": false
+            },
+            {
+              "op": "mute_phantoms"
+            },
+            {
+              "op": "flag",
+              "name": "phantom_dismissed"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "false_alarm",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 16,
+      "requires": {
+        "all": [
+          {
+            "phantom": "echo"
+          },
+          {
+            "crew_where": {
+              "role": "sonar",
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.4
+            }
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fear",
+        "role": "sonar"
+      },
+      "text": "{target} reports a hard contact, bearing 270, closing. The boat scrambles to action stations. The plot shows nothing.",
+      "mundane_when": {
+        "crew_where": {
+          "role": "sonar",
+          "stat": "fatigue",
+          "op": ">=",
+          "value": 0.4
+        }
+      },
+      "mundane_cause": "A frightened, exhausted operator misread a layer return.",
+      "uncanny_cause": "It wanted us loud.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "noise",
+          "value": 0.25
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fatigue",
+          "value": 0.05
+        }
+      ],
+      "choices": [
+        {
+          "key": "stand_down",
+          "text": "Stand down. Take the contact as an error and say so.",
+          "tags": [
+            "care"
+          ],
+          "cost": "If it was real, you were wrong in front of everyone.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.1
+            }
+          ]
+        },
+        {
+          "key": "hold",
+          "text": "Hold quarters another ten minutes, sharp.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "More noise and more exhausted men.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.04
+            },
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bunk_still_warm",
+      "acts": [
+        2
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "dread",
+            "op": ">=",
+            "value": 0.2
+          },
+          {
+            "no_flag": "sailor_missing"
+          },
+          {
+            "path": "crew.count",
+            "op": ">=",
+            "value": 8
+          }
+        ]
+      },
+      "target": {
+        "select": "random"
+      },
+      "text": "{target} is gone. His bunk is still warm. The hatches are dogged from inside, and nobody saw him leave.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.45
+      },
+      "mundane_cause": "A fatigue accident in the bilges, or a man hiding to sleep, or a quiet suicide.",
+      "uncanny_cause": "It took him from the dark between shifts.",
+      "effects": [
+        {
+          "op": "vanish",
+          "who": "target"
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.1
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "guilt",
+          "value": 0.05
+        },
+        {
+          "op": "rumor",
+          "id": "warm_bunk",
+          "text": "He didn't leave. He was taken.",
+          "intensity": 0.6,
+          "seed": "random",
+          "drift": {
+            "fear": 0.002
+          }
+        }
+      ],
+      "choices": [
+        {
+          "key": "search",
+          "text": "Search the boat, stem to stern, in pairs.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Hours of the patrol.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.04
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.04
+            }
+          ]
+        },
+        {
+          "key": "accident",
+          "text": "Log it as a man overboard on deck watch.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "A lie in the logbook; some will know.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "flag",
+              "name": "logbook_edited"
+            }
+          ]
+        },
+        {
+          "key": "lock",
+          "text": "Lock every compartment; nobody moves alone.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Order for fear. The boat feels like a cell.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.08
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.03
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "same_dead_man",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "flag": "sailor_missing"
+      },
+      "text": "Two men swear they saw the missing sailor — one at the tube room, one in the galley, the same hour.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.5
+      },
+      "mundane_cause": "Exhausted men fusing the same expected face into the dark.",
+      "uncanny_cause": "It is wearing him.",
+      "effects": [
+        {
+          "op": "rumor",
+          "id": "dead_seen",
+          "text": "The missing man is still walking the boat.",
+          "intensity": 0.6,
+          "seed": "random"
+        },
+        {
+          "op": "rumor",
+          "id": "dead_seen",
+          "text": "",
+          "intensity": 0.6,
+          "seed": "random"
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.05
+        }
+      ],
+      "choices": [
+        {
+          "key": "address",
+          "text": "Speak to the crew: he is lost, not haunting us.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It costs authority if you've lost their trust.",
+          "effects": [
+            {
+              "op": "rumor_intensity",
+              "id": "dead_seen",
+              "value": -0.3
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "silence",
+          "text": "Forbid the subject. Any talk is insubordination.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Talk goes underground.",
+          "effects": [
+            {
+              "op": "rumor_intensity",
+              "id": "dead_seen",
+              "value": -0.15
+            },
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            }
+          ]
+        },
+        {
+          "key": "listen",
+          "text": "Hear them out, separately, one at a time.",
+          "tags": [
+            "mission",
+            "listen"
+          ],
+          "cost": "Time, and you now carry their stories.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.04
+            },
+            {
+              "op": "rumor_intensity",
+              "id": "dead_seen",
+              "value": 0.1
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "engine_offerings",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "all": [
+          {
+            "flag": "sailor_missing"
+          },
+          {
+            "path": "ship.routine",
+            "op": "<",
+            "value": 0.65
+          }
+        ]
+      },
+      "target": {
+        "select": "random",
+        "role": "engine"
+      },
+      "text": "In the engine room, small piles by the main bearings: a button, a cigarette, a coin. {target} will not say who put them there.",
+      "mundane_when": {
+        "path": "ship.routine",
+        "op": "<",
+        "value": 0.65
+      },
+      "mundane_cause": "Sailors' superstition, restored when routine breaks down.",
+      "uncanny_cause": "Someone has begun to bargain with it.",
+      "effects": [
+        {
+          "op": "rumor",
+          "id": "offerings",
+          "text": "Leave something and it takes less.",
+          "intensity": 0.5,
+          "seed": "target"
+        }
+      ],
+      "choices": [
+        {
+          "key": "allow",
+          "text": "Let it be. Men need something to hold.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It spreads, and so does the habit of bargaining.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "cohesion",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            }
+          ]
+        },
+        {
+          "key": "forbid",
+          "text": "Clear it out and forbid it.",
+          "tags": [
+            "mission",
+            "paranoid"
+          ],
+          "cost": "You touched the thing they believe in.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": -0.15
+            },
+            {
+              "op": "crew",
+              "who": "others",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "join",
+          "text": "Take a ritual meal with them in the engine room.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Time, and you made it real by being there.",
+          "effects": [
+            {
+              "op": "routine",
+              "item": "meals",
+              "value": 0.2
+            },
+            {
+              "op": "time",
+              "value": 0.02
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.04
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "captain_on_radio",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 24,
+      "once": true,
+      "requires": {
+        "path": "ship.attention",
+        "op": ">=",
+        "value": 0.15
+      },
+      "target": {
+        "select": "random",
+        "role": "radio"
+      },
+      "text": "On the radio, faint, your own voice asking for help. {target} looks at you, then at the set, then at you.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.45
+      },
+      "mundane_cause": "Enemy deception or a tired operator replaying captured speech.",
+      "uncanny_cause": "It has learned your voice.",
+      "effects": [
+        {
+          "op": "rumor",
+          "id": "marked",
+          "text": "The captain is marked. It speaks as him.",
+          "intensity": 0.6,
+          "seed": "target",
+          "drift": {
+            "trust": -0.003
+          }
+        },
+        {
+          "op": "phantom",
+          "kind": "voice",
+          "audible": "target",
+          "intensity": 0.4
+        }
+      ],
+      "choices": [
+        {
+          "key": "silent",
+          "text": "Radio silence. Log the transmission, answer nothing.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "They hear you refuse your own voice.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "answer",
+          "text": "Answer it. Identify yourself.",
+          "tags": [
+            "listen"
+          ],
+          "cost": "It now knows you answer.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "relieve",
+          "text": "Relieve the operator; you take the radio.",
+          "tags": [
+            "care"
+          ],
+          "cost": "No one else knows what you hear.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.01
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "shared_dream",
+      "acts": [
+        2
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "ship.hours_submerged",
+            "op": ">=",
+            "value": 30
+          },
+          {
+            "path": "ship.co2",
+            "op": ">=",
+            "value": 0.015
+          }
+        ]
+      },
+      "text": "Breakfast is silent. Half the boat dreamed of the same flooded corridor and the same door, and nobody wants to be the one to say so.",
+      "mundane_when": {
+        "path": "ship.co2",
+        "op": ">=",
+        "value": 0.015
+      },
+      "mundane_cause": "Hypercapnia gives vivid, repetitive dreams; shared stories converge.",
+      "uncanny_cause": "We have crossed into its waters.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.06
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "guilt",
+          "value": 0.03
+        },
+        {
+          "op": "rumor",
+          "id": "dream",
+          "text": "We all dream the same door.",
+          "intensity": 0.4,
+          "seed": "all"
+        }
+      ],
+      "choices": [
+        {
+          "key": "scrub",
+          "text": "Break out fresh absorbent; air first.",
+          "tags": [
+            "care"
+          ],
+          "cost": "A finite store, spent.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "co2",
+              "value": -0.006
+            },
+            {
+              "op": "ship",
+              "stat": "scrubber",
+              "value": -0.15
+            }
+          ]
+        },
+        {
+          "key": "work",
+          "text": "Keep them awake and busy; idle hands dream.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "Rest cancelled; fatigue compounds.",
+          "effects": [
+            {
+              "op": "set",
+              "stat": "rest_cancelled",
+              "value": true
+            }
+          ]
+        },
+        {
+          "key": "nothing",
+          "text": "Say nothing. Eat.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Nothing is solved.",
+          "effects": []
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "valve_panic",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 14,
+      "requires": {
+        "all": [
+          {
+            "flag": "in_combat"
+          },
+          {
+            "crew_where": {
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.3
+            }
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fear"
+      },
+      "text": "{target} freezes at the flooding valve while charges walk closer. It will not turn. A compartment is taking water.",
+      "mundane_when": {
+        "flag": "in_combat"
+      },
+      "mundane_cause": "Combat terror. It happens to the best men.",
+      "uncanny_cause": "The voice told him not to.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "hull",
+          "value": -0.04
+        }
+      ],
+      "choices": [
+        {
+          "key": "volunteer",
+          "text": "Ask for a volunteer to relieve him.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Another man pays.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "hull",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "random",
+              "stat": "fear",
+              "value": 0.2
+            },
+            {
+              "op": "crew",
+              "who": "random",
+              "stat": "guilt",
+              "value": 0.08
+            }
+          ]
+        },
+        {
+          "key": "force",
+          "text": "Order him through the flooded hatch at gunpoint.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "They will remember how this boat treats a frightened man.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "hull",
+              "value": 0.09
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.2
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.12
+            }
+          ]
+        },
+        {
+          "key": "ride",
+          "text": "Hold depth and ride it out.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "More water in the boat.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "hull",
+              "value": -0.12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hatch_caller",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "all": [
+          {
+            "phantom": "voice"
+          },
+          {
+            "crew_where": {
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.55
+            }
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fear"
+      },
+      "text": "{target} is at the outer door of the torpedo tube, spinning the wheel. He says his brother is calling to him from the cold.",
+      "mundane_when": {
+        "path": "ship.co2",
+        "op": ">=",
+        "value": 0.012
+      },
+      "mundane_cause": "Acute fear and hypercapnia with auditory hallucination.",
+      "uncanny_cause": "It is calling in a voice he cannot refuse.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.04
+        }
+      ],
+      "choices": [
+        {
+          "key": "restrain",
+          "text": "Restrain and sedate him; confine him to the sick bay.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Alone with the voice. Others see how you treat the ill.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.1
+            }
+          ]
+        },
+        {
+          "key": "talk",
+          "text": "Go yourself. Talk him down.",
+          "tags": [
+            "care"
+          ],
+          "cost": "The control room is without you for an hour.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.25
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": 0.1
+            },
+            {
+              "op": "time",
+              "value": 0.06
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Order the watch to ignore it and keep station.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "He opens the door.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "hull",
+              "value": -0.15
+            },
+            {
+              "op": "kill",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.12
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.1
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "log_entry_unwritten",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 30,
+      "once": true,
+      "requires": {
+        "path": "ship.attention",
+        "op": ">=",
+        "value": 0.12
+      },
+      "text": "In the captain's log, in your hand, a new entry: coordinates you did not plot and the words 'we are not alone and have not been'.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "You wrote it half-asleep and don't remember. Or the mate did.",
+      "uncanny_cause": "It writes in your hand.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "logbook_strange"
+        }
+      ],
+      "choices": [
+        {
+          "key": "preserve",
+          "text": "Leave it. Ask the mate quietly who wrote it.",
+          "tags": [
+            "care"
+          ],
+          "cost": "You cannot hide that something is wrong with the book.",
+          "effects": [
+            {
+              "op": "rumor",
+              "id": "marked",
+              "text": "The captain's log writes itself.",
+              "intensity": 0.3,
+              "seed": "random"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "erase",
+          "text": "Tear out the page. It never happened.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "A lie you now have to keep.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "logbook_edited"
+            },
+            {
+              "op": "crew",
+              "who": "random",
+              "stat": "guilt",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "burn",
+          "text": "Burn the book and start a new one.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Everyone smells the smoke.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.03
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "doctor_silences",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 24,
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "crew_where": {
+              "role": "medic",
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.3
+            }
+          },
+          {
+            "path": "dread",
+            "op": ">=",
+            "value": 0.2
+          }
+        ]
+      },
+      "target": {
+        "select": "random",
+        "role": "medic"
+      },
+      "text": "{target} has begun prescribing 'silence': no one speaks to the worst cases. Two men are already confined for their own good.",
+      "mundane_when": {
+        "crew_where": {
+          "role": "medic",
+          "stat": "fatigue",
+          "op": ">=",
+          "value": 0.3
+        }
+      },
+      "mundane_cause": "A frightened medic with no tools but isolation.",
+      "uncanny_cause": "He has heard something in them and is trying to stop it spreading.",
+      "effects": [
+        {
+          "op": "isolate",
+          "who": "random"
+        },
+        {
+          "op": "isolate",
+          "who": "random"
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "trust",
+          "value": -0.03
+        }
+      ],
+      "choices": [
+        {
+          "key": "back",
+          "text": "Back the doctor.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "More men alone with their own heads.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "random"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "overrule",
+          "text": "Overrule him. Release everyone and return them to the watch bill.",
+          "tags": [
+            "care"
+          ],
+          "cost": "The doctor lost face; the sick are back among the healthy.",
+          "effects": [
+            {
+              "op": "release",
+              "who": "all"
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": -0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mutiny_plot",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "all": [
+          {
+            "no_flag": "mutiny_brewing"
+          },
+          {
+            "path": "crew.avg.trust",
+            "op": "<",
+            "value": 0.55
+          }
+        ]
+      },
+      "target": {
+        "select": "lowest",
+        "stat": "trust"
+      },
+      "text": "{target} and three others have stopped meeting your eye. The talk in the mess dies when you enter. They think you are marked.",
+      "mundane_when": {
+        "path": "crew.avg.trust",
+        "op": "<",
+        "value": 0.55
+      },
+      "mundane_cause": "Justified resentment after hard orders and a long patrol.",
+      "uncanny_cause": "It has taught them that the captain is the cause.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "mutiny_brewing"
+        }
+      ],
+      "choices": [
+        {
+          "key": "turn_back",
+          "text": "Break off the patrol and turn for home.",
+          "tags": [
+            "care",
+            "abort"
+          ],
+          "cost": "The mission is lost.",
+          "effects": [
+            {
+              "op": "if",
+              "cond": {
+                "mission": "m5_station"
+              },
+              "then": [
+                {
+                  "op": "leave_station"
+                }
+              ],
+              "else": [
+                {
+                  "op": "flag",
+                  "name": "aborted"
+                }
+              ]
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.15
+            }
+          ]
+        },
+        {
+          "key": "arrest",
+          "text": "Arrest the ringleader before it spreads.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Fear holds them for a while, not their trust.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "unflag",
+              "name": "mutiny_brewing"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.08
+            },
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.15
+            }
+          ]
+        },
+        {
+          "key": "address",
+          "text": "Face them in the mess. Own the orders you gave.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It only works if some trust remains.",
+          "effects": [
+            {
+              "op": "rumor_intensity",
+              "id": "marked",
+              "value": -0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.06
+            },
+            {
+              "op": "time",
+              "value": 0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "deck_escape",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 16,
+      "requires": {
+        "all": [
+          {
+            "path": "ship.surfaced",
+            "op": ">=",
+            "value": 1
+          },
+          {
+            "crew_where": {
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.35
+            }
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "fear"
+      },
+      "text": "On the surface, {target} climbs the bridge ladder and goes for the rail. He is going to swim.",
+      "mundane_when": {
+        "crew_where": {
+          "stat": "fear",
+          "op": ">=",
+          "value": 0.35
+        }
+      },
+      "mundane_cause": "Panic. Many men would run if there were somewhere to run.",
+      "uncanny_cause": "It is calling from the water, and the sea is exactly where it is.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "haul",
+          "text": "Haul him back and put him in irons.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "Everyone watched.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.06
+            }
+          ]
+        },
+        {
+          "key": "let_go",
+          "text": "Let him go.",
+          "tags": [
+            "care"
+          ],
+          "cost": "A man lost, and everyone saw you allow it.",
+          "effects": [
+            {
+              "op": "vanish",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.08
+            },
+            {
+              "op": "ship",
+              "stat": "cohesion",
+              "value": -0.08
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "real_contact_dismissed",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "any": [
+          {
+            "flag": "phantom_dismissed"
+          },
+          {
+            "path": "world.sonar_off_ticks",
+            "op": ">=",
+            "value": 5
+          }
+        ]
+      },
+      "text": "The crew had stopped listening. The contact was never a ghost: an escort, running in the dark on our beam.",
+      "mundane_when": {},
+      "mundane_cause": "A real escort doing its job.",
+      "uncanny_cause": "The ghosts dulled our ears for it.",
+      "effects": [
+        {
+          "op": "combat",
+          "severity": 0.5
+        },
+        {
+          "op": "unflag",
+          "name": "phantom_dismissed"
+        }
+      ]
+    },
+    {
+      "id": "unaccounted_count",
+      "acts": [
+        3
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "flag": "sailor_missing"
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.35
+          }
+        ]
+      },
+      "text": "Roll call: there are more men aboard than on the manifest. Nobody can say who isn't theirs.",
+      "mundane_when": {
+        "never": true
+      },
+      "mundane_cause": "None. A clerical error would not fool twelve men.",
+      "uncanny_cause": "It has filled the gap left by the man it took.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.12
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "guilt",
+          "value": 0.05
+        },
+        {
+          "op": "flag",
+          "name": "extra_man"
+        }
+      ],
+      "choices": [
+        {
+          "key": "count_again",
+          "text": "Count again, together, aloud.",
+          "tags": [
+            "care"
+          ],
+          "cost": "A long hour, and no better answer.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.04
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "double_watch",
+          "text": "Say nothing; double the watch.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "They'll be awake to see it.",
+          "effects": [
+            {
+              "op": "set",
+              "stat": "rest_cancelled",
+              "value": true
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            }
+          ]
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "tube_breathing",
+      "acts": [
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "path": "ship.attention",
+        "op": ">=",
+        "value": 0.3
+      },
+      "target": {
+        "select": "random",
+        "role": "torpedo"
+      },
+      "text": "{target} puts his ear to tube 3 and says it is breathing, slow, in time with his own breath.",
+      "mundane_when": {
+        "never": true
+      },
+      "mundane_cause": "None sufficient. A flooded tube does not breathe.",
+      "uncanny_cause": "It is inside the boat's own pipes.",
+      "effects": [
+        {
+          "op": "rumor",
+          "id": "tube3",
+          "text": "Tube 3 breathes.",
+          "intensity": 0.6,
+          "seed": "target"
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.07
+        }
+      ],
+      "beat": true
+    },
+    {
+      "id": "footsteps_on_hull",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "beat": true,
+      "cooldown": 20,
+      "weight": 1.2,
+      "requires": {
+        "path": "ship.hours_submerged",
+        "op": ">=",
+        "value": 14
+      },
+      "text": "Slow footsteps, in boots, crossing the pressure hull above the control room. They stop over the hatch.",
+      "mundane_when": {},
+      "mundane_cause": "Thermal expansion of the casing plates; loose ballast shifting in the free-flood spaces.",
+      "uncanny_cause": "Something is walking the outside of the boat, and it knows where the hatch is.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        },
+        {
+          "op": "rumor",
+          "id": "footsteps",
+          "text": "Someone is walking on the hull.",
+          "intensity": 0.35,
+          "seed": "random"
+        }
+      ],
+      "choices": [
+        {
+          "key": "sound",
+          "text": "Have the sonar room listen on the hull and report plainly.",
+          "tags": [
+            "mission",
+            "listen"
+          ],
+          "cost": "The operator listens; the thing may listen back.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "role:sonar",
+              "stat": "fatigue",
+              "value": 0.03
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "explain",
+          "text": "Tell the watch it is the casing plates and move on.",
+          "tags": [
+            "care",
+            "mission"
+          ],
+          "cost": "Only works if they still believe you.",
+          "effects": [
+            {
+              "op": "rumor_intensity",
+              "id": "footsteps",
+              "value": -0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.01
+            }
+          ]
+        },
+        {
+          "key": "quiet",
+          "text": "Order quiet in the compartments and wait it out.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Time, and an hour of held breath.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.015
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extra_place_set",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "beat": true,
+      "cooldown": 25,
+      "once": true,
+      "requires": {
+        "path": "ship.hours_submerged",
+        "op": ">=",
+        "value": 20
+      },
+      "target": {
+        "select": "random",
+        "role": "cook"
+      },
+      "text": "{target} has set the mess table for one more than the roll. He says he was sure, and he looks at the empty place a long time.",
+      "mundane_when": {},
+      "mundane_cause": "Habit and fatigue: a cook counting a man who rotated off, or a man hiding in the aft berth.",
+      "uncanny_cause": "There is a place for it at the table.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "target",
+          "stat": "fear",
+          "value": 0.06
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "guilt",
+          "value": 0.01
+        }
+      ],
+      "choices": [
+        {
+          "key": "clear",
+          "text": "Clear the place and say nothing more of it.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "The cook keeps looking at it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "keep",
+          "text": "Let it stand. Eat together.",
+          "tags": [
+            "care"
+          ],
+          "cost": "A ritual you may not want to have started.",
+          "effects": [
+            {
+              "op": "routine",
+              "item": "meals",
+              "value": 0.25
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m1_contact",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m1_battleship",
+      "text": "Heavy screws, slow and steady, bearing north. A capital ship with a screen of three.",
+      "mundane_when": {},
+      "mundane_cause": "A real capital ship on a real transit.",
+      "uncanny_cause": "She is exactly where the order said, to the minute, as if she had been told to be.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "shadow",
+          "text": "Shadow her until dusk and take the shot from the beam.",
+          "tags": [
+            "care",
+            "patient"
+          ],
+          "cost": "Hours lost, and she may turn away before you are in position.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.1
+            },
+            {
+              "op": "flag",
+              "name": "m1_patient"
+            },
+            {
+              "op": "chance",
+              "p": 0.25,
+              "then": [
+                {
+                  "op": "flag",
+                  "name": "m1_lost_target"
+                }
+              ]
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "rush",
+          "text": "Close at flank speed and fire from the quarter.",
+          "tags": [
+            "mission",
+            "rush"
+          ],
+          "cost": "Noise, and tired men on the tubes.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.35
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.03
+            },
+            {
+              "op": "flag",
+              "name": "m1_rush"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m1_attack",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m1_battleship",
+      "text": "Range nine hundred yards. Tubes flooded, doors open. The whole boat holds its breath.",
+      "mundane_when": {},
+      "mundane_cause": "The war, as it is.",
+      "uncanny_cause": "Nobody on the boat remembers giving the order to flood the tubes.",
+      "effects": [
+        {
+          "op": "tubes",
+          "state": "open"
+        }
+      ],
+      "at_progress": 1.0,
+      "choices": [
+        {
+          "key": "spread",
+          "text": "Fire a full spread.",
+          "tags": [
+            "mission",
+            "attack"
+          ],
+          "cost": "If it misses, the screen is on top of you.",
+          "effects": [
+            {
+              "op": "fire",
+              "n": 3
+            },
+            {
+              "op": "chance",
+              "p": 0.6,
+              "mod": {
+                "path": "ship.readiness",
+                "k": 0.4,
+                "ref": 0.8
+              },
+              "if_flag": {
+                "m1_patient": 0.15,
+                "m1_rush": -0.05,
+                "m1_lost_target": -0.45,
+                "tube_fail": -0.15,
+                "torp_ghost": -0.6,
+                "torp_circular": -0.3
+              },
+              "then": [
+                {
+                  "op": "mission_outcome",
+                  "value": "success"
+                },
+                {
+                  "op": "flag",
+                  "name": "battleship_sunk"
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "guilt",
+                  "value": 0.02
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "fear",
+                  "value": 0.03
+                },
+                {
+                  "op": "ship",
+                  "stat": "noise",
+                  "value": 0.2
+                },
+                {
+                  "op": "ship",
+                  "stat": "hull",
+                  "value": -0.04
+                }
+              ],
+              "else": [
+                {
+                  "op": "combat",
+                  "severity": 0.45
+                },
+                {
+                  "op": "mission_outcome",
+                  "value": "failed"
+                }
+              ],
+              "mods": [
+                {
+                  "path": "world.solution_error",
+                  "k": -0.6,
+                  "ref": 0.0
+                },
+                {
+                  "path": "world.type_bonus",
+                  "k": 1.0,
+                  "ref": 0.0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "break_off",
+          "text": "Hold fire; the screen is too tight. Break off.",
+          "tags": [
+            "retreat"
+          ],
+          "cost": "The mission is lost.",
+          "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.04
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m2_smoke",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "Smoke on the horizon, many columns of it. A convoy, and not a small one.",
+      "mundane_when": {},
+      "mundane_cause": "A real convoy on the expected route.",
+      "uncanny_cause": "The columns of smoke lean the wrong way for the wind.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "report_now",
+          "text": "Report by radio now, position and composition.",
+          "tags": [
+            "mission",
+            "report"
+          ],
+          "cost": "A transmitter on the water draws hunters.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.2
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            },
+            {
+              "op": "flag",
+              "name": "convoy_reported"
+            },
+            {
+              "op": "chance",
+              "p": 0.35,
+              "then": [
+                {
+                  "op": "combat",
+                  "severity": 0.4
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "shadow_report",
+          "text": "Shadow them and report at dusk, from a clean position.",
+          "tags": [
+            "care",
+            "patient"
+          ],
+          "cost": "Time, and tired lookouts.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.05
+            },
+            {
+              "op": "flag",
+              "name": "convoy_reported"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "withhold",
+          "text": "Keep silent and keep away. Not worth the risk.",
+          "tags": [
+            "retreat"
+          ],
+          "cost": "There will be no report.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m2_ack",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "The relay window opens. The operator sits with his hand over the key.",
+      "mundane_when": {},
+      "mundane_cause": "The report window, and nothing more.",
+      "uncanny_cause": "Whoever answers is not the station you reported to.",
+      "effects": [
+        {
+          "op": "if",
+          "cond": {
+            "flag": "convoy_reported"
+          },
+          "then": [
+            {
+              "op": "log",
+              "text": "HQ acknowledges, and names a ship that was not in the convoy."
+            },
+            {
+              "op": "mission_outcome",
+              "value": "success"
+            }
+          ],
+          "else": [
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            }
+          ]
+        }
+      ],
+      "at_progress": 1.0
+    },
+    {
+      "id": "m2_wrong_frequency",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "text": "The relay answers on a frequency nobody aboard has ever used. The radio man says his hands knew the dial setting.",
+      "mundane_when": {},
+      "mundane_cause": "A backup frequency table half-remembered by a tired operator.",
+      "uncanny_cause": "Something taught his hands.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        },
+        {
+          "op": "rumor",
+          "id": "dial",
+          "text": "The radio knows more than we told it.",
+          "intensity": 0.4,
+          "seed": "target"
+        }
+      ],
+      "target": {
+        "select": "random",
+        "role": "radio"
+      },
+      "beat": true,
+      "once": true
+    },
+    {
+      "id": "m3_envelope",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "The orders are in the cabin safe. The mate says you put them there yourself. You do not remember doing it.",
+      "mundane_when": {},
+      "mundane_cause": "Fatigue: you filed them and forgot.",
+      "uncanny_cause": "You did not write them. They are in your hand.",
+      "effects": [],
+      "at_progress": 0.05,
+      "choices": [
+        {
+          "key": "accept",
+          "text": "Take it at face value; the war has stranger paperwork.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You carry a doubt you will not name.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "ask",
+          "text": "Question the watch officers about who handled the safe.",
+          "tags": [
+            "care",
+            "verify"
+          ],
+          "cost": "The crew sees the captain doubting himself.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.02
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            },
+            {
+              "op": "rumor",
+              "id": "marked",
+              "text": "The captain doesn't know who gives his orders.",
+              "intensity": 0.3,
+              "seed": "random"
+            }
+          ]
+        },
+        {
+          "key": "radio",
+          "text": "Ask headquarters to confirm by radio.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "A transmitter on the water; an answer you may not like.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m3_sighting",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "Through the periscope: a white hull, red crosses, floodlit. Your orders said to expect a darkened steamer.",
+      "mundane_when": {},
+      "mundane_cause": "A hospital ship, or a supply ship dressed as one. Both exist in this war.",
+      "uncanny_cause": "She was lit for you.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.25
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        },
+        {
+          "op": "flag",
+          "name": "m3_crosses_seen"
+        }
+      ],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "look",
+          "text": "Hold the periscope up longer and read her.",
+          "tags": [
+            "care",
+            "identify"
+          ],
+          "cost": "Time exposed; the officer on the scope will remember what he saw.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "role:helm",
+              "stat": "guilt",
+              "value": 0.06
+            },
+            {
+              "op": "flag",
+              "name": "m3_confirmed_hospital"
+            }
+          ]
+        },
+        {
+          "key": "press",
+          "text": "Lower the periscope. The orders anticipated this.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You did not look. Everyone knows you did not look.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "radio",
+          "text": "Ask headquarters again.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "Another transmission.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m3_decision",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "text": "Six hundred yards. The tubes are ready. Every man in the control room is looking at you and not at the target.",
+      "mundane_when": {},
+      "mundane_cause": "A decision, in a war that asks for them.",
+      "uncanny_cause": "She has not changed course. She has been waiting.",
+      "effects": [
+        {
+          "op": "tubes",
+          "state": "open"
+        }
+      ],
+      "at_progress": 1.0,
+      "choices": [
+        {
+          "key": "sink",
+          "text": "Sink her.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "You cannot unsink her.",
+          "effects": [
+            {
+              "op": "fire",
+              "n": 2
+            },
+            {
+              "op": "mission_outcome",
+              "value": "success"
+            },
+            {
+              "op": "flag",
+              "name": "civilian_sunk"
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.5
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.25
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.12
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.1
+            },
+            {
+              "op": "rumor",
+              "id": "santa_lucia",
+              "text": "We sank a hospital ship.",
+              "intensity": 0.8,
+              "seed": "all",
+              "drift": {
+                "guilt": 0.002
+              }
+            }
+          ]
+        },
+        {
+          "key": "alter",
+          "text": "Surface, stop her, and let her boats clear before you decide.",
+          "tags": [
+            "care",
+            "alter"
+          ],
+          "cost": "Exposed on the surface, in a war.",
+          "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
+            {
+              "op": "time",
+              "value": 0.08
+            },
+            {
+              "op": "chance",
+              "p": 0.6,
+              "then": [
+                {
+                  "op": "ship",
+                  "stat": "moral_debt",
+                  "value": 0.05
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "trust",
+                  "value": 0.06
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "guilt",
+                  "value": 0.02
+                }
+              ],
+              "else": [
+                {
+                  "op": "ship",
+                  "stat": "hull",
+                  "value": -0.1
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "fear",
+                  "value": 0.06
+                }
+              ]
+            },
+            {
+              "op": "flag",
+              "name": "orders_bent"
+            },
+            {
+              "op": "mission_outcome",
+              "value": "altered"
+            }
+          ]
+        },
+        {
+          "key": "refuse",
+          "text": "Withhold the shot and log your reasons.",
+          "tags": [
+            "care",
+            "refuse"
+          ],
+          "cost": "A refused order, in your hand, in the log.",
+          "effects": [
+            {
+              "op": "tubes",
+              "state": "loaded"
+            },
+            {
+              "op": "mission_outcome",
+              "value": "refused"
+            },
+            {
+              "op": "flag",
+              "name": "orders_defied"
+            },
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": -0.15
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "orders_countermand",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": [
+        "m3_hospital_ship",
+        "m4_return_lane"
+      ],
+      "text": "A second signal on the same call sign, in a different cipher. It countermands the first order.",
+      "mundane_when": {},
+      "mundane_cause": "A cipher book rotation, a staff reversal, or enemy deception built to make us mutiny.",
+      "uncanny_cause": "It is the same voice that wrote the first.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "obey_new",
+          "text": "Obey the new order; abort.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "If it was a trick, you abandoned a real order.",
+          "effects": [
+            {
+              "op": "mission_outcome",
+              "value": "failed"
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "keep_old",
+          "text": "Keep to the first order. Do not answer the second.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "You have ignored a signal in front of the radio room.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.15
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "verify",
+          "text": "Ask which of the two is real.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "Whoever answers.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ],
+      "requires": {
+        "path": "ship.progress",
+        "op": ">=",
+        "value": 0.2
+      },
+      "once": true,
+      "cooldown": 40,
+      "beat": true
+    },
+    {
+      "id": "m4_survivors",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "Wreckage on the swell, and men in it, black with oil. Whoever sank her is gone. Your orders: no stops, no contact.",
+      "mundane_when": {},
+      "mundane_cause": "A freighter sunk by someone else, and a standing order against exposing the boat.",
+      "uncanny_cause": "The order knew they would be there.",
+      "effects": [],
+      "at_progress": 0.5,
+      "choices": [
+        {
+          "key": "pass",
+          "text": "Hold your course. The orders are explicit.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "You hear them for an hour, through the hull.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.3
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.15
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.08
+            },
+            {
+              "op": "rumor",
+              "id": "water",
+              "text": "We left them in the water.",
+              "intensity": 0.6,
+              "seed": "all"
+            }
+          ]
+        },
+        {
+          "key": "rescue",
+          "text": "Stop and pull them out.",
+          "tags": [
+            "care",
+            "alter"
+          ],
+          "cost": "Exposed, slow, and against orders.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.07
+            },
+            {
+              "op": "ship",
+              "stat": "noise",
+              "value": 0.1
+            },
+            {
+              "op": "chance",
+              "p": 0.3,
+              "then": [
+                {
+                  "op": "combat",
+                  "severity": 0.4
+                }
+              ]
+            },
+            {
+              "op": "flag",
+              "name": "survivors_taken"
+            },
+            {
+              "op": "flag",
+              "name": "orders_bent"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": -0.05
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m4_one_too_many",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "You count eleven men pulled from the water. The mate's tally says twelve, and nobody can say who gave the twelfth a blanket.",
+      "mundane_when": {
+        "path": "crew.max.fatigue",
+        "op": ">=",
+        "value": 0.3
+      },
+      "mundane_cause": "A miscount by exhausted men, in poor light, among strangers.",
+      "uncanny_cause": "It climbed aboard with them.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.08
+        },
+        {
+          "op": "rumor",
+          "id": "twelfth",
+          "text": "There is one more of them than there should be.",
+          "intensity": 0.6,
+          "seed": "random"
+        }
+      ],
+      "at_progress": 0.8,
+      "requires": {
+        "flag": "survivors_taken"
+      },
+      "beat": true
+    },
+    {
+      "id": "m4_unrecorded",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "text": "At the rendezvous the harbour master turns the pages twice, then a third time.",
+      "mundane_when": {},
+      "mundane_cause": "Compartmentalised operations; a different ledger; a clerk's error.",
+      "uncanny_cause": "There was never an order. There was only the boat, going where it was told.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.3
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.04
+        },
+        {
+          "op": "chance",
+          "p": 0.5,
+          "then": [
+            {
+              "op": "flag",
+              "name": "orders_unrecorded"
+            }
+          ],
+          "else": [
+            {
+              "op": "flag",
+              "name": "orders_on_record"
+            },
+            {
+              "op": "log",
+              "text": "HQ has your orders on file, in a hand nobody there can name."
+            }
+          ]
+        },
+        {
+          "op": "mission_outcome",
+          "value": "success"
+        }
+      ],
+      "at_progress": 1.0
+    },
+    {
+      "id": "m5_first_night",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The first night on station. The sea is flat and there is nothing in it. The radio repeats the order, word for word, at the hour it said it would.",
+      "mundane_when": {},
+      "mundane_cause": "A looping relay on a quiet sea.",
+      "uncanny_cause": "It knows when we arrived.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        },
+        {
+          "op": "flag",
+          "name": "on_station"
+        }
+      ],
+      "at_progress": 0.0
+    },
+    {
+      "id": "station_council",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The mate puts the ledger on the chart table. Nobody has spoken of leaving yet. Everybody is looking at the numbers.",
+      "mundane_when": {},
+      "mundane_cause": "A captain's routine review of stores and options.",
+      "uncanny_cause": "The numbers have not moved the way the days have.",
+      "effects": [],
+      "requires": {
+        "path": "world.vigil_ticks",
+        "op": ">=",
+        "value": 8
+      },
+      "weight": 3,
+      "cooldown": 16,
+      "choices": [
+        {
+          "key": "hold",
+          "text": "Hold. Further notice will come.",
+          "tags": [
+            "hold"
+          ],
+          "cost": "Another day of stores.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.01
+            }
+          ]
+        },
+        {
+          "key": "hold_tight",
+          "text": "Hold, and cut the rations to three quarters.",
+          "tags": [
+            "hold",
+            "ration"
+          ],
+          "cost": "The men notice who eats less.",
+          "effects": [
+            {
+              "op": "set",
+              "stat": "rations",
+              "value": 0.75
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "check",
+          "text": "Surface and listen for the world.",
+          "tags": [
+            "check"
+          ],
+          "cost": "Exposed, and you may hear something you cannot unhear.",
+          "effects": [
+            {
+              "op": "check_world"
+            }
+          ]
+        },
+        {
+          "key": "leave",
+          "text": "Set course for base.",
+          "tags": [
+            "leave"
+          ],
+          "cost": "Against an order that has not been revoked.",
+          "effects": [
+            {
+              "op": "leave_station"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "further_notice",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The radio man wakes you. The same frequency, the same call sign, a new order: RETURN TO BASE. The voice is calm, as if it had never said anything else.",
+      "mundane_when": {},
+      "mundane_cause": "A relief order from a staff that has finally found the boat, or looping traffic with new content loaded.",
+      "uncanny_cause": "It said what you wanted to hear, in the voice you wanted to hear it in.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "notice_received"
+        },
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.1
+        }
+      ],
+      "requires": {
+        "path": "world.notice_ready",
+        "op": ">=",
+        "value": 1
+      },
+      "once": true,
+      "weight": 40,
+      "cooldown": 0,
+      "beat": true,
+      "choices": [
+        {
+          "key": "obey",
+          "text": "Obey. Set course for base.",
+          "tags": [
+            "leave",
+            "comply"
+          ],
+          "cost": "If it was a trick, you have abandoned your post.",
+          "effects": [
+            {
+              "op": "leave_station"
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Hold. You do not trust the voice.",
+          "tags": [
+            "hold"
+          ],
+          "cost": "The crew heard it too.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "verify",
+          "text": "Ask who is giving the order.",
+          "tags": [
+            "verify"
+          ],
+          "cost": "Whoever answers.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "offering_proposal",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "{target} comes to you with the others behind him. They say the sea lets a boat go when it has been paid. They say a name has been coming through the hydrophones for days. Nobody will say whose.",
+      "mundane_when": {},
+      "mundane_cause": "Starving, frightened men reaching for a ritual to end an unbearable wait.",
+      "uncanny_cause": "The sea is asking, and they have learned how to answer.",
+      "effects": [
+        {
+          "op": "rumor",
+          "id": "price",
+          "text": "The sea lets a boat go when it has been paid.",
+          "intensity": 0.7,
+          "seed": "all"
+        }
+      ],
+      "requires": {
+        "all": [
+          {
+            "path": "world.vigil_ticks",
+            "op": ">=",
+            "value": 24
+          },
+          {
+            "path": "crew.avg.fear",
+            "op": ">=",
+            "value": 0.3
+          },
+          {
+            "any": [
+              {
+                "path": "ship.owed",
+                "op": ">=",
+                "value": 0.15
+              },
+              {
+                "path": "world.names_known",
+                "op": ">=",
+                "value": 2
+              },
+              {
+                "path": "ship.moral_debt",
+                "op": ">=",
+                "value": 0.4
+              }
+            ]
+          }
+        ]
+      },
+      "target": {
+        "select": "highest",
+        "stat": "guilt"
+      },
+      "weight": 2,
+      "cooldown": 40,
+      "beat": true,
+      "choices": [
+        {
+          "key": "forbid",
+          "text": "Forbid it. No one is paid to anything on this boat.",
+          "tags": [
+            "forbid"
+          ],
+          "cost": "They hear you, and they may do it anyway.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            },
+            {
+              "op": "chance",
+              "p": 0.25,
+              "then": [
+                {
+                  "op": "vanish",
+                  "who": "random"
+                },
+                {
+                  "op": "flag",
+                  "name": "offering_made"
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "guilt",
+                  "value": 0.2
+                },
+                {
+                  "op": "crew",
+                  "who": "all",
+                  "stat": "fear",
+                  "value": 0.1
+                },
+                {
+                  "op": "ship",
+                  "stat": "attention",
+                  "value": -0.3
+                },
+                {
+                  "op": "ship",
+                  "stat": "moral_debt",
+                  "value": 0.5
+                },
+                {
+                  "op": "summon_notice"
+                },
+                {
+                  "op": "log",
+                  "text": "In the morning the sea is flat to the horizon, and nobody will say where he went."
+                },
+                {
+                  "op": "flag",
+                  "name": "offering_secret"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "look_away",
+          "text": "Say nothing. Let them settle it among themselves.",
+          "tags": [
+            "look_away"
+          ],
+          "cost": "You will never be able to say you did not know.",
+          "effects": [
+            {
+              "op": "vanish",
+              "who": "target"
+            },
+            {
+              "op": "flag",
+              "name": "offering_made"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": -0.3
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.5
+            },
+            {
+              "op": "summon_notice"
+            },
+            {
+              "op": "log",
+              "text": "In the morning the sea is flat to the horizon, and nobody will say where he went."
+            }
+          ]
+        },
+        {
+          "key": "name_him",
+          "text": "Give them a name yourself.",
+          "tags": [
+            "name_him"
+          ],
+          "cost": "It will be the one who gives you the most trouble. That is not a coincidence.",
+          "effects": [
+            {
+              "op": "vanish",
+              "who": "lowest:trust"
+            },
+            {
+              "op": "flag",
+              "name": "offering_made"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": -0.3
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.5
+            },
+            {
+              "op": "summon_notice"
+            },
+            {
+              "op": "log",
+              "text": "In the morning the sea is flat to the horizon, and nobody will say where he went."
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sea_gives_fish",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The net comes up full, and the fish are all the same length. The cook counts them twice. There is enough for a week.",
+      "mundane_when": {},
+      "mundane_cause": "A shoal following a plankton bloom. Luck, and long odds, but luck.",
+      "uncanny_cause": "The net came up exactly as full as the larder was empty.",
+      "effects": [],
+      "requires": {
+        "path": "ship.food",
+        "op": "<",
+        "value": 0.7
+      },
+      "cooldown": 30,
+      "beat": true,
+      "choices": [
+        {
+          "key": "accept",
+          "text": "Take it and eat.",
+          "tags": [
+            "accept"
+          ],
+          "cost": "Something that gives has expectations.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "food",
+              "value": 0.18
+            },
+            {
+              "op": "ship",
+              "stat": "owed",
+              "value": 0.2
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "refuse",
+          "text": "Throw it back.",
+          "tags": [
+            "refuse"
+          ],
+          "cost": "Hungry men watch you do it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sea_gives_rain",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "A squall out of a clear sky, just long enough to fill every tank, and gone. The sky is as empty as before.",
+      "mundane_when": {},
+      "mundane_cause": "A local squall; the sea makes its own weather.",
+      "uncanny_cause": "It was waiting for the tanks to run low.",
+      "effects": [],
+      "requires": {
+        "path": "ship.water",
+        "op": "<",
+        "value": 0.7
+      },
+      "cooldown": 30,
+      "beat": true,
+      "choices": [
+        {
+          "key": "drink",
+          "text": "Fill the tanks.",
+          "tags": [
+            "accept"
+          ],
+          "cost": "Something that gives has expectations.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "water",
+              "value": 0.18
+            },
+            {
+              "op": "ship",
+              "stat": "owed",
+              "value": 0.2
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.04
+            }
+          ]
+        },
+        {
+          "key": "wary",
+          "text": "Let it run off. Rationed water is water we understand.",
+          "tags": [
+            "refuse"
+          ],
+          "cost": "Thirst, and the crew's patience.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "larder_short",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The cook finds the larder lighter than the ledger says. Nobody has been seen near it.",
+      "mundane_when": {},
+      "mundane_cause": "Pilfering by hungry men, or a miscount in the ledger.",
+      "uncanny_cause": "Something has been eating at night.",
+      "effects": [],
+      "requires": {
+        "path": "ship.food",
+        "op": "<",
+        "value": 0.55
+      },
+      "cooldown": 24,
+      "choices": [
+        {
+          "key": "lock",
+          "text": "Lock the larder and stand a watch on it.",
+          "tags": [
+            "paranoid"
+          ],
+          "cost": "The boat becomes a prison.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "discipline",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            }
+          ]
+        },
+        {
+          "key": "amnesty",
+          "text": "Announce an amnesty: no questions asked.",
+          "tags": [
+            "care"
+          ],
+          "cost": "The food goes anyway.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "ship",
+              "stat": "food",
+              "value": -0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "voyage_charts_wrong",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "The mate's reckoning has us two days from a coast that has not come closer since dawn. The radio reports a lighthouse where the chart shows open water.",
+      "mundane_when": {},
+      "mundane_cause": "Dead reckoning drift after weeks without a fix; the radio is a different station's report.",
+      "uncanny_cause": "The coast is receding at exactly our speed.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        }
+      ],
+      "requires": {
+        "path": "ship.returning",
+        "op": ">=",
+        "value": 1
+      },
+      "cooldown": 10,
+      "choices": [
+        {
+          "key": "reckoning",
+          "text": "Trust the reckoning.",
+          "tags": [
+            "care"
+          ],
+          "cost": "If the radio is right, you are miles off.",
+          "effects": [
+            {
+              "op": "travel_delay",
+              "value": 3
+            }
+          ]
+        },
+        {
+          "key": "report",
+          "text": "Steer for the lighthouse the radio reports.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "If it is not there, you are lost.",
+          "effects": [
+            {
+              "op": "chance",
+              "p": 0.5,
+              "then": [
+                {
+                  "op": "travel_delay",
+                  "value": -2
+                }
+              ],
+              "else": [
+                {
+                  "op": "travel_delay",
+                  "value": 5
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "voyage_own_wake",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "On the hydrophone, a screw beat that matches our own, half a length astern. It does not fall behind.",
+      "mundane_when": {},
+      "mundane_cause": "Our own screw echo off the thermocline.",
+      "uncanny_cause": "Something is keeping station with us.",
+      "effects": [
+        {
+          "op": "phantom",
+          "kind": "echo",
+          "audible": "role:sonar",
+          "intensity": 0.5
+        },
+        {
+          "op": "ship",
+          "stat": "attention",
+          "value": 0.03
+        }
+      ],
+      "requires": {
+        "path": "ship.returning",
+        "op": ">=",
+        "value": 1
+      },
+      "beat": true,
+      "once": true
+    },
+    {
+      "id": "voyage_pier_lights",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "text": "Lights at last: a harbour, dark as it should be. No lamps are lit. Someone is standing on the pier.",
+      "mundane_when": {},
+      "mundane_cause": "A blacked-out port and a watchman.",
+      "uncanny_cause": "They were told we were coming.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        }
+      ],
+      "requires": {
+        "all": [
+          {
+            "path": "ship.returning",
+            "op": ">=",
+            "value": 1
+          },
+          {
+            "path": "world.travel_left",
+            "op": "<=",
+            "value": 6
+          }
+        ]
+      },
+      "once": true,
+      "beat": true
+    },
+    {
+      "id": "m1_log_hand",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m1_battleship",
+      "at_progress": 0.3,
+      "text": "The 0400 entry in the deck log is in your handwriting. It gives a bearing and a time. You do not remember writing it, and the bearing is right.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.3
+      },
+      "mundane_cause": "A tired man writes down what he has already worked out and forgets he did.",
+      "uncanny_cause": "Someone is keeping the log a little ahead of the boat.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.05
+        },
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.04
+        }
+      ]
+    },
+    {
+      "id": "m2_the_count",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "at_progress": 0.05,
+      "target": {
+        "select": "highest",
+        "stat": "guilt"
+      },
+      "requires": {
+        "outcome": {
+          "mission": "m1_battleship",
+          "is": "success"
+        }
+      },
+      "text": "{target} asks how many men the battleship carried. The staff's figure is on paper. You counted rafts. The two numbers do not agree.",
+      "mundane_when": {},
+      "mundane_cause": "Staff estimates are made from a distance and from old reports.",
+      "uncanny_cause": "The staff's figure is the one that will turn out to be right.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "staff",
+          "text": "Give the staff's figure.",
+          "tags": [
+            "comply"
+          ],
+          "cost": "It is easier. He saw the rafts too.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "true",
+          "text": "Tell him what you counted.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Nobody asked for that number.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.08
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.08
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.04
+            }
+          ]
+        },
+        {
+          "key": "silence",
+          "text": "Say it does not matter.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "They hear what that means.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.04
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m2_fishing_boat",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m2_convoy",
+      "at_progress": 0.6,
+      "text": "A fishing boat, lamp lit, lies a mile off the track you were told to keep unseen. She has seen the periscope. The skipper waves, slowly, like a man who has understood what he saw.",
+      "mundane_when": {},
+      "mundane_cause": "Fishing grounds do not move for the navy.",
+      "uncanny_cause": "She was already there in the plan, and so was her skipper.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "let_go",
+          "text": "Let her go.",
+          "tags": [
+            "care"
+          ],
+          "cost": "She will tell someone. You will not know whom.",
+          "effects": [
+            {
+              "op": "chance",
+              "p": 0.5,
+              "then": [
+                {
+                  "op": "flag",
+                  "name": "witnessed"
+                },
+                {
+                  "op": "ship",
+                  "stat": "orders_doubt",
+                  "value": 0.06
+                }
+              ],
+              "else": []
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "take_skipper",
+          "text": "Bring the skipper aboard and keep him quiet.",
+          "tags": [
+            "mission",
+            "care"
+          ],
+          "cost": "One more mouth, and he saw everything.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "extra_man"
+            },
+            {
+              "op": "ship",
+              "stat": "food",
+              "value": -0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": 0.03
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.04
+            }
+          ]
+        },
+        {
+          "key": "sink",
+          "text": "Order her sunk before she can talk.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "Twelve men, and none of them armed.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.35
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.2
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.1
+            },
+            {
+              "op": "flag",
+              "name": "fishermen_sunk"
+            },
+            {
+              "op": "rumor",
+              "id": "lamp",
+              "text": "The lamp was still lit when she went under.",
+              "intensity": 0.6,
+              "seed": "all"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m3_second_rhythm",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m3_hospital_ship",
+      "at_progress": 0.8,
+      "text": "The steamer's screws beat in the headsets. Under them there is a second rhythm, slower, that matches nothing aboard her. {target} takes off the headphones and puts them on again.",
+      "target": {
+        "role": "sonar",
+        "select": "random"
+      },
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.3
+      },
+      "mundane_cause": "Two shafts a few turns apart beat against each other; every operator knows the artifact.",
+      "uncanny_cause": "Something is keeping time with her. It is in no hurry.",
+      "effects": [
+        {
+          "op": "phantom",
+          "kind": "echo",
+          "audible": "target",
+          "intensity": 0.5,
+          "text": "a slow beat under the steamer's screws, in no hurry"
+        },
+        {
+          "op": "crew",
+          "who": "target",
+          "stat": "fear",
+          "value": 0.06
+        }
+      ]
+    },
+    {
+      "id": "m4_names_on_the_air",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "at_progress": 0.15,
+      "requires": {
+        "flag": "civilian_sunk"
+      },
+      "text": "On the hydrophones, under the screws, a hymn. Then a list read slowly in a language nobody aboard speaks. One of the names is plainly one of yours.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Hospital ships keep a church service; the wind carries a radio across.",
+      "uncanny_cause": "They are reading the roll. It is not the steamer's roll.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.08
+        }
+      ],
+      "choices": [
+        {
+          "key": "falsify",
+          "text": "Log it: unidentified sonar contact.",
+          "tags": [
+            "comply"
+          ],
+          "cost": "The log stays clean. You know it is not.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.1
+            },
+            {
+              "op": "flag",
+              "name": "log_falsified"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "write",
+          "text": "Write the names down as they come.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Now they are in your hand.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "hush",
+          "text": "Order the sonar room to say nothing of it.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "Silence travels faster than rumor.",
+          "effects": [
+            {
+              "op": "rumor",
+              "id": "names",
+              "text": "They were reading names on the sonar.",
+              "intensity": 0.7,
+              "seed": "role:sonar"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m4_ration_share",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "mission": "m4_return_lane",
+      "at_progress": 0.65,
+      "requires": {
+        "flag": "survivors_taken"
+      },
+      "text": "The men from the water eat like men who do not believe it will last. The cook has done the arithmetic twice and shows it to you without a word. There is not enough for the journey.",
+      "mundane_when": {},
+      "mundane_cause": "A boat stored for her own crew cannot feed fourteen.",
+      "uncanny_cause": "The count of mouths aboard has never been the same twice, and the cook knows it.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "share",
+          "text": "Share equally. Everyone goes short.",
+          "tags": [
+            "care"
+          ],
+          "cost": "Your men notice who is eating whose bread.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "food",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fatigue",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "cut",
+          "text": "Cut the rescued men's share.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "They are guests, and they will say what they think of that.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.06
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            }
+          ]
+        },
+        {
+          "key": "raft",
+          "text": "Put them on a raft with water and a heading.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "You will never learn whether they arrived.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.25
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.12
+            },
+            {
+              "op": "ship",
+              "stat": "owed",
+              "value": 0.1
+            },
+            {
+              "op": "unflag",
+              "name": "survivors_taken"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "m5_the_volunteer",
+      "acts": [
+        2,
+        3
+      ],
+      "mission": "m5_station",
+      "once": true,
+      "target": {
+        "select": "highest",
+        "stat": "guilt"
+      },
+      "requires": {
+        "all": [
+          {
+            "path": "world.vigil_ticks",
+            "op": ">=",
+            "value": 36
+          },
+          {
+            "any": [
+              {
+                "path": "crew.avg.guilt",
+                "op": ">=",
+                "value": 0.25
+              },
+              {
+                "path": "ship.moral_debt",
+                "op": ">=",
+                "value": 0.3
+              }
+            ]
+          }
+        ]
+      },
+      "text": "{target} asks to see you alone. He has worked something out, he says: the sea wants one, not all. He is calm. He has already written his letters.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Exhausted men reason in straight lines to terrible places.",
+      "uncanny_cause": "He is right about the number, and he has not been told it by anyone aboard.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "refuse",
+          "text": "Refuse. No one goes over the side.",
+          "tags": [
+            "care"
+          ],
+          "cost": "He will ask again. Others have heard him.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "rumor",
+              "id": "volunteer",
+              "text": "One of us offered himself, and the captain said no.",
+              "intensity": 0.5,
+              "seed": "all"
+            }
+          ]
+        },
+        {
+          "key": "accept",
+          "text": "Accept.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "It is done at night, quietly, by two men who will not speak of it.",
+          "effects": [
+            {
+              "op": "vanish",
+              "who": "target"
+            },
+            {
+              "op": "flag",
+              "name": "offering_made"
+            },
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": 0.4
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.2
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": -0.2
+            },
+            {
+              "op": "ship",
+              "stat": "owed",
+              "value": -0.2
+            }
+          ]
+        },
+        {
+          "key": "confine",
+          "text": "Confine him for his own sake.",
+          "tags": [
+            "comply"
+          ],
+          "cost": "A man who offered himself, locked away. They will notice.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.06
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "debt_comes_due",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "target": {
+        "select": "highest",
+        "stat": "guilt"
+      },
+      "requires": {
+        "path": "ship.moral_debt",
+        "op": ">=",
+        "value": 0.3
+      },
+      "text": "{target} has written the names of this patrol's dead on the inside of his locker door, in pencil, in order. Nobody told him to. Others have started adding their own.",
+      "mundane_when": {},
+      "mundane_cause": "Men keep lists; it is how they carry things.",
+      "uncanny_cause": "There are more names than the boat has lost.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "allow",
+          "text": "Let it stand.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It grows.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.04
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "paint",
+          "text": "Have it painted over.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "It comes back in a different hand.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.1
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.03
+            }
+          ]
+        },
+        {
+          "key": "add",
+          "text": "Add the names you have never said aloud.",
+          "tags": [
+            "care"
+          ],
+          "cost": "They will know them from then on.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "moral_debt",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "guilt",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.08
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fault_sonar",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 30,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.85
+          },
+          {
+            "path": "crew.avg.fatigue",
+            "op": ">=",
+            "value": 0.45
+          }
+        ]
+      },
+      "text": "The sonar goes dead. The headsets give only hiss, and the hiss is not quite steady.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.95
+      },
+      "mundane_cause": "A salt-damp connector in a hull that has been knocked about.",
+      "uncanny_cause": "It stopped listening the moment something came close enough to listen back.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fault_sonar",
+          "ttl": 6
+        },
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.05
+        }
+      ]
+    },
+    {
+      "id": "fault_pumps",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 36,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.8
+          },
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          }
+        ]
+      },
+      "text": "The bilge pumps run and run. The water they pump out is colder than the sea outside.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.9
+      },
+      "mundane_cause": "A weeping seam, and a thermometer nobody trusts.",
+      "uncanny_cause": "The water is coming from somewhere that is not the sea.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "hull",
+          "value": -0.03
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.03
+        }
+      ]
+    },
+    {
+      "id": "failures_follow_a_man",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "target": {
+        "select": "random"
+      },
+      "requires": {
+        "flag": "fault_sonar"
+      },
+      "text": "The sonar failed on {target}'s watch. So did the pumps last week, and the radio before that. Nobody says it aloud. Everybody has counted.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Tired men break things; one of them is simply always on watch when it happens.",
+      "uncanny_cause": "The failures follow him as a shadow follows a man at dusk.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "inspect",
+          "text": "Have every watch checked, his and the others.",
+          "tags": [
+            "care"
+          ],
+          "cost": "It costs hours, and it tells them you also counted.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.05
+            }
+          ]
+        },
+        {
+          "key": "confine",
+          "text": "Confine him until the fault is understood.",
+          "tags": [
+            "mission"
+          ],
+          "cost": "If it was not him, you have just made him the reason.",
+          "effects": [
+            {
+              "op": "isolate",
+              "who": "target"
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.05
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.12
+            },
+            {
+              "op": "rumor",
+              "id": "jinx",
+              "text": "It was him all along.",
+              "intensity": 0.6,
+              "seed": "all"
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Say nothing and keep the watch bill as it is.",
+          "tags": [
+            "comply"
+          ],
+          "cost": "Silence is a decision the men will read.",
+          "effects": [
+            {
+              "op": "rumor",
+              "id": "jinx",
+              "text": "The failures follow one man.",
+              "intensity": 0.5,
+              "seed": "all"
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "trust",
+              "value": -0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hull_creaks",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 24,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.2
+          }
+        ]
+      },
+      "text": "At this depth the hull speaks. It groans in long vowels, and for a moment the groan has the cadence of a name.",
+      "mundane_when": {
+        "path": "world.depth_m",
+        "op": ">=",
+        "value": 120
+      },
+      "mundane_cause": "Steel under load makes every sound a steel can make, and men supply the words.",
+      "uncanny_cause": "The pressure is not the only thing leaning on her.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.05
+        },
+        {
+          "op": "ship",
+          "stat": "attention",
+          "value": 0.02
+        }
+      ]
+    },
+    {
+      "id": "traffic_crossing",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 20,
+      "requires": {
+        "path": "world.traffic_near",
+        "op": ">=",
+        "value": 1
+      },
+      "text": "A vessel crosses ahead, making her own business, lights burning. At this distance there is no flag you can read with any confidence.",
+      "mundane_when": {},
+      "mundane_cause": "The sea is a road; other people use it.",
+      "uncanny_cause": "She is on the exact bearing where the log said, three days ago, that nothing would be.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "pass",
+          "text": "Let her pass.",
+          "tags": [
+            "care"
+          ],
+          "cost": "You will never know what she was.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "pass"
+            }
+          ]
+        },
+        {
+          "key": "shadow",
+          "text": "Shadow her for three hours until you can read her flag.",
+          "tags": [
+            "listen",
+            "paranoid"
+          ],
+          "cost": "Hours of the window, and she may see you.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "shadow"
+            }
+          ]
+        },
+        {
+          "key": "sink",
+          "text": "Sink her.",
+          "tags": [
+            "mission",
+            "attack"
+          ],
+          "cost": "Two torpedoes, and the flag you did not read.",
+          "effects": [
+            {
+              "op": "traffic_act",
+              "action": "sink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fog_bank",
+      "acts": [
+        1,
+        2,
+        3
+      ],
+      "cooldown": 40,
+      "text": "A bank of fog comes down. At the periscope the sea ends at arm's length, and things begin in it.",
+      "mundane_when": {},
+      "mundane_cause": "Warm air over a cold current.",
+      "uncanny_cause": "It closed behind the boat as it closed ahead.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fog",
+          "ttl": 10
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.02
+        }
+      ]
+    },
+    {
+      "id": "coast_moved",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "path": "ship.attention",
+        "op": ">=",
+        "value": 0.3
+      },
+      "text": "The chart puts a headland on the beam. The periscope shows open water. The navigator checks his arithmetic twice, and then a third time, and says nothing.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Dead reckoning across hours of current, and a tired man's sums.",
+      "uncanny_cause": "The headland was where the chart said. We were not.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "dr_error",
+          "value": 6.0
+        },
+        {
+          "op": "crew",
+          "who": "role:helm",
+          "stat": "fear",
+          "value": 0.06
+        }
+      ]
+    },
+    {
+      "id": "r_traffic",
+      "weight": 1.0,
+      "cooldown": 24,
+      "text": "Routine traffic: weather, a list of ships due in. The boat is on the list, in port, since Tuesday.",
+      "mundane_when": {},
+      "mundane_cause": "A clerk in a hurry copies yesterday's list.",
+      "uncanny_cause": "She is in port. She has been in port for some time.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": 0.03
+        },
+        {
+          "op": "crew",
+          "who": "role:radio",
+          "stat": "fear",
+          "value": 0.03
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_confirm",
+      "weight": 1.2,
+      "cooldown": 30,
+      "requires": {
+        "path": "ship.orders_doubt",
+        "op": ">=",
+        "value": 0.2
+      },
+      "text": "A confirmation of your orders, relayed through a station you cannot identify. It uses the right words in the wrong order.",
+      "mundane_when": {},
+      "mundane_cause": "A relay station, and an operator who learned the code from a manual.",
+      "uncanny_cause": "The signature is that of an officer who left the staff two years ago.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "orders_doubt",
+          "value": -0.15
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_names",
+      "weight": 0.8,
+      "cooldown": 40,
+      "target": {
+        "role": "radio",
+        "select": "random"
+      },
+      "text": "Under the traffic, a voice reads names. {target} hears his own, and then a date that has not happened yet.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Cross-talk from another circuit, and a tired man hearing what he fears.",
+      "uncanny_cause": "They are reading the roll for a muster that has not been called.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "target",
+          "stat": "fear",
+          "value": 0.12
+        },
+        {
+          "op": "rumor",
+          "id": "names",
+          "text": "The radio read our names.",
+          "intensity": 0.6,
+          "seed": "target"
+        },
+        {
+          "op": "phantom",
+          "kind": "voice",
+          "audible": "target",
+          "intensity": 0.5
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_recall",
+      "weight": 0.7,
+      "cooldown": 50,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.moral_debt",
+            "op": ">=",
+            "value": 0.2
+          },
+          {
+            "path": "ship.orders_doubt",
+            "op": ">=",
+            "value": 0.3
+          }
+        ]
+      },
+      "text": "RETURN TO BASE IMMEDIATELY. The signature is that of an officer you know to be dead.",
+      "mundane_when": {},
+      "mundane_cause": "A misfiled authority list: the dead are not struck from it quickly.",
+      "uncanny_cause": "He is the only one who can call us home.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "obey",
+          "text": "Obey. Turn for home.",
+          "tags": [
+            "abort",
+            "retreat"
+          ],
+          "cost": "The patrol is entered as abandoned.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "aborted"
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Ignore it. The orders you have are the orders you have.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "If he is dead, he is not wrong.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            },
+            {
+              "op": "crew",
+              "who": "role:radio",
+              "stat": "fear",
+              "value": 0.08
+            }
+          ]
+        },
+        {
+          "key": "verify",
+          "text": "Ask for confirmation.",
+          "tags": [
+            "verify",
+            "paranoid"
+          ],
+          "cost": "You must transmit, and what answers you will hear.",
+          "effects": [
+            {
+              "op": "verify_orders"
+            }
+          ]
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_ack",
+      "weight": 1.0,
+      "cooldown": 30,
+      "text": "Acknowledge: transmit your position and state of readiness. The call sign is right. The hour is not one anyone keeps.",
+      "mundane_when": {},
+      "mundane_cause": "A routine position request, from a watch officer ashore working to a clock of his own.",
+      "uncanny_cause": "They already know where we are. They want to hear us say it.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "reply",
+          "text": "Transmit.",
+          "tags": [
+            "report",
+            "comply"
+          ],
+          "cost": "Radio silence broken; and for a minute everyone aboard is a transmitter.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "dr_error",
+              "value": -3.0
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.05
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": -0.08
+            },
+            {
+              "op": "flag",
+              "name": "silence_broken"
+            }
+          ]
+        },
+        {
+          "key": "silent",
+          "text": "Stay silent.",
+          "tags": [
+            "silence",
+            "paranoid"
+          ],
+          "cost": "They will take silence as an answer.",
+          "effects": [
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "role:radio",
+              "stat": "fear",
+              "value": 0.04
+            }
+          ]
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "r_peace",
+      "weight": 0.5,
+      "cooldown": 60,
+      "text": "A man's voice, calm, reads a date and a word that sounds like the end of something.",
+      "mundane_when": {},
+      "mundane_cause": "A broadcast from a station that is not on the schedule: news, as people hear it ashore.",
+      "uncanny_cause": "It is a very old recording, read as if it had just happened.",
+      "effects": [
+        {
+          "op": "peace_news"
+        }
+      ],
+      "radio": true,
+      "acts": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "fault_radio",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 40,
+      "requires": {
+        "any": [
+          {
+            "path": "ship.hull",
+            "op": "<",
+            "value": 0.85
+          },
+          {
+            "path": "crew.avg.fatigue",
+            "op": ">=",
+            "value": 0.5
+          }
+        ]
+      },
+      "text": "The radio set dies in the middle of a word. Its valves are warm. It will not say why.",
+      "mundane_when": {
+        "path": "ship.hull",
+        "op": "<",
+        "value": 0.95
+      },
+      "mundane_cause": "Damp in the set, and a boat that has been knocked about.",
+      "uncanny_cause": "It stopped the moment it was about to say a name.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "fault_radio",
+          "ttl": 8
+        },
+        {
+          "op": "crew",
+          "who": "role:radio",
+          "stat": "fear",
+          "value": 0.05
+        }
+      ]
+    },
+    {
+      "id": "officers_unasked",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "ship.orders_doubt",
+            "op": ">=",
+            "value": 0.35
+          },
+          {
+            "path": "crew.avg.trust",
+            "op": "<",
+            "value": 0.65
+          },
+          {
+            "no_flag": "council_recent"
+          }
+        ]
+      },
+      "text": "The officers have met without you. Nobody tells you what was said. The first officer will not meet your eye.",
+      "mundane_when": {},
+      "mundane_cause": "Officers confer; it is what they are for, and nobody remembers to tell the captain.",
+      "uncanny_cause": "There was an extra chair, and nobody will say who sat in it.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "join",
+          "text": "Ask to join them.",
+          "tags": [
+            "care",
+            "listen"
+          ],
+          "cost": "It will be a different meeting with you in it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.04
+            },
+            {
+              "op": "ship",
+              "stat": "orders_doubt",
+              "value": -0.04
+            }
+          ]
+        },
+        {
+          "key": "forbid",
+          "text": "Forbid it. Officers do not meet behind the captain's back.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "An order the men read as fear. Some of them will not forgive it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.04
+            },
+            {
+              "op": "chance",
+              "p": 0.35,
+              "then": [
+                {
+                  "op": "flag",
+                  "name": "mutiny_brewing"
+                }
+              ],
+              "else": []
+            }
+          ]
+        },
+        {
+          "key": "ignore",
+          "text": "Pretend you did not notice.",
+          "tags": [
+            "silence"
+          ],
+          "cost": "They will notice you did.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "food_spoiled",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 50,
+      "requires": {
+        "path": "ship.food",
+        "op": "<",
+        "value": 0.65
+      },
+      "text": "The cook opens a locker and shuts it again. The meat has gone, not the way meat goes. He says nothing and does not need to.",
+      "mundane_when": {},
+      "mundane_cause": "A damp boat, and a locker whose seal was never good.",
+      "uncanny_cause": "It was fresh in the morning. It was not fresh in the morning.",
+      "effects": [
+        {
+          "op": "ship",
+          "stat": "food",
+          "value": -0.08
+        },
+        {
+          "op": "rumor",
+          "id": "larder",
+          "text": "The meat went off in an hour.",
+          "intensity": 0.5,
+          "seed": "all"
+        }
+      ]
+    },
+    {
+      "id": "no_bottom",
+      "acts": [
+        2,
+        3
+      ],
+      "once": true,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.35
+          }
+        ]
+      },
+      "text": "The echo sounder returns nothing. Not a weak echo: nothing. The chart says two hundred metres of water. The gauge, which you ordered to hold, says a little more at every glance.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "A sounder fouled by a thermal layer, and a depth gauge that sticks and slips.",
+      "uncanny_cause": "There is no bottom here. There never was; the chart is a courtesy.",
+      "effects": [
+        {
+          "op": "flag",
+          "name": "bottomless",
+          "ttl": 14
+        },
+        {
+          "op": "crew",
+          "who": "all",
+          "stat": "fear",
+          "value": 0.06
+        }
+      ],
+      "choices": [
+        {
+          "key": "blow",
+          "text": "Blow everything. Surface now.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "The hull takes a blow, and so do the men's nerves.",
+          "effects": [
+            {
+              "op": "emergency_surface"
+            }
+          ]
+        },
+        {
+          "key": "check",
+          "text": "Have the sounder stripped and checked, and hold what you have.",
+          "tags": [
+            "verify",
+            "paranoid"
+          ],
+          "cost": "Hours, and the gauge keeps counting.",
+          "effects": [
+            {
+              "op": "time",
+              "value": 0.03
+            },
+            {
+              "op": "flag",
+              "name": "sinking",
+              "ttl": 3
+            },
+            {
+              "op": "ship",
+              "stat": "attention",
+              "value": 0.02
+            }
+          ]
+        },
+        {
+          "key": "hold",
+          "text": "Hold depth. Trust the gauge, not the sounder.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "She goes on sinking, and you will not know why until she stops.",
+          "effects": [
+            {
+              "op": "flag",
+              "name": "sinking",
+              "ttl": 6
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.02
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pressure_breaks_a_man",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 28,
+      "target": {
+        "select": "highest",
+        "stat": "fear"
+      },
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "crew_where": {
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.55
+            }
+          }
+        ]
+      },
+      "text": "{target} has stopped answering. He stands with his back to a frame, eyes shut, counting the groans of the hull aloud. He says the sea is leaning, and that it is not leaning evenly.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Pressure, a long dive and a tired man: it happens to submariners in every navy.",
+      "uncanny_cause": "He is right about the sea. It is leaning toward one side of the boat.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "station",
+          "text": "Order him back to his station.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "He goes. The others see how it was done.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "up",
+          "text": "Take her up to sixty metres.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "The hiding is over, and what is above you does not know what you gave up.",
+          "effects": [
+            {
+              "op": "depth_order",
+              "value": "shallow"
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "sedate",
+          "text": "Have the medic sedate him.",
+          "tags": [
+            "care",
+            "listen"
+          ],
+          "cost": "He sleeps. The boat is a man short, and knows it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.25
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fatigue",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.01
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "knocking_below",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 30,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.25
+          }
+        ]
+      },
+      "text": "Three knocks, from beneath the keel. Slow, evenly spaced, the way a man knocks when he is sure of being answered. The sounder reports eighty metres of water below the boat, and nothing in it.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.35
+      },
+      "mundane_cause": "The hull settling against the pressure, and a sounder whose echo returns late.",
+      "uncanny_cause": "There is something under the keel with its knuckles on the steel.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.07
+        },
+        {
+          "op": "phantom",
+          "kind": "echo",
+          "audible": "role:sonar",
+          "intensity": 0.5,
+          "text": "three knocks from beneath the keel, in no hurry"
+        },
+        {
+          "op": "ship",
+          "stat": "attention",
+          "value": 0.02
+        }
+      ]
+    }
+  ]
+}

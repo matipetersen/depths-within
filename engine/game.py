@@ -78,6 +78,9 @@ class Game:
         
         # Depth change tracking
         self.target_depth = 0  # Target depth for diving/surfacing
+        self.dread_ui = None       # set when the dread model attaches
+        self.dread_over = False
+        self.dread_ending = None
         self.depth_change_rate = 10  # meters per turn
         
         # Initialize crew and progression systems
@@ -225,6 +228,21 @@ class Game:
             # HORROR PROGRESSION SYSTEM
             from engine.horror_progression import HorrorManager
             self.horror_manager = HorrorManager()
+            try:
+                from dread.bridge import DreadBridge
+                from ui.dread_ui import DreadUI
+                # DREAD_MISSIONS=0 runs the horror model without the five-mission story
+                story = None if os.environ.get('DREAD_MISSIONS', '1') != '0' else ()
+                bridge = DreadBridge(getattr(self, 'crew_roster', None), missions=story)
+                self.horror_manager.attach_dread(bridge)
+                for line in bridge.world.log:                      # the first orders, before the first hour
+                    self.logger.log(line)
+                bridge._logged = len(bridge.world.log)
+                self.dread_ui = DreadUI()
+                self.target_depth = max(self.target_depth, 60)   # the patrol clock only runs submerged
+                self.logger.log("Captain's bridge: TAB. Wait an hour: SPACE. Wait for news: W.")
+            except Exception as dread_err:   # fall back to the legacy model, but say so
+                self.logger.log(f"[dread] disabled, using legacy horror model: {dread_err!r}")
             
             self.logger.log("New tactical systems initialized: Time, Fog of War, Divers, HORROR")
         except Exception as e:
@@ -339,6 +357,8 @@ class Game:
         return self.get_visible_contacts()
 
     def _tick(self):
+        if self.dread_over:
+            return                                   # the patrol is over: nothing moves any more
         # Advance world / submarine systems by one turn
         self.turn += 1
         # process a single event for demo
@@ -378,7 +398,8 @@ class Game:
                 # Advance horror (1 hour per turn)
                 horror_results = self.horror_manager.advance_turn(
                     time_passed_hours=1.0,
-                    current_depth=depth
+                    current_depth=depth,
+                    submarine=self.submarine
                 )
                 
                 # Display horror messages
@@ -399,10 +420,22 @@ class Game:
                         # TODO: Apply to crew_roster when sanity system is integrated
                         pass
                         
+                # A dread event is waiting for the captain
+                dread = self.horror_manager.dread
+                if dread is not None and self.decision_manager and not self.decision_manager.pending_decision:
+                    decision = dread.pending_decision()
+                    if decision:
+                        self.decision_manager.pending_decision = decision
+                        self.logger.log(f"CAPTAIN! {decision.title} (Input required)")
+
+                if dread is not None and dread.finished and not self.dread_over:
+                    self.dread_over = True
+                    self.dread_ending = dread.ending()
+                    self.logger.log(f"THE PATROL IS OVER: {self.dread_ending.replace('_', ' ')}")
+
             except Exception as horror_err:
-                # Don't let horror system crash the game
-                if self.turn == 1:
-                    print(f"Horror system error: {horror_err}")
+                # Don't let the horror system crash the game, but never swallow it silently
+                self.logger.log(f"[horror] error on turn {self.turn}: {horror_err!r}")
         
         # Update fog of war with current sensors
         if self.fog_of_war and self.submarine and self.time_system:
@@ -707,7 +740,9 @@ class Game:
         if self.decision_manager and not self.decision_manager.pending_decision:
             # Only trigger if not in combat
             in_combat = self.tactical_map and self.tactical_map.any_contacts() if self.tactical_map else False
-            if not in_combat and random.random() < 0.015:  # 1.5% chance per turn
+            dread_active = bool(self.horror_manager and getattr(self.horror_manager, 'dread', None))
+            # With the dread model attached, decisions come from state-driven events instead
+            if not dread_active and not in_combat and random.random() < 0.015:  # 1.5% chance per turn
                 decision = self.decision_manager.generate_random_decision()
                 if decision:
                     self.decision_manager.pending_decision = decision
@@ -834,11 +869,48 @@ class Game:
         except Exception:
             pass
 
+    def answer_decision(self, n: int):
+        """Answer the pending captain's decision with option ``n`` (1-based)."""
+        dm = self.decision_manager
+        d = dm.pending_decision if dm else None
+        if d is None or not 1 <= n <= len(d.options):
+            return None
+        result = dm.resolve_option(d, d.options[n - 1].key, self)
+        self.logger.log(f"> {d.options[n - 1].text}")
+        return result
+
+    def wait_for_news(self, max_hours: int = 12):
+        """Advance until something is reported, a decision is due, or the patrol ends."""
+        seen = len(self.logger.entries)
+        for _ in range(max_hours):
+            if self.dread_over or (self.decision_manager and self.decision_manager.pending_decision):
+                break
+            self._tick()
+            if len(self.logger.entries) - seen > 2:      # more than the routine tick chatter
+                break
+
     def process_command(self, user_input: str) -> bool:
         """
         Process a user command using the hotkey system.
         Returns True if game should continue, False to quit.
         """
+        # The patrol is over: show the two accounts and stop
+        if self.dread_over:
+            from dread import hud
+            print(hud.epilogue_screen(self.horror_manager.dread.world, self.dread_ending))
+            return False
+
+        # The captain's bridge, in console mode: `bridge` shows it, `order N` gives order N
+        cmd_l = user_input.strip().lower()
+        if self.dread_ui is not None and (cmd_l == 'bridge' or cmd_l.startswith('order ')):
+            session = self.dread_ui.session(self)
+            if cmd_l == 'bridge':
+                print(session.view())
+            else:
+                session.handle(cmd_l.split(None, 1)[1])
+                print(session.notice or session.view())
+            return True
+
         # Handle pending decisions first
         if self.decision_manager and self.decision_manager.pending_decision:
             # Check if input matches an option key
@@ -1911,6 +1983,9 @@ class Game:
                         for event in tcod.event.wait():
                             if event.type == 'KEYDOWN':
                                 k = event.sym
+                                # the captain's bridge, decisions and the ending take the keys first
+                                if self.dread_ui is not None and self.dread_ui.handle_key(self, k):
+                                    continue
                                 # when ascii GUI active, allow cursor movement and firing
                                 if getattr(self, 'ascii_gui', False):
                                     try:
@@ -2037,6 +2112,9 @@ class Game:
                                     # surface
                                     self.submarine.surface()
                                     should_tick = True
+                                elif k == tcod.event.KeySym.W:
+                                    # wait until something happens (at most 12 hours)
+                                    self.wait_for_news()
                                 elif k == tcod.event.KeySym.SPACE:
                                     # Wait/skip turn - just advance time without moving
                                     self.logger.log("Waiting... maintaining position.")
@@ -2071,7 +2149,7 @@ class Game:
                                         depth = getattr(self.submarine.systems, 'depth', 0)
                                         self.logger.log(f"═══ SYSTEM STATUS ═══")
                                         self.logger.log(f"Battery: {battery:.1f}%  Oxygen: {oxygen:.1f}%  Hull: {hull:.1f}%")
-                                        self.logger.log(f"Depth: {depth}m  Horror: {self.horror_manager.current_stage.name if self.horror_manager else 'N/A'}")
+                                        self.logger.log(f"Depth: {depth}m  Day: {self.turn // 24 + 1}")
                                     except Exception as e:
                                         self.logger.log(f"Status check failed: {e}")
                                 elif k == tcod.event.KeySym.E:
