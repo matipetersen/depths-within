@@ -333,3 +333,117 @@ def test_the_hud_shows_the_kinds_of_torpedo_and_what_the_lookout_says():
         if c.role == "deck":
             c.candor, c.trust = 1.0, 1.0
     assert "lookout" in "\n".join(hud.sonar(w))
+
+
+# ---- depth and the dread ---------------------------------------------------------------------------------
+def _deep(seed=3, order="deep"):
+    w = _w(seed)
+    w.run.acts_done = 1
+    _at(w, 40, 50)
+    O.set_depth(w, order)
+    assert w.ship.depth_order == order
+    return w
+
+
+def test_the_deeper_she_goes_the_more_the_presence_leans_in_and_the_surface_lets_go():
+    def attention(order):
+        w = _deep(3, order) if order != "shallow" else _w()
+        if order == "shallow":
+            w.run.acts_done = 1
+            _at(w, 40, 50)
+        w.ship.attention = 0.2
+        for _ in range(30):
+            if w.pending is not None:
+                w.choose(w.pending.choices[0].key)
+            w.ship.hull = 1.0
+            w.tick()
+        return w.ship.attention
+    assert attention("test") > attention("deep") > attention("shallow")
+
+
+def test_nobody_sleeps_well_under_that_much_sea():
+    def rest(order):
+        w = _deep(3, order) if order != "shallow" else _w()
+        if order == "shallow":
+            w.run.acts_done = 1
+            _at(w, 40, 50)
+        for c in w.crew:
+            c.section, c.fatigue, c.fear = 2, 0.6, 0.1
+        w.tick_no = 2
+        w.tick()
+        return sum(c.fatigue for c in w.crew)
+    assert rest("test") > rest("deep") > rest("shallow")
+
+
+def test_a_frightened_man_cries_out_at_depth_and_the_boat_gets_louder():
+    heard = 0
+    for seed in range(40):
+        w = _deep(seed)
+        for c in w.crew:
+            c.fear = 0.9
+        n = w.ship.noise
+        for _ in range(10):
+            if w.pending is not None:
+                w.choose(w.pending.choices[0].key)
+            w.tick()
+        heard += "presses both hands flat against the hull" in "\n".join(w.log)
+    assert heard >= 25
+    w = _w()
+    w.run.acts_done = 1
+    for c in w.crew:
+        c.fear = 0.9
+    for _ in range(10):
+        if w.pending is not None:
+            w.choose(w.pending.choices[0].key)
+        w.tick()
+    assert "presses both hands flat" not in "\n".join(w.log)         # at sixty metres nobody does
+
+
+def test_the_headsets_are_fuller_and_the_voices_likelier_in_the_deep():
+    def kinds(order):
+        n = {"echo": 0, "voice": 0, "morse": 0}
+        for seed in range(80):
+            w = _deep(seed, order) if order != "shallow" else _w(seed)
+            if order == "shallow":
+                w.run.acts_done = 1
+                _at(w, 40, 50)
+            for c in w.crew:
+                c.fear, c.fatigue = 0.5, 0.5
+            w.ship.attention = 0.4
+            w.deck.names_learned.update({1, 2, 3})
+            for _ in range(8):
+                if w.pending is not None:
+                    w.choose(w.pending.choices[0].key)
+                w.ship.hull = 1.0
+                w.tick()
+            for p in w.deck.phantoms:
+                n[p.kind] += 1
+        return n
+    deep, shallow = kinds("deep"), kinds("shallow")
+    assert sum(deep.values()) > sum(shallow.values()) and deep["voice"] > shallow["voice"]
+
+
+def test_a_man_who_cannot_bear_the_depth_is_a_decision_with_three_costs():
+    w = _deep()
+    for c in w.crew:
+        c.fear = 0.2
+    w.crew[5].fear = 0.8
+    w.engine.fire(w.engine.events["pressure_breaks_a_man"], w)
+    assert {c.key for c in w.pending.choices} == {"station", "up", "sedate"}
+    assert w.event_target is w.crew[5]
+    w.choose("up")
+    assert w.ship.depth_order == "shallow" and w.crew[5].fear < 0.8
+
+
+def test_the_knocking_comes_only_to_a_boat_that_is_deep_and_watched():
+    w = _deep()
+    w.ship.attention = 0.3
+    assert w.engine.events["knocking_below"]
+    from dread.conditions import evaluate
+    ev = w.engine.events["knocking_below"]
+    assert evaluate(ev["requires"], w)
+    w.ship.attention = 0.1
+    assert not evaluate(ev["requires"], w)
+    w2 = _w()
+    w2.ship.attention = 0.5
+    assert not evaluate(ev["requires"], w2)

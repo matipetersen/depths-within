@@ -212,6 +212,15 @@ def tick(w):
         elif d > crush - 30 and w.rng.random() < 0.1:
             s.hull = clamp(s.hull - 0.05)
             w.log.append(f"[{t:03d}] A frame buckles with a sound like a gun. The hull is nearer its limit than the gauge says.")
+        if d >= 120:                                                   # the deeper, the nearer to what listens
+            s.attention = clamp(s.attention + 0.0015 * (d / 60.0 - 1.0))
+            afraid = [c for c in live if c.fear > 0.6]
+            if afraid and w.rng.random() < (0.03 if d < 180 else 0.06) * len(afraid):
+                man = max(afraid, key=lambda c: c.fear)
+                s.noise = clamp(s.noise + 0.1)
+                for c in live:
+                    c.fear = clamp(c.fear + 0.02)
+                w.log.append(f"[{t:03d}] {man.name} cries out and presses both hands flat against the hull, as if to hold it.")
         if s.depth_order == "deep":
             for c in live:
                 c.fear = clamp(c.fear + 0.0015)

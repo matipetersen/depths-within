@@ -783,3 +783,12 @@ Existencias por clase (vapor 6, eléctrico 4, acústico 2; el total sigue siendo
 - **Visibilidad desde el puente:** los vigías descansados la amplían (×1,2) y los agotados la reducen (hasta ×0,84).
 - **Escotilla.** Zambullirse lo hace la dotación de cubierta; asustada, agotada o inexistente, la escotilla no cierra y el barco se queda dos horas más en superficie.
 - **Encuentro.** El paso "hacer el encuentro" de la misión 4 exige un hombre de cubierta para las amarras y las señales.
+
+## 16.4 La profundidad como terreno del miedo
+La profundidad ya no es solo "esconderse a cambio de crujidos": es una apuesta psicológica.
+- **Protege del enemigo, acerca a la presencia.** Bajo 120 m la atención crece cada hora (`0,0015 × (m/60 − 1)`: más cuanto más hondo), mientras que en el combate la banda de profundidad sigue reduciendo los impactos y emerger la baja.
+- **Nadie duerme bien:** el descanso fuera de guardia rinde 80 % a 120 m y 60 % a 180 m.
+- **El miedo se oye.** Con hombres de miedo alto, cada hora hay probabilidad de que uno grite y apriete las manos contra el casco: el barco hace ruido (+0,1) y los demás se asustan; el riesgo se duplica a 180 m.
+- **Más cargado el hidrófono.** A 120 m o más nacen más ecos y las voces son más probables (con nombres aprendidos).
+- **Dos eventos propios.** "La presión quiebra a un hombre" (volver a su puesto, subir a 60 m o sedarlo; cada una tiene su coste) y "los golpes bajo la quilla" (tres golpes, la sonda no ve nada). Ambos con par mundano/inquietante.
+- A eso se suman los de §16.1 (el casco que cede, la sonda que no devuelve nada, el hundimiento sin orden).

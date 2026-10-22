@@ -262,6 +262,9 @@ def apply_effects(effects: List[dict], world, target=None):
         elif op == "engage_order":
             from . import combat
             combat.order(world, fx["order"])
+        elif op == "depth_order":
+            ship.depth_order = fx["value"]
+            ship.depth_extra = 0
         elif op == "emergency_surface":
             ship.surfaced = True
             ship.scope_up = False

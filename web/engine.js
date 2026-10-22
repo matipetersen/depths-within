@@ -366,9 +366,10 @@
       const sonarOps = live.filter((c) => c.role === 'sonar');
       if (sonarOps.length && this.phantoms.length < 4) {
         const op = maxBy(sonarOps, (c) => c.fear + c.fatigue);
-        const pSpawn = 0.01 + 0.05 * ship.attention + 0.015 * (op.fear + op.fatigue);
+        const deep = world.depth_m >= 120;
+        const pSpawn = 0.01 + 0.05 * ship.attention + 0.015 * (op.fear + op.fatigue) + (deep ? 0.02 : 0.0);
         if (ship.sonar_on && rng.random() < pSpawn) {
-          let kind = rng.choice(['echo', 'echo', 'voice', 'morse']);
+          let kind = rng.choice(deep ? ['echo', 'voice', 'voice', 'morse'] : ['echo', 'echo', 'voice', 'morse']);
           if (kind === 'voice' && this.names_learned.size === 0) kind = 'echo';
           this.spawn(kind, [op.id], 0.3, '', rng, crew);
         }
@@ -535,6 +536,8 @@
         trafficAct(world, fx.action);
       } else if (op === 'engage_order') {
         engageOrder(world, fx.order);
+      } else if (op === 'depth_order') {
+        world.ship.depth_order = fx.value; world.ship.depth_extra = 0;
       } else if (op === 'emergency_surface') {
         const sh = world.ship;
         sh.surfaced = true; sh.scope_up = false; sh.depth_extra = 0; sh.flags.delete('sinking');
@@ -879,6 +882,16 @@
       const crush = crushDepth(s.hull);
       if (d >= crush) { s.hull = 0.0; w.log.push(`${tag(t)} The pressure hull gives at ${d} metres. It is very quick, and nobody is left to be surprised.`); }
       else if (d > crush - 30 && w.rng.random() < 0.1) { s.hull = clamp(s.hull - 0.05); w.log.push(`${tag(t)} A frame buckles with a sound like a gun. The hull is nearer its limit than the gauge says.`); }
+      if (d >= 120) {
+        s.attention = clamp(s.attention + 0.0015 * (d / 60.0 - 1.0));
+        const afraid = live.filter((c) => c.fear > 0.6);
+        if (afraid.length && w.rng.random() < (d < 180 ? 0.03 : 0.06) * afraid.length) {
+          const man = maxBy(afraid, (c) => c.fear);
+          s.noise = clamp(s.noise + 0.1);
+          for (const c of live) c.fear = clamp(c.fear + 0.02);
+          w.log.push(`${tag(t)} ${man.name} cries out and presses both hands flat against the hull, as if to hold it.`);
+        }
+      }
       if (s.depth_order === 'deep') {
         for (const c of live) c.fear = clamp(c.fear + 0.0015);
         if (s.hull < 0.6 && w.rng.random() < 0.02) { s.hull = clamp(s.hull - 0.02); w.log.push(`${tag(t)} A seam weeps at 120 metres.`); }
@@ -1135,14 +1148,14 @@
       s.noise = clamp(base + (s.noise - base) * 0.6);
       for (const k of Object.keys(s.routines)) s.routines[k] = clamp(s.routines[k] - 0.008);
       if (s.rest_cancelled) s.routines.watches = clamp(s.routines.watches - 0.01);
-      const routine = s.routine, cohesion = s.cohesion;
+      const routine = s.routine, cohesion = s.cohesion, depth = depthM(this);
       for (const c of live) {
         const onWatch = Math.floor(this.tick_no / 4) % 3 === c.section;
         if (s.stand_down) c.fatigue = clamp(c.fatigue + (onWatch ? 0.005 : -0.03));
         else if (onWatch) c.fatigue = clamp(c.fatigue + 0.015);
         else if (s.rest_cancelled) c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE);
         else {
-          const quality = (s.co2 > 0.015 ? 0.5 : 1.0) * (c.fear > 0.6 ? 0.5 : 1.0) * ({ ok: 1.0, damaged: 0.7, dead: 0.4 }[systemState(this, 'crew quarters')]);
+          const quality = (s.co2 > 0.015 ? 0.5 : 1.0) * (c.fear > 0.6 ? 0.5 : 1.0) * (depth < 120 ? 1.0 : depth < 180 ? 0.8 : 0.6) * ({ ok: 1.0, damaged: 0.7, dead: 0.4 }[systemState(this, 'crew quarters')]);
           c.fatigue = clamp(c.fatigue - 0.012 * quality);
         }
         if (s.co2 > 0.015) c.fatigue = clamp(c.fatigue + 0.003);

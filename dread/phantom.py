@@ -107,9 +107,10 @@ class SonarDeck:
         sonar_ops = [c for c in live if c.role == "sonar"]
         if sonar_ops and len(self.phantoms) < 4:
             op = max(sonar_ops, key=lambda c: c.fear + c.fatigue)
-            p_spawn = 0.01 + 0.05 * ship.attention + 0.015 * (op.fear + op.fatigue)
+            deep = world.depth_m >= 120                       # down there the headsets are fuller, and the voices likelier
+            p_spawn = 0.01 + 0.05 * ship.attention + 0.015 * (op.fear + op.fatigue) + (0.02 if deep else 0.0)
             if ship.sonar_on and rng.random() < p_spawn:
-                kind = rng.choice(["echo", "echo", "voice", "morse"])
+                kind = rng.choice(["echo", "voice", "voice", "morse"] if deep else ["echo", "echo", "voice", "morse"])
                 if kind == "voice" and not self.names_learned:
                     kind = "echo"
                 self.spawn(kind, {op.id}, intensity=0.3, rng=rng, crew=crew)

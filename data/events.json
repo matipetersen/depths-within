@@ -5589,6 +5589,186 @@
           ]
         }
       ]
+    },
+    {
+      "id": "pressure_breaks_a_man",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 28,
+      "target": {
+        "select": "highest",
+        "stat": "fear"
+      },
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "crew_where": {
+              "stat": "fear",
+              "op": ">=",
+              "value": 0.55
+            }
+          }
+        ]
+      },
+      "text": "{target} has stopped answering. He stands with his back to a frame, eyes shut, counting the groans of the hull aloud. He says the sea is leaning, and that it is not leaning evenly.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.4
+      },
+      "mundane_cause": "Pressure, a long dive and a tired man: it happens to submariners in every navy.",
+      "uncanny_cause": "He is right about the sea. It is leaning toward one side of the boat.",
+      "effects": [],
+      "choices": [
+        {
+          "key": "station",
+          "text": "Order him back to his station.",
+          "tags": [
+            "mission",
+            "comply"
+          ],
+          "cost": "He goes. The others see how it was done.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "guilt",
+              "value": 0.05
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.03
+            }
+          ]
+        },
+        {
+          "key": "up",
+          "text": "Take her up to sixty metres.",
+          "tags": [
+            "care",
+            "retreat"
+          ],
+          "cost": "The hiding is over, and what is above you does not know what you gave up.",
+          "effects": [
+            {
+              "op": "depth_order",
+              "value": "shallow"
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": 0.03
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "fear",
+              "value": -0.02
+            }
+          ]
+        },
+        {
+          "key": "sedate",
+          "text": "Have the medic sedate him.",
+          "tags": [
+            "care",
+            "listen"
+          ],
+          "cost": "He sleeps. The boat is a man short, and knows it.",
+          "effects": [
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fear",
+              "value": -0.25
+            },
+            {
+              "op": "crew",
+              "who": "target",
+              "stat": "fatigue",
+              "value": 0.1
+            },
+            {
+              "op": "crew",
+              "who": "all",
+              "stat": "trust",
+              "value": -0.01
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "knocking_below",
+      "acts": [
+        2,
+        3
+      ],
+      "cooldown": 30,
+      "requires": {
+        "all": [
+          {
+            "path": "world.depth_m",
+            "op": ">=",
+            "value": 120
+          },
+          {
+            "path": "ship.attention",
+            "op": ">=",
+            "value": 0.25
+          }
+        ]
+      },
+      "text": "Three knocks, from beneath the keel. Slow, evenly spaced, the way a man knocks when he is sure of being answered. The sounder reports eighty metres of water below the boat, and nothing in it.",
+      "mundane_when": {
+        "path": "crew.avg.fatigue",
+        "op": ">=",
+        "value": 0.35
+      },
+      "mundane_cause": "The hull settling against the pressure, and a sounder whose echo returns late.",
+      "uncanny_cause": "There is something under the keel with its knuckles on the steel.",
+      "effects": [
+        {
+          "op": "crew",
+          "who": "role:sonar",
+          "stat": "fear",
+          "value": 0.07
+        },
+        {
+          "op": "phantom",
+          "kind": "echo",
+          "audible": "role:sonar",
+          "intensity": 0.5,
+          "text": "three knocks from beneath the keel, in no hurry"
+        },
+        {
+          "op": "ship",
+          "stat": "attention",
+          "value": 0.02
+        }
+      ]
     }
   ]
 }

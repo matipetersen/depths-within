@@ -238,6 +238,7 @@ class DreadWorld:
         if s.rest_cancelled:
             s.routines["watches"] = clamp(s.routines["watches"] - 0.01)
         routine, cohesion = s.routine, s.cohesion
+        depth = systems.depth_m(self)
         for c in live:
             on_watch = (self.tick_no // 4) % 3 == c.section
             if s.stand_down:
@@ -248,6 +249,7 @@ class DreadWorld:
                 c.fatigue = clamp(c.fatigue + REST_CANCEL_FATIGUE)
             else:
                 quality = ((0.5 if s.co2 > 0.015 else 1.0) * (0.5 if c.fear > 0.6 else 1.0)
+                           * (1.0 if depth < 120 else 0.8 if depth < 180 else 0.6)               # nobody sleeps well under that much sea
                            * {"ok": 1.0, "damaged": 0.7, "dead": 0.4}[systems.system_state(self, "crew quarters")])
                 c.fatigue = clamp(c.fatigue - 0.012 * quality)
             if s.co2 > 0.015:
