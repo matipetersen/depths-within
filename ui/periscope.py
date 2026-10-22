@@ -178,5 +178,3 @@ def draw_ship(buffer, cx, bottom_y, w, h, ship_type):
                 buf_x = line_start_x + c_idx
                 if 0 <= buf_x < width and char != ' ':
                     buffer[buf_y][buf_x] = char
-
-```
